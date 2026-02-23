@@ -1,12 +1,15 @@
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import {
-  clients, sessions, packages, sessionNotes, settings,
+  clients, sessions, packages, sessionNotes, settings, clientForms, referrals, invoices,
   type Client, type InsertClient,
   type Session, type InsertSession,
   type Package, type InsertPackage,
   type SessionNote, type InsertSessionNote,
   type Settings, type InsertSettings,
+  type ClientForm, type InsertClientForm,
+  type Referral, type InsertReferral,
+  type Invoice, type InsertInvoice,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -28,10 +31,27 @@ export interface IStorage {
   updatePackage(id: string, data: Partial<InsertPackage>): Promise<Package | undefined>;
 
   getNotes(): Promise<SessionNote[]>;
+  getNote(id: string): Promise<SessionNote | undefined>;
   createNote(data: InsertSessionNote): Promise<SessionNote>;
+  updateNote(id: string, data: Partial<InsertSessionNote>): Promise<SessionNote | undefined>;
+  deleteNote(id: string): Promise<void>;
 
   getSettings(): Promise<Settings | undefined>;
   upsertSettings(data: InsertSettings): Promise<Settings>;
+
+  getClientForms(): Promise<ClientForm[]>;
+  getClientForm(id: string): Promise<ClientForm | undefined>;
+  createClientForm(data: InsertClientForm): Promise<ClientForm>;
+  updateClientForm(id: string, data: Partial<InsertClientForm>): Promise<ClientForm | undefined>;
+  deleteClientForm(id: string): Promise<void>;
+
+  getReferrals(): Promise<Referral[]>;
+  createReferral(data: InsertReferral): Promise<Referral>;
+  updateReferral(id: string, data: Partial<InsertReferral>): Promise<Referral | undefined>;
+
+  getInvoices(): Promise<Invoice[]>;
+  createInvoice(data: InsertInvoice): Promise<Invoice>;
+  updateInvoice(id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -104,9 +124,23 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(sessionNotes);
   }
 
+  async getNote(id: string): Promise<SessionNote | undefined> {
+    const rows = await db.select().from(sessionNotes).where(eq(sessionNotes.id, id));
+    return rows[0];
+  }
+
   async createNote(data: InsertSessionNote): Promise<SessionNote> {
     const rows = await db.insert(sessionNotes).values(data).returning();
     return rows[0];
+  }
+
+  async updateNote(id: string, data: Partial<InsertSessionNote>): Promise<SessionNote | undefined> {
+    const rows = await db.update(sessionNotes).set(data).where(eq(sessionNotes.id, id)).returning();
+    return rows[0];
+  }
+
+  async deleteNote(id: string): Promise<void> {
+    await db.delete(sessionNotes).where(eq(sessionNotes.id, id));
   }
 
   async getSettings(): Promise<Settings | undefined> {
@@ -121,6 +155,57 @@ export class DatabaseStorage implements IStorage {
       return rows[0];
     }
     const rows = await db.insert(settings).values({ ...data, id: "default" }).returning();
+    return rows[0];
+  }
+
+  async getClientForms(): Promise<ClientForm[]> {
+    return db.select().from(clientForms);
+  }
+
+  async getClientForm(id: string): Promise<ClientForm | undefined> {
+    const rows = await db.select().from(clientForms).where(eq(clientForms.id, id));
+    return rows[0];
+  }
+
+  async createClientForm(data: InsertClientForm): Promise<ClientForm> {
+    const rows = await db.insert(clientForms).values(data).returning();
+    return rows[0];
+  }
+
+  async updateClientForm(id: string, data: Partial<InsertClientForm>): Promise<ClientForm | undefined> {
+    const rows = await db.update(clientForms).set(data).where(eq(clientForms.id, id)).returning();
+    return rows[0];
+  }
+
+  async deleteClientForm(id: string): Promise<void> {
+    await db.delete(clientForms).where(eq(clientForms.id, id));
+  }
+
+  async getReferrals(): Promise<Referral[]> {
+    return db.select().from(referrals);
+  }
+
+  async createReferral(data: InsertReferral): Promise<Referral> {
+    const rows = await db.insert(referrals).values(data).returning();
+    return rows[0];
+  }
+
+  async updateReferral(id: string, data: Partial<InsertReferral>): Promise<Referral | undefined> {
+    const rows = await db.update(referrals).set(data).where(eq(referrals.id, id)).returning();
+    return rows[0];
+  }
+
+  async getInvoices(): Promise<Invoice[]> {
+    return db.select().from(invoices);
+  }
+
+  async createInvoice(data: InsertInvoice): Promise<Invoice> {
+    const rows = await db.insert(invoices).values(data).returning();
+    return rows[0];
+  }
+
+  async updateInvoice(id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined> {
+    const rows = await db.update(invoices).set(data).where(eq(invoices.id, id)).returning();
     return rows[0];
   }
 }
