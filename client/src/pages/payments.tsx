@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Package, CreditCard, ExternalLink, AlertTriangle, FileText, DollarSign, Clock, CheckCircle } from "lucide-react";
+import { Plus, Package, CreditCard, ExternalLink, AlertTriangle, FileText, DollarSign, Clock, CheckCircle, Pencil } from "lucide-react";
 import type { Client, Package as PackageType, Settings, Invoice } from "@shared/schema";
 
 function NewPackageDialog({ open, onOpenChange, clients }: {
@@ -282,9 +282,78 @@ function InvoiceStatusBadge({ status }: { status: string }) {
   );
 }
 
+function EditSessionsDialog({ open, onOpenChange, pkg }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  pkg: PackageType;
+}) {
+  const { toast } = useToast();
+  const [totalSessions, setTotalSessions] = useState(pkg.totalSessions);
+  const [usedSessions, setUsedSessions] = useState(pkg.usedSessions || 0);
+
+  const remaining = totalSessions - usedSessions;
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/packages/${pkg.id}`, { totalSessions, usedSessions });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      toast({ title: "Sessions updated" });
+      onOpenChange(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error updating sessions", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Edit Sessions</DialogTitle>
+          <DialogDescription>{pkg.name}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Total Sessions</Label>
+            <Input
+              type="number"
+              min={1}
+              value={totalSessions}
+              onChange={(e) => setTotalSessions(parseInt(e.target.value) || 1)}
+              data-testid="input-edit-total-sessions"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Used Sessions</Label>
+            <Input
+              type="number"
+              min={0}
+              max={totalSessions}
+              value={usedSessions}
+              onChange={(e) => setUsedSessions(Math.min(parseInt(e.target.value) || 0, totalSessions))}
+              data-testid="input-edit-used-sessions"
+            />
+          </div>
+          <div className="rounded-md bg-accent p-3 text-center">
+            <p className="text-sm text-muted-foreground">Remaining</p>
+            <p className="text-2xl font-bold" data-testid="text-edit-remaining">{remaining}</p>
+          </div>
+          <Button className="w-full" onClick={() => mutation.mutate()} disabled={mutation.isPending} data-testid="button-save-sessions">
+            {mutation.isPending ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Payments() {
   const [newPackageOpen, setNewPackageOpen] = useState(false);
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
+  const [editingPkg, setEditingPkg] = useState<PackageType | null>(null);
 
   const { data: clients = [], isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -518,6 +587,16 @@ export default function Payments() {
                       {!isMonthly && pkg.price && (
                         <p className="text-xs text-muted-foreground">Price: {pkg.price}</p>
                       )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setEditingPkg(pkg)}
+                        data-testid={`button-edit-sessions-${pkg.id}`}
+                      >
+                        <Pencil className="w-3 h-3 mr-1" />
+                        Edit Sessions
+                      </Button>
                     </CardContent>
                   </Card>
                 );
@@ -589,6 +668,13 @@ export default function Payments() {
 
       <NewPackageDialog open={newPackageOpen} onOpenChange={setNewPackageOpen} clients={clients} />
       <NewInvoiceDialog open={newInvoiceOpen} onOpenChange={setNewInvoiceOpen} clients={clients} />
+      {editingPkg && (
+        <EditSessionsDialog
+          open={!!editingPkg}
+          onOpenChange={(open) => { if (!open) setEditingPkg(null); }}
+          pkg={editingPkg}
+        />
+      )}
     </div>
   );
 }
