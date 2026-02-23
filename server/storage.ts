@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import {
-  clients, sessions, packages, sessionNotes, settings, clientForms, referrals, invoices,
+  clients, trainingSessions, packages, sessionNotes, settings, clientForms, referrals, invoices,
   type Client, type InsertClient,
   type Session, type InsertSession,
   type Package, type InsertPackage,
@@ -79,26 +79,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSessions(): Promise<Session[]> {
-    return db.select().from(sessions);
+    return db.select().from(trainingSessions);
   }
 
   async getSession(id: string): Promise<Session | undefined> {
-    const rows = await db.select().from(sessions).where(eq(sessions.id, id));
+    const rows = await db.select().from(trainingSessions).where(eq(trainingSessions.id, id));
     return rows[0];
   }
 
   async createSession(data: InsertSession): Promise<Session> {
-    const rows = await db.insert(sessions).values(data).returning();
+    const rows = await db.insert(trainingSessions).values(data).returning();
     return rows[0];
   }
 
   async updateSession(id: string, data: Partial<InsertSession>): Promise<Session | undefined> {
-    const rows = await db.update(sessions).set(data).where(eq(sessions.id, id)).returning();
+    const rows = await db.update(trainingSessions).set(data).where(eq(trainingSessions.id, id)).returning();
     return rows[0];
   }
 
   async deleteSession(id: string): Promise<void> {
-    await db.delete(sessions).where(eq(sessions.id, id));
+    await db.delete(trainingSessions).where(eq(trainingSessions.id, id));
   }
 
   async getPackages(): Promise<Package[]> {

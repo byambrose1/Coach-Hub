@@ -2,11 +2,21 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema } from "@shared/schema";
+import { isAuthenticated } from "./replit_integrations/auth";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  app.use("/api/clients", isAuthenticated);
+  app.use("/api/sessions", isAuthenticated);
+  app.use("/api/packages", isAuthenticated);
+  app.use("/api/notes", isAuthenticated);
+  app.use("/api/settings", isAuthenticated);
+  app.use("/api/forms", isAuthenticated);
+  app.use("/api/referrals", isAuthenticated);
+  app.use("/api/invoices", isAuthenticated);
 
   // --- Clients ---
   app.get("/api/clients", async (_req, res) => {

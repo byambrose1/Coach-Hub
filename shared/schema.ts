@@ -21,7 +21,7 @@ export const insertClientSchema = createInsertSchema(clients).omit({ id: true })
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 
-export const sessions = pgTable("sessions", {
+export const trainingSessions = pgTable("training_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   clientId: varchar("client_id").notNull(),
   title: text("title").notNull(),
@@ -34,9 +34,9 @@ export const sessions = pgTable("sessions", {
   notes: text("notes"),
 });
 
-export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true });
+export const insertSessionSchema = createInsertSchema(trainingSessions).omit({ id: true });
 export type InsertSession = z.infer<typeof insertSessionSchema>;
-export type Session = typeof sessions.$inferSelect;
+export type Session = typeof trainingSessions.$inferSelect;
 
 export const packages = pgTable("packages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

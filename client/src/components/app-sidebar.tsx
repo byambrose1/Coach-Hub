@@ -1,5 +1,7 @@
-import { Calendar, Users, CreditCard, FileText, Settings, LayoutDashboard } from "lucide-react";
+import { Calendar, Users, CreditCard, FileText, Settings, LayoutDashboard, LogOut } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +29,7 @@ const bottomItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { user } = useAuth();
 
   return (
     <Sidebar>
@@ -81,6 +84,24 @@ export function AppSidebar() {
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
+        {user && (
+          <div className="p-3 border-t flex items-center gap-3">
+            <Avatar className="w-8 h-8">
+              {user.profileImageUrl && <AvatarImage src={user.profileImageUrl} />}
+              <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                {(user.firstName?.[0] || user.email?.[0] || "C").toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate" data-testid="text-user-name">
+                {user.firstName ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}` : user.email || "Coach"}
+              </p>
+            </div>
+            <a href="/api/logout" data-testid="button-logout" className="text-muted-foreground hover:text-foreground">
+              <LogOut className="w-4 h-4" />
+            </a>
+          </div>
+        )}
       </SidebarFooter>
     </Sidebar>
   );
