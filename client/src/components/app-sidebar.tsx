@@ -1,4 +1,4 @@
-import { Calendar, Users, CreditCard, FileText, Settings, LayoutDashboard, LogOut } from "lucide-react";
+import { Calendar, Users, CreditCard, FileText, Settings, LayoutDashboard, LogOut, Gift } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,6 +21,7 @@ const navItems = [
   { title: "Clients", url: "/clients", icon: Users },
   { title: "Payments", url: "/payments", icon: CreditCard },
   { title: "Notes", url: "/notes", icon: FileText },
+  { title: "Referrals", url: "/referrals", icon: Gift },
 ];
 
 const bottomItems = [

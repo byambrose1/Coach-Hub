@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -10,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, FileText, Search } from "lucide-react";
+import { Plus, FileText, Search, Pencil, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import type { Client, Session, SessionNote } from "@shared/schema";
@@ -52,6 +53,7 @@ function NewNoteDialog({ open, onOpenChange, clients, sessions }: {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add Session Note</DialogTitle>
+          <DialogDescription>Create a new note for a client session.</DialogDescription>
         </DialogHeader>
         <form onSubmit={(e) => {
           e.preventDefault();
@@ -121,10 +123,120 @@ function NewNoteDialog({ open, onOpenChange, clients, sessions }: {
   );
 }
 
+function EditNoteDialog({ note, open, onOpenChange, clients, sessions }: {
+  note: SessionNote;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  clients: Client[];
+  sessions: Session[];
+}) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    clientId: note.clientId,
+    sessionId: note.sessionId || "",
+    content: note.content,
+    date: note.date,
+  });
+
+  const clientSessions = sessions.filter((s) => s.clientId === formData.clientId);
+
+  const mutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await apiRequest("PATCH", `/api/notes/${note.id}`, {
+        ...data,
+        sessionId: data.sessionId === "none" || data.sessionId === "" ? null : data.sessionId,
+        updatedAt: new Date().toISOString(),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notes"] });
+      onOpenChange(false);
+      toast({ title: "Note updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error updating note", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Session Note</DialogTitle>
+          <DialogDescription>Update the details of this note.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          mutation.mutate(formData);
+        }} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Client</Label>
+            <Select value={formData.clientId} onValueChange={(v) => setFormData({ ...formData, clientId: v, sessionId: "" })}>
+              <SelectTrigger data-testid="select-edit-note-client">
+                <SelectValue placeholder="Select a client" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {formData.clientId && clientSessions.length > 0 && (
+            <div className="space-y-2">
+              <Label>Link to Session (optional)</Label>
+              <Select value={formData.sessionId} onValueChange={(v) => setFormData({ ...formData, sessionId: v })}>
+                <SelectTrigger data-testid="select-edit-note-session">
+                  <SelectValue placeholder="Select a session" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No session</SelectItem>
+                  {clientSessions.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.date} · {s.startTime} - {s.sessionType}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label>Date</Label>
+            <Input
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              data-testid="input-edit-note-date"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Note</Label>
+            <Textarea
+              placeholder="Session notes, progress, exercises, measurements..."
+              value={formData.content}
+              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+              className="min-h-[120px]"
+              required
+              data-testid="input-edit-note-content"
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={!formData.clientId || !formData.content || mutation.isPending} data-testid="button-submit-edit-note">
+            {mutation.isPending ? "Updating..." : "Update Note"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Notes() {
   const [newNoteOpen, setNewNoteOpen] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<SessionNote | null>(null);
+  const [deleteNote, setDeleteNote] = useState<SessionNote | null>(null);
   const [search, setSearch] = useState("");
   const [clientFilter, setClientFilter] = useState("all");
+  const { toast } = useToast();
 
   const { data: notes = [], isLoading: notesLoading } = useQuery<SessionNote[]>({
     queryKey: ["/api/notes"],
@@ -136,6 +248,20 @@ export default function Notes() {
 
   const { data: sessions = [] } = useQuery<Session[]>({
     queryKey: ["/api/sessions"],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/notes/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notes"] });
+      setDeleteNote(null);
+      toast({ title: "Note deleted" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error deleting note", description: err.message, variant: "destructive" });
+    },
   });
 
   const isLoading = notesLoading || clientsLoading;
@@ -215,7 +341,7 @@ export default function Notes() {
       ) : (
         <div className="space-y-3">
           {filtered.map((note) => (
-            <Card key={note.id} data-testid={`card-note-${note.id}`}>
+            <Card key={note.id} data-testid={`card-note-${note.id}`} className="group">
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
                   <Avatar className="w-8 h-8 flex-shrink-0 mt-0.5">
@@ -226,7 +352,32 @@ export default function Notes() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <p className="text-sm font-medium">{clientMap.get(note.clientId) || "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground flex-shrink-0">{note.date}</p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-1">
+                          {note.updatedAt && (
+                            <span className="text-xs text-muted-foreground italic" data-testid={`text-edited-${note.id}`}>edited</span>
+                          )}
+                          <p className="text-xs text-muted-foreground">{note.date}</p>
+                        </div>
+                        <div className="flex items-center gap-1 invisible group-hover:visible">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setSelectedNote(note)}
+                            data-testid={`button-edit-note-${note.id}`}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setDeleteNote(note)}
+                            data-testid={`button-delete-note-${note.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{note.content}</p>
                   </div>
@@ -238,6 +389,37 @@ export default function Notes() {
       )}
 
       <NewNoteDialog open={newNoteOpen} onOpenChange={setNewNoteOpen} clients={clients} sessions={sessions} />
+
+      {selectedNote && (
+        <EditNoteDialog
+          note={selectedNote}
+          open={!!selectedNote}
+          onOpenChange={(open) => { if (!open) setSelectedNote(null); }}
+          clients={clients}
+          sessions={sessions}
+        />
+      )}
+
+      <AlertDialog open={!!deleteNote} onOpenChange={(open) => { if (!open) setDeleteNote(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Note</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this note? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-note">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (deleteNote) deleteMutation.mutate(deleteNote.id); }}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-note"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

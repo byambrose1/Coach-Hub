@@ -14,6 +14,7 @@ import Clients from "@/pages/clients";
 import Payments from "@/pages/payments";
 import Notes from "@/pages/notes";
 import SettingsPage from "@/pages/settings";
+import Referrals from "@/pages/referrals";
 import Landing from "@/pages/landing";
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/clients" component={Clients} />
       <Route path="/payments" component={Payments} />
       <Route path="/notes" component={Notes} />
+      <Route path="/referrals" component={Referrals} />
       <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>

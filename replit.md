@@ -1,42 +1,61 @@
 # FitTrack - Solo Coach Dashboard
 
 ## Overview
-A simple fitness trainer app designed for solo coaches who see clients in person and online. Streamlines all client data in one place with schedule management, client profiles, session packages, payments, and notes.
+A fitness trainer app designed for solo coaches managing in-person and online clients. Features authentication via Replit Auth, client management with health forms (PARQs), editable session notes, referral tracking with rewards, flexible payment options (block sessions and monthly billing), invoicing, HIPAA compliance options, and notification settings.
 
 ## Tech Stack
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS + shadcn/ui
 - **Backend**: Express.js + TypeScript
 - **Database**: PostgreSQL with Drizzle ORM
+- **Auth**: Replit Auth (OpenID Connect) via Passport.js
 - **Routing**: wouter (frontend), Express (backend)
 - **State**: TanStack React Query
 
 ## Project Structure
-- `client/src/pages/` - Dashboard, Schedule, Clients, Payments, Notes, Settings
+- `client/src/pages/` - Landing, Dashboard, Schedule, Clients, Payments, Notes, Referrals, Settings
 - `client/src/components/` - AppSidebar, shadcn UI components
+- `client/src/hooks/use-auth.ts` - Authentication hook (fetches /api/auth/user)
 - `server/` - Express server, routes, storage layer, database connection, seed data
-- `shared/schema.ts` - Drizzle schema definitions (clients, sessions, packages, sessionNotes, settings)
+- `server/replit_integrations/auth/` - Replit Auth setup (passport, OIDC, session store)
+- `shared/schema.ts` - Drizzle schema definitions
 
 ## Key Features
+- **Auth**: Replit Auth (OIDC) login/logout, route protection via isAuthenticated middleware
+- **Landing Page**: Split-screen design for unauthenticated users
 - **Dashboard**: Today's schedule, stats, upcoming sessions, low session alerts
-- **Schedule**: Weekly calendar view, book sessions (1:1, group, online, outdoor), mark complete/cancel
-- **Clients**: Client profiles with session history, packages, notes in a detail dialog
-- **Payments**: Session packages with usage tracking, progress bars, low session alerts
-- **Notes**: Session notes with client filter and search
-- **Settings**: Trainer profile, cancellation policy, payment link, notification threshold
+- **Schedule**: Monthly calendar view with day detail dialog, book sessions (1:1, group, online, outdoor), mark complete/cancel
+- **Clients**: Client profiles with edit dialog, PARQ health forms tab, session history, packages, notes
+- **Payments**: Session packages (block & monthly billing), invoicing with create/mark paid, summary stats
+- **Notes**: Session notes with edit/delete, "edited" indicator, client filter and search
+- **Referrals**: Referral tracking, convert/reward workflow, stats dashboard
+- **Settings**: Profile, cancellation policy, payment settings, email notifications (stub), session reminders, HIPAA compliance, data retention, subscription info, account deletion
 
 ## Database Tables
-- `clients` - name, email, phone, notes, sessionType, status
-- `sessions` - clientId, title, date, startTime, endTime, sessionType, location, status, notes
-- `packages` - clientId, name, totalSessions, usedSessions, price, status
-- `session_notes` - sessionId, clientId, content, date
-- `settings` - trainerName, businessName, cancellationPolicy, paymentLink, lowSessionThreshold
+- `clients` - name, email, phone, notes, sessionType, status, referredBy, referralCode
+- `training_sessions` (NOT `sessions`) - clientId, title, date, startTime, endTime, sessionType, location, status, notes
+- `sessions` - Auth session storage (connect-pg-simple)
+- `packages` - clientId, name, totalSessions, usedSessions, price, status, billingType, monthlyRate, nextBillingDate
+- `session_notes` - sessionId, clientId, content, date, updatedAt
+- `settings` - trainerName, businessName, trainerEmail, trainerPhone, businessAddress, cancellationPolicy, paymentLink, acceptedPaymentMethods, invoicePrefix, lowSessionThreshold, enableEmailNotifications, enableSessionReminders, reminderHoursBefore, subscriptionStatus, subscriptionPlan, hipaaCompliant, dataRetentionDays, termsAccepted
+- `client_forms` - clientId, formType, title, responses (JSON), status, date, updatedAt
+- `referrals` - referrerClientId, referredClientId, referredName, referredEmail, referredPhone, status, rewardType, rewardApplied, date, notes
+- `invoices` - clientId, packageId, invoiceNumber, amount, status, dueDate, sentDate, paidDate, notes, paymentMethod
 
-## API Routes (all prefixed with /api)
+## CRITICAL: Table Naming
+- App training sessions use `training_sessions` table (Drizzle: `trainingSessions`)
+- Auth sessions use `sessions` table (managed by connect-pg-simple)
+- API routes use `/api/sessions` but map to `training_sessions` table
+
+## API Routes (all prefixed with /api, all protected by isAuthenticated)
+- Auth: GET /api/auth/user, GET /api/login, GET /api/logout, GET /api/callback
 - GET/POST /clients, GET/PATCH/DELETE /clients/:id
 - GET/POST /sessions, GET/PATCH/DELETE /sessions/:id
 - GET/POST /packages, PATCH /packages/:id
-- GET/POST /notes
+- GET/POST /notes, PATCH/DELETE /notes/:id
 - GET/PUT /settings
+- GET/POST /forms, GET/PATCH/DELETE /forms/:id
+- GET/POST /referrals, PATCH /referrals/:id
+- GET/POST /invoices, PATCH /invoices/:id
 
 ## Running
 - `npm run dev` starts both frontend and backend on port 5000
