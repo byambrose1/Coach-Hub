@@ -729,10 +729,19 @@ export default function Payments() {
 
   const activePackages = packages.filter((p) => p.status === "active");
   const lowPackages = activePackages.filter((p) => p.billingType !== "monthly" && (p.totalSessions - (p.usedSessions || 0)) <= 2);
-  const monthlyRevenue = activePackages
-    .filter((p) => p.billingType === "monthly" && p.monthlyRate)
-    .reduce((sum, p) => sum + (parseFloat(p.monthlyRate!.replace(/[^0-9.]/g, "")) || 0), 0);
-  const pendingInvoices = invoices.filter((inv) => inv.status === "pending" || inv.status === "overdue");
+  
+  const calculateRevenue = () => {
+    const monthlyRevenue = activePackages
+      .filter((p) => p.billingType === "monthly" && p.monthlyRate)
+      .reduce((sum, p) => sum + (parseFloat(p.monthlyRate!.replace(/[^0-9.]/g, "")) || 0), 0);
+    
+    const pendingInvoices = invoices.filter((inv) => inv.status === "pending" || inv.status === "sent" || inv.status === "overdue");
+    const pendingTotal = pendingInvoices.reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
+    
+    return { monthlyRevenue, pendingInvoices, pendingTotal };
+  };
+
+  const { monthlyRevenue, pendingInvoices, pendingTotal } = calculateRevenue();
 
   if (isLoading) {
     return (
@@ -785,8 +794,8 @@ export default function Payments() {
               <Clock className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold" data-testid="stat-pending-invoices">{pendingInvoices.length}</p>
-              <p className="text-xs text-muted-foreground">Pending Invoices</p>
+              <p className="text-2xl font-bold" data-testid="stat-pending-invoices">{currency}{pendingTotal.toFixed(0)}</p>
+              <p className="text-xs text-muted-foreground">{pendingInvoices.length} Pending Invoices</p>
             </div>
           </CardContent>
         </Card>
@@ -887,11 +896,14 @@ export default function Payments() {
                           <p className="font-medium text-sm">{clientMap.get(pkg.clientId) || "Unknown"}</p>
                           <p className="text-xs text-muted-foreground">{pkg.name}</p>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <Badge variant="secondary" className="text-xs" data-testid={`badge-billing-type-${pkg.id}`}>
-                            {isMonthly ? "Monthly" : "Block"}
-                          </Badge>
-                          {!isMonthly && (
+                <div className="flex flex-col items-end gap-1">
+                  <Badge variant="secondary" className="text-xs" data-testid={`badge-billing-type-${pkg.id}`}>
+                    {isMonthly ? "Monthly" : "Block"}
+                  </Badge>
+                  {isMonthly && pkg.nextBillingDate && (
+                    <p className="text-[10px] text-muted-foreground">Next: {formatDateUK(pkg.nextBillingDate)}</p>
+                  )}
+                  {!isMonthly && (
                             <Badge
                               variant={pkg.status === "active" ? (isLow ? "destructive" : "default") : "secondary"}
                               className="text-xs"

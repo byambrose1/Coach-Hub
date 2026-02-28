@@ -103,10 +103,20 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
 </body>
 </html>`;
 
-  await brevo.transactionalEmails.sendTransacEmail({
-    subject: `Invoice ${invoiceNumber} from ${senderName}`,
-    htmlContent,
-    sender: { name: senderName, email: senderEmail },
-    to: [{ email: clientEmail, name: clientName }],
-  });
+  try {
+    console.log(`Attempting to send invoice email to ${clientEmail} via Brevo...`);
+    const response = await brevo.transactionalEmails.sendTransacEmail({
+      subject: `Invoice ${invoiceNumber} from ${senderName}`,
+      htmlContent,
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: clientEmail, name: clientName }],
+    });
+    console.log(`Brevo response:`, JSON.stringify(response));
+  } catch (error: any) {
+    console.error(`Failed to send email via Brevo:`, error);
+    if (error.response) {
+      console.error(`Brevo error response body:`, JSON.stringify(error.response.body));
+    }
+    throw error;
+  }
 }

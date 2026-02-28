@@ -108,6 +108,16 @@ export async function registerRoutes(
   app.patch("/api/packages/:id", async (req, res) => {
     const pkg = await storage.updatePackage(req.params.id, req.body);
     if (!pkg) return res.status(404).json({ message: "Package not found" });
+    
+    // If billing type changed to monthly, ensure we have a next billing date if not provided
+    if (req.body.billingType === "monthly" && !req.body.nextBillingDate && !pkg.nextBillingDate) {
+      const nextMonth = new Date();
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      await storage.updatePackage(req.params.id, { 
+        nextBillingDate: nextMonth.toISOString().split("T")[0] 
+      });
+    }
+    
     res.json(pkg);
   });
 
