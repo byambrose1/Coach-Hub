@@ -50,6 +50,7 @@ export interface IStorage {
   updateReferral(id: string, data: Partial<InsertReferral>): Promise<Referral | undefined>;
 
   getInvoices(): Promise<Invoice[]>;
+  getInvoice(id: string): Promise<Invoice | undefined>;
   createInvoice(data: InsertInvoice): Promise<Invoice>;
   updateInvoice(id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined>;
 }
@@ -197,6 +198,11 @@ export class DatabaseStorage implements IStorage {
 
   async getInvoices(): Promise<Invoice[]> {
     return db.select().from(invoices);
+  }
+
+  async getInvoice(id: string): Promise<Invoice | undefined> {
+    const rows = await db.select().from(invoices).where(eq(invoices.id, id));
+    return rows[0];
   }
 
   async createInvoice(data: InsertInvoice): Promise<Invoice> {

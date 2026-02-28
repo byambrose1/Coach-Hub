@@ -57,7 +57,7 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - GET/PUT /settings
 - GET/POST /forms, GET/PATCH/DELETE /forms/:id
 - GET/POST /referrals, PATCH /referrals/:id
-- GET/POST /invoices, PATCH /invoices/:id
+- GET/POST /invoices, PATCH /invoices/:id, POST /invoices/:id/send
 
 ## Running
 - `npm run dev` starts both frontend and backend on port 5000
@@ -67,3 +67,11 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - All dates displayed in UK format: DD/MM/YYYY (using date-fns `dd/MM/yyyy`)
 - Currency configurable in Settings (default £, options: £/$/€)
 - Currency stored in `settings.currency` field
+
+## Email (Brevo)
+- Invoice sending uses Brevo transactional email API (`@getbrevo/brevo` SDK)
+- API key stored in `BREVO_API_KEY` environment secret
+- Email service: `server/email.ts` - `sendInvoiceEmail()` function
+- Sender email comes from `settings.trainerEmail`; sender name from `settings.businessName` or `settings.trainerName`
+- Important: The sender email must be a verified sender in your Brevo account
+- POST `/api/invoices/:id/send` triggers email delivery and marks invoice as "sent"

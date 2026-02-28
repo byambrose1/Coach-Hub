@@ -397,15 +397,12 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
 
   const sendMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PATCH", `/api/invoices/${invoice.id}`, {
-        status: "sent",
-        sentDate: new Date().toISOString().split("T")[0],
-      });
+      const res = await apiRequest("POST", `/api/invoices/${invoice.id}/send`);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ title: "Invoice marked as sent", description: "Email sending coming soon." });
+      toast({ title: "Invoice sent", description: "Invoice emailed to client successfully." });
     },
     onError: (err: Error) => {
       toast({ title: "Error sending invoice", description: err.message, variant: "destructive" });

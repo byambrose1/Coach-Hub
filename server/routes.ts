@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema } from "@shared/schema";
 import { isAuthenticated } from "./replit_integrations/auth";
+import { sendInvoiceEmail } from "./email";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -226,6 +227,45 @@ export async function registerRoutes(
     const inv = await storage.updateInvoice(req.params.id, req.body);
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
     res.json(inv);
+  });
+
+  app.post("/api/invoices/:id/send", async (req, res) => {
+    try {
+      const inv = await storage.getInvoice(req.params.id);
+      if (!inv) return res.status(404).json({ message: "Invoice not found" });
+
+      const client = await storage.getClient(inv.clientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!client.email) return res.status(400).json({ message: "Client has no email address" });
+
+      const s = await storage.getSettings();
+      const currency = s?.currency || "£";
+
+      await sendInvoiceEmail({
+        clientName: client.name,
+        clientEmail: client.email,
+        invoiceNumber: inv.invoiceNumber,
+        amount: inv.amount,
+        currency,
+        dueDate: inv.dueDate,
+        notes: inv.notes || undefined,
+        trainerName: s?.trainerName || "Coach",
+        businessName: s?.businessName || "",
+        businessAddress: s?.businessAddress || undefined,
+        trainerEmail: s?.trainerEmail || undefined,
+        paymentLink: s?.paymentLink || undefined,
+      });
+
+      const updated = await storage.updateInvoice(req.params.id, {
+        status: "sent",
+        sentDate: new Date().toISOString().split("T")[0],
+      });
+
+      res.json(updated);
+    } catch (err: any) {
+      console.error("Error sending invoice email:", err);
+      res.status(500).json({ message: err.message || "Failed to send invoice email" });
+    }
   });
 
   return httpServer;
