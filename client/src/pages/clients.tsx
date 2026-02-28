@@ -13,8 +13,17 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X } from "lucide-react";
+import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import type { Client, Session, Package as PackageType, SessionNote, ClientForm } from "@shared/schema";
+
+function formatDateUK(dateStr: string): string {
+  try {
+    return format(parseISO(dateStr), "dd/MM/yyyy");
+  } catch {
+    return dateStr;
+  }
+}
 
 function NewClientDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
@@ -75,7 +84,7 @@ function NewClientDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
             <div className="space-y-2">
               <Label>Phone</Label>
               <Input
-                placeholder="+1 234 567 890"
+                placeholder="+44 7700 900000"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 data-testid="input-client-phone"
@@ -139,6 +148,20 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
     status: client.status || "active",
   });
   const [parqAnswers, setParqAnswers] = useState<Record<number, boolean>>({});
+
+  const [newNoteContent, setNewNoteContent] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteContent, setEditingNoteContent] = useState("");
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+
+  const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
+  const [editPkgTotal, setEditPkgTotal] = useState(0);
+  const [editPkgUsed, setEditPkgUsed] = useState(0);
+
+  const { data: allClients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+  });
+  const currentClient = allClients.find(c => c.id === client.id) || client;
 
   const { data: sessions = [] } = useQuery<Session[]>({
     queryKey: ["/api/sessions"],
@@ -220,6 +243,73 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
     },
   });
 
+  const createNoteMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const res = await apiRequest("POST", "/api/notes", {
+        clientId: client.id,
+        content,
+        date: new Date().toISOString().split("T")[0],
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notes"] });
+      setNewNoteContent("");
+      toast({ title: "Note added" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error adding note", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      const res = await apiRequest("PATCH", `/api/notes/${id}`, {
+        content,
+        updatedAt: new Date().toISOString(),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notes"] });
+      setEditingNoteId(null);
+      setEditingNoteContent("");
+      toast({ title: "Note updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error updating note", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/notes/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notes"] });
+      setDeletingNoteId(null);
+      toast({ title: "Note deleted" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error deleting note", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updatePkgMutation = useMutation({
+    mutationFn: async ({ id, totalSessions, usedSessions }: { id: string; totalSessions: number; usedSessions: number }) => {
+      const res = await apiRequest("PATCH", `/api/packages/${id}`, { totalSessions, usedSessions });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      setEditingPkgId(null);
+      toast({ title: "Package updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error updating package", description: err.message, variant: "destructive" });
+    },
+  });
+
   const handleCloseDialog = () => {
     setIsEditing(false);
     setShowDeleteConfirm(false);
@@ -227,12 +317,12 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
     setViewingForm(null);
     setParqAnswers({});
     setEditData({
-      name: client.name,
-      email: client.email || "",
-      phone: client.phone || "",
-      notes: client.notes || "",
-      sessionType: client.sessionType || "1:1",
-      status: client.status || "active",
+      name: currentClient.name,
+      email: currentClient.email || "",
+      phone: currentClient.phone || "",
+      notes: currentClient.notes || "",
+      sessionType: currentClient.sessionType || "1:1",
+      status: currentClient.status || "active",
     });
     onClose();
   };
@@ -245,23 +335,23 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
             <DialogTitle className="flex items-center gap-3">
               <Avatar className="w-10 h-10">
                 <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                  {client.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                  {currentClient.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-left truncate">{client.name}</p>
+                  <p className="text-left truncate">{currentClient.name}</p>
                   <Button
                     size="icon"
                     variant="ghost"
                     onClick={() => {
                       setEditData({
-                        name: client.name,
-                        email: client.email || "",
-                        phone: client.phone || "",
-                        notes: client.notes || "",
-                        sessionType: client.sessionType || "1:1",
-                        status: client.status || "active",
+                        name: currentClient.name,
+                        email: currentClient.email || "",
+                        phone: currentClient.phone || "",
+                        notes: currentClient.notes || "",
+                        sessionType: currentClient.sessionType || "1:1",
+                        status: currentClient.status || "active",
                       });
                       setIsEditing(true);
                     }}
@@ -279,12 +369,12 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                   </Button>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="secondary" className="text-xs">{client.sessionType || "1:1"}</Badge>
-                  <Badge variant={client.status === "active" ? "default" : "secondary"} className="text-xs">{client.status}</Badge>
+                  <Badge variant="secondary" className="text-xs">{currentClient.sessionType || "1:1"}</Badge>
+                  <Badge variant={currentClient.status === "active" ? "default" : "secondary"} className="text-xs">{currentClient.status}</Badge>
                 </div>
               </div>
             </DialogTitle>
-            <DialogDescription className="sr-only">Details for client {client.name}</DialogDescription>
+            <DialogDescription className="sr-only">Details for client {currentClient.name}</DialogDescription>
           </DialogHeader>
 
           {showDeleteConfirm && (
@@ -312,16 +402,16 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
           )}
 
           <div className="space-y-3">
-            {client.email && (
+            {currentClient.email && (
               <div className="flex items-center gap-2 text-sm">
                 <Mail className="w-4 h-4 text-muted-foreground" />
-                <span>{client.email}</span>
+                <span data-testid="text-client-email">{currentClient.email}</span>
               </div>
             )}
-            {client.phone && (
+            {currentClient.phone && (
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="w-4 h-4 text-muted-foreground" />
-                <span>{client.phone}</span>
+                <span data-testid="text-client-phone">{currentClient.phone}</span>
               </div>
             )}
 
@@ -351,7 +441,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                 clientSessions.slice(0, 10).map((s) => (
                   <div key={s.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-b-0">
                     <div>
-                      <p className="text-sm font-medium">{s.date} · {s.startTime}</p>
+                      <p className="text-sm font-medium">{formatDateUK(s.date)} · {s.startTime}</p>
                       <p className="text-xs text-muted-foreground">{s.sessionType}{s.location ? ` · ${s.location}` : ""}</p>
                     </div>
                     <Badge variant={s.status === "completed" ? "secondary" : s.status === "cancelled" ? "destructive" : "default"} className="text-xs">
@@ -361,42 +451,206 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                 ))
               )}
             </TabsContent>
-            <TabsContent value="packages" className="mt-3 space-y-2">
+
+            <TabsContent value="packages" className="mt-3 space-y-3">
               {clientPackages.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No packages</p>
               ) : (
                 clientPackages.map((p) => {
-                  const remaining = p.totalSessions - (p.usedSessions || 0);
-                  const pct = ((p.usedSessions || 0) / p.totalSessions) * 100;
+                  const isEditingThis = editingPkgId === p.id;
+                  const displayTotal = isEditingThis ? editPkgTotal : p.totalSessions;
+                  const displayUsed = isEditingThis ? editPkgUsed : (p.usedSessions || 0);
+                  const remaining = displayTotal - displayUsed;
+                  const pct = (displayUsed / displayTotal) * 100;
                   return (
-                    <div key={p.id} className="rounded-md border p-3">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <p className="text-sm font-medium">{p.name}</p>
-                        <Badge variant={remaining <= 2 ? "destructive" : "secondary"} className="text-xs">
-                          {remaining} left
-                        </Badge>
+                    <div key={p.id} className="rounded-md border p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-medium">{p.name}</p>
+                          {p.billingType === "monthly" && p.monthlyRate && (
+                            <p className="text-xs text-muted-foreground">{p.monthlyRate}/month</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={remaining <= 2 && p.status === "active" ? "destructive" : "secondary"} className="text-xs">
+                            {remaining} left
+                          </Badge>
+                          {!isEditingThis && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="w-7 h-7"
+                              onClick={() => {
+                                setEditingPkgId(p.id);
+                                setEditPkgTotal(p.totalSessions);
+                                setEditPkgUsed(p.usedSessions || 0);
+                              }}
+                              data-testid={`button-edit-pkg-${p.id}`}
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div className="bg-primary rounded-full h-2 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">{p.usedSessions || 0} / {p.totalSessions} sessions used{p.price ? ` · ${p.price}` : ""}</p>
+
+                      {isEditingThis ? (
+                        <div className="space-y-3 pt-2 border-t">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Total</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={editPkgTotal}
+                                onChange={(e) => setEditPkgTotal(parseInt(e.target.value) || 1)}
+                                data-testid="input-pkg-total"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Used</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={editPkgTotal}
+                                value={editPkgUsed}
+                                onChange={(e) => setEditPkgUsed(Math.min(parseInt(e.target.value) || 0, editPkgTotal))}
+                                data-testid="input-pkg-used"
+                              />
+                            </div>
+                          </div>
+                          <div className="rounded-md bg-accent p-2 text-center">
+                            <p className="text-xs text-muted-foreground">Remaining: <span className="font-bold text-sm">{remaining}</span></p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => updatePkgMutation.mutate({ id: p.id, totalSessions: editPkgTotal, usedSessions: editPkgUsed })}
+                              disabled={updatePkgMutation.isPending}
+                              data-testid="button-save-pkg"
+                            >
+                              <Save className="w-3 h-3 mr-1" />
+                              {updatePkgMutation.isPending ? "Saving..." : "Save"}
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={() => setEditingPkgId(null)} data-testid="button-cancel-pkg-edit">
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="w-full bg-muted rounded-full h-2">
+                            <div className="bg-primary rounded-full h-2 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
+                          </div>
+                          <p className="text-xs text-muted-foreground">{p.usedSessions || 0} / {p.totalSessions} sessions used{p.price ? ` · ${p.price}` : ""}</p>
+                        </>
+                      )}
                     </div>
                   );
                 })
               )}
             </TabsContent>
-            <TabsContent value="notes" className="mt-3 space-y-2">
+
+            <TabsContent value="notes" className="mt-3 space-y-3">
+              <div className="space-y-2">
+                <Textarea
+                  placeholder="Add a note..."
+                  value={newNoteContent}
+                  onChange={(e) => setNewNoteContent(e.target.value)}
+                  className="min-h-[60px]"
+                  data-testid="input-new-note"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => createNoteMutation.mutate(newNoteContent)}
+                  disabled={!newNoteContent.trim() || createNoteMutation.isPending}
+                  data-testid="button-add-note"
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  {createNoteMutation.isPending ? "Adding..." : "Add Note"}
+                </Button>
+              </div>
+
               {clientNotes.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No notes yet</p>
               ) : (
                 clientNotes.map((n) => (
-                  <div key={n.id} className="border-b last:border-b-0 py-2">
-                    <p className="text-xs text-muted-foreground">{n.date}</p>
-                    <p className="text-sm mt-1">{n.content}</p>
+                  <div key={n.id} className="border rounded-md p-3 space-y-2" data-testid={`note-item-${n.id}`}>
+                    {deletingNoteId === n.id ? (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-destructive">Delete this note?</p>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => deleteNoteMutation.mutate(n.id)}
+                            disabled={deleteNoteMutation.isPending}
+                            data-testid="button-confirm-delete-note"
+                          >
+                            {deleteNoteMutation.isPending ? "Deleting..." : "Delete"}
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => setDeletingNoteId(null)} data-testid="button-cancel-delete-note">
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : editingNoteId === n.id ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editingNoteContent}
+                          onChange={(e) => setEditingNoteContent(e.target.value)}
+                          className="min-h-[60px]"
+                          data-testid="input-edit-note"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => updateNoteMutation.mutate({ id: n.id, content: editingNoteContent })}
+                            disabled={!editingNoteContent.trim() || updateNoteMutation.isPending}
+                            data-testid="button-save-note"
+                          >
+                            {updateNoteMutation.isPending ? "Saving..." : "Save"}
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => { setEditingNoteId(null); setEditingNoteContent(""); }} data-testid="button-cancel-edit-note">
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-muted-foreground">{formatDateUK(n.date)}</p>
+                            {n.updatedAt && <Badge variant="secondary" className="text-[10px]">edited</Badge>}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="w-6 h-6"
+                              onClick={() => { setEditingNoteId(n.id); setEditingNoteContent(n.content); }}
+                              data-testid={`button-edit-note-${n.id}`}
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="w-6 h-6"
+                              onClick={() => setDeletingNoteId(n.id)}
+                              data-testid={`button-delete-note-${n.id}`}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <p className="text-sm">{n.content}</p>
+                      </>
+                    )}
                   </div>
                 ))
               )}
             </TabsContent>
+
             <TabsContent value="forms" className="mt-3 space-y-3">
               <Button
                 variant="secondary"
@@ -421,7 +675,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                   >
                     <div>
                       <p className="text-sm font-medium">{f.title}</p>
-                      <p className="text-xs text-muted-foreground">{f.date} · {f.formType}</p>
+                      <p className="text-xs text-muted-foreground">{formatDateUK(f.date)} · {f.formType}</p>
                     </div>
                     <Badge variant={f.status === "completed" ? "secondary" : "default"} className="text-xs">
                       {f.status}
@@ -528,7 +782,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
         <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>PAR-Q Health Screening</DialogTitle>
-            <DialogDescription>Please answer the following health screening questions for {client.name}.</DialogDescription>
+            <DialogDescription>Please answer the following health screening questions for {currentClient.name}.</DialogDescription>
           </DialogHeader>
           <form
             onSubmit={(e) => {
@@ -580,7 +834,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
         <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{viewingForm?.title}</DialogTitle>
-            <DialogDescription>{viewingForm?.date} · {viewingForm?.formType}</DialogDescription>
+            <DialogDescription>{viewingForm?.date ? formatDateUK(viewingForm.date) : ""} · {viewingForm?.formType}</DialogDescription>
           </DialogHeader>
           {viewingForm && (() => {
             try {

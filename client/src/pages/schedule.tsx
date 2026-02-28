@@ -24,8 +24,14 @@ import {
   isSameMonth,
   isSameDay,
   isToday,
+  addWeeks,
+  subWeeks,
+  subDays,
+  eachDayOfInterval,
 } from "date-fns";
 import type { Session, Client } from "@shared/schema";
+
+type CalView = "month" | "week" | "day";
 
 function NewSessionDialog({ open, onOpenChange, clients, preselectedDate }: {
   open: boolean;
@@ -214,7 +220,7 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
     <Dialog open={true} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{format(date, "EEEE, MMMM d, yyyy")}</DialogTitle>
+          <DialogTitle>{format(date, "EEEE, d MMMM yyyy")}</DialogTitle>
           <DialogDescription>{daySessions.length} session{daySessions.length !== 1 ? "s" : ""} scheduled</DialogDescription>
         </DialogHeader>
 
@@ -306,8 +312,44 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
   );
 }
 
+const HOURS = Array.from({ length: 16 }, (_, i) => i + 6);
+
+function SessionBlock({ session, clientMap, typeColors, onClick }: {
+  session: Session;
+  clientMap: Map<string, string>;
+  typeColors: Record<string, string>;
+  onClick?: () => void;
+}) {
+  const colorClass = session.status === "completed"
+    ? "bg-muted text-muted-foreground"
+    : typeColors[session.sessionType || "1:1"] || typeColors["1:1"];
+
+  return (
+    <div
+      className={`text-xs px-2 py-1.5 rounded-md cursor-pointer ${colorClass}`}
+      onClick={onClick}
+      data-testid={`session-block-${session.id}`}
+    >
+      <div className="font-medium truncate">{clientMap.get(session.clientId)?.split(" ")[0] || "Unknown"}</div>
+      <div className="opacity-80 flex items-center gap-1">
+        <Clock className="w-3 h-3 flex-shrink-0" />
+        {session.startTime} - {session.endTime}
+      </div>
+      {session.location && (
+        <div className="opacity-70 flex items-center gap-1 truncate">
+          <MapPin className="w-3 h-3 flex-shrink-0" />
+          {session.location}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Schedule() {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
+  const [currentWeek, setCurrentWeek] = useState(() => new Date());
+  const [currentDay, setCurrentDay] = useState(() => new Date());
+  const [calView, setCalView] = useState<CalView>("month");
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
   const [detailDate, setDetailDate] = useState<Date | null>(null);
@@ -349,6 +391,10 @@ export default function Schedule() {
     day = addDays(day, 1);
   }
 
+  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
+  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
   const typeColors: Record<string, string> = {
     "1:1": "bg-primary text-primary-foreground",
     "group": "bg-emerald-500 text-white",
@@ -366,6 +412,44 @@ export default function Schedule() {
   const handleNewSession = (date?: string) => {
     setSelectedDate(date);
     setNewSessionOpen(true);
+  };
+
+  const navigatePrev = () => {
+    if (calView === "month") setCurrentMonth(subMonths(currentMonth, 1));
+    else if (calView === "week") setCurrentWeek(subWeeks(currentWeek, 1));
+    else setCurrentDay(subDays(currentDay, 1));
+  };
+
+  const navigateNext = () => {
+    if (calView === "month") setCurrentMonth(addMonths(currentMonth, 1));
+    else if (calView === "week") setCurrentWeek(addWeeks(currentWeek, 1));
+    else setCurrentDay(addDays(currentDay, 1));
+  };
+
+  const navigateToday = () => {
+    const now = new Date();
+    if (calView === "month") setCurrentMonth(now);
+    else if (calView === "week") setCurrentWeek(now);
+    else setCurrentDay(now);
+  };
+
+  const showTodayButton = () => {
+    if (calView === "month") return !isSameMonth(currentMonth, new Date());
+    if (calView === "week") {
+      const nowWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+      return !isSameDay(weekStart, nowWeekStart);
+    }
+    return !isToday(currentDay);
+  };
+
+  const headerLabel = () => {
+    if (calView === "month") return format(currentMonth, "MMMM yyyy");
+    if (calView === "week") {
+      const ws = format(weekStart, "d MMM");
+      const we = format(weekEnd, "d MMM yyyy");
+      return `${ws} - ${we}`;
+    }
+    return format(currentDay, "EEEE, d MMMM yyyy");
   };
 
   if (isLoading) {
@@ -391,112 +475,228 @@ export default function Schedule() {
         </Button>
       </div>
 
+      <div className="flex items-center justify-center gap-1">
+        {(["month", "week", "day"] as CalView[]).map((v) => (
+          <Button
+            key={v}
+            variant={calView === v ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCalView(v)}
+            data-testid={`button-view-${v}`}
+          >
+            {v.charAt(0).toUpperCase() + v.slice(1)}
+          </Button>
+        ))}
+      </div>
+
       <div className="flex items-center justify-between gap-2">
-        <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} data-testid="button-prev-month">
+        <Button variant="ghost" size="icon" onClick={navigatePrev} data-testid="button-prev-month">
           <ChevronLeft className="w-4 h-4" />
         </Button>
         <div className="text-center">
           <span className="text-lg font-semibold" data-testid="text-current-month">
-            {format(currentMonth, "MMMM yyyy")}
+            {headerLabel()}
           </span>
-          {!isSameMonth(currentMonth, new Date()) && (
+          {showTodayButton() && (
             <Button
-              variant="link"
+              variant="ghost"
               size="sm"
-              className="ml-2 text-xs"
-              onClick={() => setCurrentMonth(new Date())}
+              className="ml-2 text-xs underline"
+              onClick={navigateToday}
               data-testid="button-today"
             >
               Today
             </Button>
           )}
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} data-testid="button-next-month">
+        <Button variant="ghost" size="icon" onClick={navigateNext} data-testid="button-next-month">
           <ChevronRight className="w-4 h-4" />
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="grid grid-cols-7">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-              <div key={d} className="p-2 text-center text-xs font-medium text-muted-foreground border-b">
-                {d}
-              </div>
-            ))}
-          </div>
+      {calView === "month" && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="grid grid-cols-7">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                <div key={d} className="p-2 text-center text-xs font-medium text-muted-foreground border-b">
+                  {d}
+                </div>
+              ))}
+            </div>
 
-          <div className="grid grid-cols-7">
-            {calendarDays.map((calDay, idx) => {
-              const dateStr = format(calDay, "yyyy-MM-dd");
-              const daySessions = sessions
-                .filter((s) => s.date === dateStr && s.status !== "cancelled")
-                .sort((a, b) => a.startTime.localeCompare(b.startTime));
-              const inCurrentMonth = isSameMonth(calDay, currentMonth);
-              const today = isToday(calDay);
+            <div className="grid grid-cols-7">
+              {calendarDays.map((calDay, idx) => {
+                const dateStr = format(calDay, "yyyy-MM-dd");
+                const daySessions = sessions
+                  .filter((s) => s.date === dateStr && s.status !== "cancelled")
+                  .sort((a, b) => a.startTime.localeCompare(b.startTime));
+                const inCurrentMonth = isSameMonth(calDay, currentMonth);
+                const today = isToday(calDay);
 
-              return (
-                <div
-                  key={dateStr}
-                  className={`min-h-[80px] md:min-h-[100px] border-b border-r p-1 cursor-pointer transition-colors hover:bg-accent/50 ${
-                    !inCurrentMonth ? "bg-muted/30" : ""
-                  } ${idx % 7 === 0 ? "border-l" : ""}`}
-                  onClick={() => setDetailDate(calDay)}
-                  data-testid={`day-cell-${dateStr}`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span
-                      className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${
-                        today ? "bg-primary text-primary-foreground" : !inCurrentMonth ? "text-muted-foreground" : ""
-                      }`}
-                    >
-                      {format(calDay, "d")}
-                    </span>
-                    {daySessions.length > 0 && (
-                      <span className="text-[10px] text-muted-foreground">{daySessions.length}</span>
-                    )}
-                  </div>
-
-                  <div className="space-y-0.5 hidden md:block">
-                    {daySessions.slice(0, 3).map((session) => (
-                      <div
-                        key={session.id}
-                        className={`text-[10px] px-1 py-0.5 rounded truncate ${
-                          session.status === "completed"
-                            ? "bg-muted text-muted-foreground"
-                            : typeColors[session.sessionType || "1:1"] || typeColors["1:1"]
+                return (
+                  <div
+                    key={dateStr}
+                    className={`min-h-[80px] md:min-h-[100px] border-b border-r p-1 cursor-pointer transition-colors hover:bg-accent/50 ${
+                      !inCurrentMonth ? "bg-muted/30" : ""
+                    } ${idx % 7 === 0 ? "border-l" : ""}`}
+                    onClick={() => setDetailDate(calDay)}
+                    data-testid={`day-cell-${dateStr}`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span
+                        className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${
+                          today ? "bg-primary text-primary-foreground" : !inCurrentMonth ? "text-muted-foreground" : ""
                         }`}
-                        data-testid={`cal-session-${session.id}`}
                       >
-                        {session.startTime} {clientMap.get(session.clientId)?.split(" ")[0] || ""}
-                      </div>
-                    ))}
-                    {daySessions.length > 3 && (
-                      <p className="text-[10px] text-muted-foreground text-center">+{daySessions.length - 3} more</p>
-                    )}
-                  </div>
+                        {format(calDay, "d")}
+                      </span>
+                      {daySessions.length > 0 && (
+                        <span className="text-[10px] text-muted-foreground">{daySessions.length}</span>
+                      )}
+                    </div>
 
-                  <div className="flex gap-0.5 mt-1 md:hidden flex-wrap">
-                    {daySessions.slice(0, 4).map((session) => (
-                      <div
+                    <div className="space-y-0.5 hidden md:block">
+                      {daySessions.slice(0, 3).map((session) => (
+                        <div
+                          key={session.id}
+                          className={`text-[10px] px-1 py-0.5 rounded truncate ${
+                            session.status === "completed"
+                              ? "bg-muted text-muted-foreground"
+                              : typeColors[session.sessionType || "1:1"] || typeColors["1:1"]
+                          }`}
+                          data-testid={`cal-session-${session.id}`}
+                        >
+                          {session.startTime} {clientMap.get(session.clientId)?.split(" ")[0] || ""}
+                        </div>
+                      ))}
+                      {daySessions.length > 3 && (
+                        <p className="text-[10px] text-muted-foreground text-center">+{daySessions.length - 3} more</p>
+                      )}
+                    </div>
+
+                    <div className="flex gap-0.5 mt-1 md:hidden flex-wrap">
+                      {daySessions.slice(0, 4).map((session) => (
+                        <div
+                          key={session.id}
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            session.status === "completed"
+                              ? "bg-muted-foreground/40"
+                              : typeDotColors[session.sessionType || "1:1"] || typeDotColors["1:1"]
+                          }`}
+                        />
+                      ))}
+                      {daySessions.length > 4 && (
+                        <span className="text-[8px] text-muted-foreground">+{daySessions.length - 4}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {calView === "week" && (
+        <Card>
+          <CardContent className="p-0 overflow-x-auto">
+            <div className="grid grid-cols-7 min-w-[700px]">
+              {weekDays.map((wd) => {
+                const today = isToday(wd);
+                return (
+                  <div key={format(wd, "yyyy-MM-dd")} className={`p-2 text-center text-xs font-medium border-b ${today ? "bg-primary/10" : ""}`}>
+                    <div className="text-muted-foreground">{format(wd, "EEE")}</div>
+                    <div className={`mt-0.5 inline-flex items-center justify-center w-6 h-6 rounded-full text-sm font-semibold ${today ? "bg-primary text-primary-foreground" : ""}`}>
+                      {format(wd, "d")}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">{format(wd, "dd/MM")}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="grid grid-cols-7 min-w-[700px]">
+              {weekDays.map((wd) => {
+                const dateStr = format(wd, "yyyy-MM-dd");
+                const daySessions = sessions
+                  .filter((s) => s.date === dateStr && s.status !== "cancelled")
+                  .sort((a, b) => a.startTime.localeCompare(b.startTime));
+                const today = isToday(wd);
+
+                return (
+                  <div
+                    key={dateStr}
+                    className={`min-h-[300px] border-r p-1.5 space-y-1 cursor-pointer transition-colors hover:bg-accent/50 ${today ? "bg-primary/5" : ""}`}
+                    onClick={() => setDetailDate(wd)}
+                    data-testid={`week-day-${dateStr}`}
+                  >
+                    {daySessions.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground text-center pt-4">No sessions</p>
+                    )}
+                    {daySessions.map((session) => (
+                      <SessionBlock
                         key={session.id}
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          session.status === "completed"
-                            ? "bg-muted-foreground/40"
-                            : typeDotColors[session.sessionType || "1:1"] || typeDotColors["1:1"]
-                        }`}
+                        session={session}
+                        clientMap={clientMap}
+                        typeColors={typeColors}
+                        onClick={() => setDetailDate(wd)}
                       />
                     ))}
-                    {daySessions.length > 4 && (
-                      <span className="text-[8px] text-muted-foreground">+{daySessions.length - 4}</span>
-                    )}
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {calView === "day" && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {HOURS.map((hour) => {
+                const hourStr = hour.toString().padStart(2, "0");
+                const dateStr = format(currentDay, "yyyy-MM-dd");
+                const hourSessions = sessions.filter((s) => {
+                  if (s.date !== dateStr || s.status === "cancelled") return false;
+                  const startHour = parseInt(s.startTime.split(":")[0], 10);
+                  return startHour === hour;
+                }).sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+                return (
+                  <div
+                    key={hour}
+                    className="flex min-h-[60px] cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => {
+                      if (hourSessions.length > 0) {
+                        setDetailDate(currentDay);
+                      } else {
+                        handleNewSession(dateStr);
+                      }
+                    }}
+                    data-testid={`day-hour-${hourStr}`}
+                  >
+                    <div className="w-16 flex-shrink-0 p-2 text-xs text-muted-foreground text-right border-r">
+                      {`${hourStr}:00`}
+                    </div>
+                    <div className="flex-1 p-1.5 space-y-1">
+                      {hourSessions.map((session) => (
+                        <SessionBlock
+                          key={session.id}
+                          session={session}
+                          clientMap={clientMap}
+                          typeColors={typeColors}
+                          onClick={() => setDetailDate(currentDay)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-primary" /> 1:1</span>

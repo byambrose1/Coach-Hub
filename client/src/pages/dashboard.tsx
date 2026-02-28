@@ -7,9 +7,9 @@ import { Calendar, Users, Clock, AlertTriangle, Plus, ChevronRight } from "lucid
 import { format, isToday, isTomorrow, parseISO } from "date-fns";
 import type { Session, Client, Package } from "@shared/schema";
 
-function StatCard({ title, value, icon: Icon, subtitle }: { title: string; value: string | number; icon: any; subtitle?: string }) {
-  return (
-    <Card>
+function StatCard({ title, value, icon: Icon, subtitle, href }: { title: string; value: string | number; icon: any; subtitle?: string; href?: string }) {
+  const card = (
+    <Card className={href ? "cursor-pointer hover-elevate" : ""}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-1">
           <div>
@@ -24,6 +24,16 @@ function StatCard({ title, value, icon: Icon, subtitle }: { title: string; value
       </CardContent>
     </Card>
   );
+
+  if (href) {
+    return (
+      <a href={href} className="block" data-testid="link-stat-active-clients">
+        {card}
+      </a>
+    );
+  }
+
+  return card;
 }
 
 function SessionRow({ session, clientName }: { session: Session; clientName: string }) {
@@ -127,7 +137,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-dashboard-title">Dashboard</h1>
-          <p className="text-muted-foreground text-sm">{format(new Date(), "EEEE, MMMM d, yyyy")}</p>
+          <p className="text-muted-foreground text-sm">{format(new Date(), "EEEE, d MMMM yyyy")}</p>
         </div>
         <Button asChild data-testid="button-quick-book">
           <a href="/schedule?new=true">
@@ -139,7 +149,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Today's Sessions" value={todaySessions.length} icon={Calendar} subtitle={`${completedToday} completed`} />
-        <StatCard title="Active Clients" value={activeClients} icon={Users} />
+        <StatCard title="Active Clients" value={activeClients} icon={Users} href="/clients" />
         <StatCard title="This Week" value={sessions.filter((s) => {
           const d = s.date;
           const now = new Date();
@@ -200,7 +210,7 @@ export default function Dashboard() {
                       ? "Today"
                       : isTomorrow(parseISO(session.date))
                         ? "Tomorrow"
-                        : format(parseISO(session.date), "EEE, MMM d");
+                        : format(parseISO(session.date), "EEE, d MMM");
                     return (
                       <div key={session.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-b-0" data-testid={`row-upcoming-${session.id}`}>
                         <div className="min-w-0">

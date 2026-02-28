@@ -1,7 +1,7 @@
 # FitTrack - Solo Coach Dashboard
 
 ## Overview
-A fitness trainer app designed for solo coaches managing in-person and online clients. Features authentication via Replit Auth, client management with health forms (PARQs), editable session notes, referral tracking with rewards, flexible payment options (block sessions and monthly billing), invoicing, HIPAA compliance options, and notification settings.
+A fitness trainer app designed for solo coaches managing in-person and online clients. Features authentication via Replit Auth, client management with health forms (PARQs), editable notes within client profiles, flexible payment options (block sessions and monthly billing), full invoice management (view/edit/download/send), configurable currency (£/$/€), UK date formats, HIPAA compliance options, and notification settings.
 
 ## Tech Stack
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS + shadcn/ui
@@ -12,7 +12,7 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - **State**: TanStack React Query
 
 ## Project Structure
-- `client/src/pages/` - Landing, Dashboard, Schedule, Clients, Payments, Notes, Referrals, Settings
+- `client/src/pages/` - Landing, Dashboard, Schedule, Clients, Payments, Settings
 - `client/src/components/` - AppSidebar, shadcn UI components
 - `client/src/hooks/use-auth.ts` - Authentication hook (fetches /api/auth/user)
 - `server/` - Express server, routes, storage layer, database connection, seed data
@@ -22,13 +22,15 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 ## Key Features
 - **Auth**: Replit Auth (OIDC) login/logout, route protection via isAuthenticated middleware
 - **Landing Page**: Split-screen design for unauthenticated users
-- **Dashboard**: Today's schedule, stats, upcoming sessions, low session alerts
-- **Schedule**: Monthly calendar view with day detail dialog, book sessions (1:1, group, online, outdoor), mark complete/cancel
-- **Clients**: Client profiles with edit dialog, PARQ health forms tab, session history, packages, notes
-- **Payments**: Session packages (block & monthly billing), invoicing with create/mark paid, summary stats
-- **Notes**: Session notes with edit/delete, "edited" indicator, client filter and search
-- **Referrals**: Referral tracking, convert/reward workflow, stats dashboard
-- **Settings**: Profile, cancellation policy, payment settings, email notifications (stub), session reminders, HIPAA compliance, data retention, subscription info, account deletion
+- **Dashboard**: Today's schedule, stats (Active Clients is clickable → /clients), upcoming sessions, low session alerts. UK date format.
+- **Schedule**: Month/Week/Day calendar views with toggle, day detail dialog, book sessions (1:1, group, online, outdoor), mark complete/cancel. UK date format.
+- **Clients**: Client profiles with edit dialog (phone/email save fix), PARQ health forms tab, session history, editable packages (inline edit total/used sessions), full notes CRUD (create/edit/delete within profile with "edited" indicator)
+- **Payments**: Session packages (block & monthly billing) with edit sessions, full invoice management (view detail, edit, download PDF, send/mark sent, mark paid), configurable currency (£/$/€), summary stats
+- **Settings**: Profile, cancellation policy, currency selector, payment settings, email notifications (stub), session reminders, HIPAA compliance, data retention, subscription info, account deletion
+
+## Removed Features
+- **Notes page**: Removed from sidebar. Notes now live within each client's profile (Notes tab).
+- **Referrals page**: Removed entirely from sidebar and routes.
 
 ## Database Tables
 - `clients` - name, email, phone, notes, sessionType, status, referredBy, referralCode
@@ -36,7 +38,7 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - `sessions` - Auth session storage (connect-pg-simple)
 - `packages` - clientId, name, totalSessions, usedSessions, price, status, billingType, monthlyRate, nextBillingDate
 - `session_notes` - sessionId, clientId, content, date, updatedAt
-- `settings` - trainerName, businessName, trainerEmail, trainerPhone, businessAddress, cancellationPolicy, paymentLink, acceptedPaymentMethods, invoicePrefix, lowSessionThreshold, enableEmailNotifications, enableSessionReminders, reminderHoursBefore, subscriptionStatus, subscriptionPlan, hipaaCompliant, dataRetentionDays, termsAccepted
+- `settings` - trainerName, businessName, trainerEmail, trainerPhone, businessAddress, cancellationPolicy, paymentLink, acceptedPaymentMethods, invoicePrefix, lowSessionThreshold, enableEmailNotifications, enableSessionReminders, reminderHoursBefore, subscriptionStatus, subscriptionPlan, hipaaCompliant, dataRetentionDays, termsAccepted, **currency** (£/$/€)
 - `client_forms` - clientId, formType, title, responses (JSON), status, date, updatedAt
 - `referrals` - referrerClientId, referredClientId, referredName, referredEmail, referredPhone, status, rewardType, rewardApplied, date, notes
 - `invoices` - clientId, packageId, invoiceNumber, amount, status, dueDate, sentDate, paidDate, notes, paymentMethod
@@ -60,3 +62,8 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 ## Running
 - `npm run dev` starts both frontend and backend on port 5000
 - `npm run db:push` pushes schema changes to database
+
+## Date & Currency
+- All dates displayed in UK format: DD/MM/YYYY (using date-fns `dd/MM/yyyy`)
+- Currency configurable in Settings (default £, options: £/$/€)
+- Currency stored in `settings.currency` field

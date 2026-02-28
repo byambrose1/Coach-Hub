@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,15 +10,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Package, CreditCard, ExternalLink, AlertTriangle, FileText, DollarSign, Clock, CheckCircle, Pencil } from "lucide-react";
+import { Plus, Package, CreditCard, ExternalLink, AlertTriangle, FileText, Clock, CheckCircle, Pencil, Download, Send, Eye, PoundSterling } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import type { Client, Package as PackageType, Settings, Invoice } from "@shared/schema";
 
-function NewPackageDialog({ open, onOpenChange, clients }: {
+function formatDateUK(dateStr: string): string {
+  try {
+    return format(parseISO(dateStr), "dd/MM/yyyy");
+  } catch {
+    return dateStr;
+  }
+}
+
+function NewPackageDialog({ open, onOpenChange, clients, currency }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clients: Client[];
+  currency: string;
 }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
@@ -106,7 +117,7 @@ function NewPackageDialog({ open, onOpenChange, clients }: {
             <div className="space-y-2">
               <Label>Price</Label>
               <Input
-                placeholder="e.g. $500"
+                placeholder={`e.g. ${currency}500`}
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 data-testid="input-package-price"
@@ -117,7 +128,7 @@ function NewPackageDialog({ open, onOpenChange, clients }: {
               <div className="space-y-2">
                 <Label>Monthly Rate</Label>
                 <Input
-                  placeholder="e.g. $200"
+                  placeholder={`e.g. ${currency}200`}
                   value={formData.monthlyRate}
                   onChange={(e) => setFormData({ ...formData, monthlyRate: e.target.value })}
                   data-testid="input-monthly-rate"
@@ -143,10 +154,11 @@ function NewPackageDialog({ open, onOpenChange, clients }: {
   );
 }
 
-function NewInvoiceDialog({ open, onOpenChange, clients }: {
+function NewInvoiceDialog({ open, onOpenChange, clients, currency }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clients: Client[];
+  currency: string;
 }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
@@ -214,9 +226,9 @@ function NewInvoiceDialog({ open, onOpenChange, clients }: {
               />
             </div>
             <div className="space-y-2">
-              <Label>Amount</Label>
+              <Label>Amount ({currency})</Label>
               <Input
-                placeholder="e.g. $200"
+                placeholder={`e.g. ${currency}200`}
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 required
@@ -350,10 +362,339 @@ function EditSessionsDialog({ open, onOpenChange, pkg }: {
   );
 }
 
+function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
+  invoice: Invoice;
+  clientName: string;
+  settings: Settings | undefined;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
+  const currency = settings?.currency || "£";
+  const [editData, setEditData] = useState({
+    invoiceNumber: invoice.invoiceNumber,
+    amount: invoice.amount,
+    dueDate: invoice.dueDate,
+    status: invoice.status || "pending",
+    paymentMethod: invoice.paymentMethod || "",
+    notes: invoice.notes || "",
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: typeof editData) => {
+      const res = await apiRequest("PATCH", `/api/invoices/${invoice.id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      setIsEditing(false);
+      toast({ title: "Invoice updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error updating invoice", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/invoices/${invoice.id}`, {
+        status: "sent",
+        sentDate: new Date().toISOString().split("T")[0],
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      toast({ title: "Invoice marked as sent", description: "Email sending coming soon." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error sending invoice", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleDownload = () => {
+    const invoiceHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice ${invoice.invoiceNumber}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #333; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
+          .business-info { text-align: right; }
+          .business-info h2 { margin: 0; color: #2563eb; }
+          .business-info p { margin: 2px 0; font-size: 13px; color: #666; }
+          .invoice-title { font-size: 32px; font-weight: bold; color: #2563eb; margin-bottom: 20px; }
+          .invoice-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+          .meta-group h4 { margin: 0 0 5px; color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+          .meta-group p { margin: 2px 0; font-size: 14px; }
+          .line-items { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+          .line-items th { background: #f8f9fa; padding: 10px 15px; text-align: left; font-size: 12px; text-transform: uppercase; color: #666; border-bottom: 2px solid #e5e7eb; }
+          .line-items td { padding: 12px 15px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+          .total-row { background: #f0f4ff; }
+          .total-row td { font-weight: bold; font-size: 16px; color: #2563eb; }
+          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #999; text-align: center; }
+          .status-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+          .status-pending { background: #fef3c7; color: #92400e; }
+          .status-sent { background: #dbeafe; color: #1e40af; }
+          .status-paid { background: #d1fae5; color: #065f46; }
+          .status-overdue { background: #fee2e2; color: #991b1b; }
+          @media print { body { padding: 20px; } .no-print { display: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="invoice-title">INVOICE</div>
+            <p style="font-size:14px;color:#666;">Invoice No: <strong>${invoice.invoiceNumber}</strong></p>
+          </div>
+          <div class="business-info">
+            <h2>${settings?.businessName || "FitTrack"}</h2>
+            <p>${settings?.trainerName || "Coach"}</p>
+            ${settings?.trainerEmail ? `<p>${settings.trainerEmail}</p>` : ""}
+            ${settings?.trainerPhone ? `<p>${settings.trainerPhone}</p>` : ""}
+            ${settings?.businessAddress ? `<p>${settings.businessAddress}</p>` : ""}
+          </div>
+        </div>
+        <div class="invoice-meta">
+          <div class="meta-group">
+            <h4>Bill To</h4>
+            <p><strong>${clientName}</strong></p>
+          </div>
+          <div class="meta-group">
+            <h4>Invoice Details</h4>
+            <p>Date: ${formatDateUK(new Date().toISOString().split("T")[0])}</p>
+            <p>Due: ${formatDateUK(invoice.dueDate)}</p>
+            <p>Status: <span class="status-badge status-${invoice.status || "pending"}">${invoice.status || "pending"}</span></p>
+            ${invoice.paymentMethod ? `<p>Payment: ${invoice.paymentMethod}</p>` : ""}
+          </div>
+        </div>
+        <table class="line-items">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th style="text-align:right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>${invoice.notes || "Training services"}</td>
+              <td style="text-align:right;">${currency}${invoice.amount}</td>
+            </tr>
+            <tr class="total-row">
+              <td>Total Due</td>
+              <td style="text-align:right;">${currency}${invoice.amount}</td>
+            </tr>
+          </tbody>
+        </table>
+        ${settings?.paymentLink ? `<p style="font-size:13px;color:#666;">Pay online: <a href="${settings.paymentLink}" style="color:#2563eb;">${settings.paymentLink}</a></p>` : ""}
+        <div class="footer">
+          <p>Thank you for your business</p>
+          <p>${settings?.businessName || "FitTrack"} · Generated on ${formatDateUK(new Date().toISOString().split("T")[0])}</p>
+        </div>
+        <div class="no-print" style="margin-top:30px;text-align:center;">
+          <button onclick="window.print()" style="padding:10px 30px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Print / Save as PDF</button>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(invoiceHTML);
+      printWindow.document.close();
+    }
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            {isEditing ? "Edit Invoice" : `Invoice ${invoice.invoiceNumber}`}
+          </DialogTitle>
+          <DialogDescription>
+            {clientName} · <InvoiceStatusBadge status={invoice.status || "pending"} />
+          </DialogDescription>
+        </DialogHeader>
+
+        {isEditing ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              updateMutation.mutate(editData);
+            }}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Invoice Number</Label>
+                <Input
+                  value={editData.invoiceNumber}
+                  onChange={(e) => setEditData({ ...editData, invoiceNumber: e.target.value })}
+                  data-testid="input-edit-invoice-number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Amount ({currency})</Label>
+                <Input
+                  value={editData.amount}
+                  onChange={(e) => setEditData({ ...editData, amount: e.target.value })}
+                  data-testid="input-edit-invoice-amount"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Due Date</Label>
+                <Input
+                  type="date"
+                  value={editData.dueDate}
+                  onChange={(e) => setEditData({ ...editData, dueDate: e.target.value })}
+                  data-testid="input-edit-invoice-due-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={editData.status} onValueChange={(v) => setEditData({ ...editData, status: v })}>
+                  <SelectTrigger data-testid="select-edit-invoice-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <Select value={editData.paymentMethod} onValueChange={(v) => setEditData({ ...editData, paymentMethod: v })}>
+                <SelectTrigger data-testid="select-edit-payment-method">
+                  <SelectValue placeholder="Select method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="transfer">Transfer</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={editData.notes}
+                onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                data-testid="input-edit-invoice-notes"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={updateMutation.isPending} data-testid="button-save-invoice">
+                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setIsEditing(false)} data-testid="button-cancel-edit-invoice">
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Amount</p>
+                <p className="text-lg font-bold" data-testid="text-detail-amount">{currency}{invoice.amount}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Due Date</p>
+                <p className="text-sm font-medium" data-testid="text-detail-due-date">{formatDateUK(invoice.dueDate)}</p>
+              </div>
+            </div>
+
+            {invoice.paymentMethod && (
+              <div>
+                <p className="text-xs text-muted-foreground">Payment Method</p>
+                <p className="text-sm capitalize">{invoice.paymentMethod}</p>
+              </div>
+            )}
+
+            {invoice.sentDate && (
+              <div>
+                <p className="text-xs text-muted-foreground">Sent Date</p>
+                <p className="text-sm">{formatDateUK(invoice.sentDate)}</p>
+              </div>
+            )}
+
+            {invoice.paidDate && (
+              <div>
+                <p className="text-xs text-muted-foreground">Paid Date</p>
+                <p className="text-sm">{formatDateUK(invoice.paidDate)}</p>
+              </div>
+            )}
+
+            {invoice.notes && (
+              <div>
+                <p className="text-xs text-muted-foreground">Notes</p>
+                <p className="text-sm">{invoice.notes}</p>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} data-testid="button-edit-invoice">
+                <Pencil className="w-3 h-3 mr-1" />
+                Edit
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDownload} data-testid="button-download-invoice">
+                <Download className="w-3 h-3 mr-1" />
+                Download PDF
+              </Button>
+              {invoice.status !== "sent" && invoice.status !== "paid" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => sendMutation.mutate()}
+                  disabled={sendMutation.isPending}
+                  data-testid="button-send-invoice"
+                >
+                  <Send className="w-3 h-3 mr-1" />
+                  {sendMutation.isPending ? "Sending..." : "Send"}
+                </Button>
+              )}
+              {invoice.status !== "paid" && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => {
+                    apiRequest("PATCH", `/api/invoices/${invoice.id}`, {
+                      status: "paid",
+                      paidDate: new Date().toISOString().split("T")[0],
+                    }).then(() => {
+                      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+                      toast({ title: "Invoice marked as paid" });
+                    });
+                  }}
+                  data-testid="button-detail-mark-paid"
+                >
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Mark Paid
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Payments() {
   const [newPackageOpen, setNewPackageOpen] = useState(false);
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [editingPkg, setEditingPkg] = useState<PackageType | null>(null);
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
 
   const { data: clients = [], isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -370,6 +711,8 @@ export default function Payments() {
   const { data: settings } = useQuery<Settings>({
     queryKey: ["/api/settings"],
   });
+
+  const currency = settings?.currency || "£";
 
   const markPaidMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -431,10 +774,10 @@ export default function Payments() {
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-primary" />
+              <PoundSterling className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold" data-testid="stat-monthly-revenue">${monthlyRevenue.toFixed(0)}</p>
+              <p className="text-2xl font-bold" data-testid="stat-monthly-revenue">{currency}{monthlyRevenue.toFixed(0)}</p>
               <p className="text-xs text-muted-foreground">Monthly Revenue</p>
             </div>
           </CardContent>
@@ -570,7 +913,7 @@ export default function Payments() {
                           )}
                           {pkg.nextBillingDate && (
                             <p className="text-xs text-muted-foreground" data-testid={`text-next-billing-${pkg.id}`}>
-                              Next billing: {pkg.nextBillingDate}
+                              Next billing: {formatDateUK(pkg.nextBillingDate)}
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground">{pkg.totalSessions} sessions included</p>
@@ -618,7 +961,12 @@ export default function Payments() {
           ) : (
             <div className="space-y-3">
               {invoices.map((inv) => (
-                <Card key={inv.id} data-testid={`card-invoice-${inv.id}`}>
+                <Card
+                  key={inv.id}
+                  className="cursor-pointer hover-elevate"
+                  onClick={() => setViewingInvoice(inv)}
+                  data-testid={`card-invoice-${inv.id}`}
+                >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-3">
@@ -632,8 +980,8 @@ export default function Payments() {
                       </div>
                       <div className="flex items-center gap-3 flex-wrap">
                         <div className="text-right">
-                          <p className="text-sm font-medium" data-testid={`text-invoice-amount-${inv.id}`}>{inv.amount}</p>
-                          <p className="text-xs text-muted-foreground">Due: {inv.dueDate}</p>
+                          <p className="text-sm font-medium" data-testid={`text-invoice-amount-${inv.id}`}>{currency}{inv.amount}</p>
+                          <p className="text-xs text-muted-foreground">Due: {formatDateUK(inv.dueDate)}</p>
                         </div>
                         {inv.paymentMethod && (
                           <Badge variant="secondary" className="text-xs" data-testid={`badge-payment-method-${inv.id}`}>
@@ -641,18 +989,6 @@ export default function Payments() {
                           </Badge>
                         )}
                         <InvoiceStatusBadge status={inv.status || "pending"} />
-                        {inv.status !== "paid" && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => markPaidMutation.mutate(inv.id)}
-                            disabled={markPaidMutation.isPending}
-                            data-testid={`button-mark-paid-${inv.id}`}
-                          >
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Mark Paid
-                          </Button>
-                        )}
                       </div>
                     </div>
                     {inv.notes && (
@@ -666,13 +1002,21 @@ export default function Payments() {
         </TabsContent>
       </Tabs>
 
-      <NewPackageDialog open={newPackageOpen} onOpenChange={setNewPackageOpen} clients={clients} />
-      <NewInvoiceDialog open={newInvoiceOpen} onOpenChange={setNewInvoiceOpen} clients={clients} />
+      <NewPackageDialog open={newPackageOpen} onOpenChange={setNewPackageOpen} clients={clients} currency={currency} />
+      <NewInvoiceDialog open={newInvoiceOpen} onOpenChange={setNewInvoiceOpen} clients={clients} currency={currency} />
       {editingPkg && (
         <EditSessionsDialog
           open={!!editingPkg}
           onOpenChange={(open) => { if (!open) setEditingPkg(null); }}
           pkg={editingPkg}
+        />
+      )}
+      {viewingInvoice && (
+        <InvoiceDetailDialog
+          invoice={viewingInvoice}
+          clientName={clientMap.get(viewingInvoice.clientId) || "Unknown"}
+          settings={settings}
+          onClose={() => setViewingInvoice(null)}
         />
       )}
     </div>

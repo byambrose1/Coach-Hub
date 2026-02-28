@@ -88,6 +88,7 @@ export const settings = pgTable("settings", {
   hipaaCompliant: boolean("hipaa_compliant").default(false),
   dataRetentionDays: integer("data_retention_days").default(365),
   termsAccepted: boolean("terms_accepted").default(false),
+  currency: text("currency").default("£"),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({ id: true });

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, User, FileText, CreditCard, Bell, Shield, Trash2, Mail, Phone, MapPin, Receipt } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Settings } from "@shared/schema";
@@ -49,6 +50,7 @@ export default function SettingsPage() {
     hipaaCompliant: false,
     dataRetentionDays: 365,
     termsAccepted: false,
+    currency: "£",
   });
 
   useEffect(() => {
@@ -70,6 +72,7 @@ export default function SettingsPage() {
         hipaaCompliant: settings.hipaaCompliant || false,
         dataRetentionDays: settings.dataRetentionDays || 365,
         termsAccepted: settings.termsAccepted || false,
+        currency: settings.currency || "£",
       });
     }
   }, [settings]);
@@ -200,6 +203,20 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Currency</Label>
+            <Select value={formData.currency} onValueChange={(v) => setFormData({ ...formData, currency: v })}>
+              <SelectTrigger className="max-w-[120px]" data-testid="select-currency">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="£">£ GBP</SelectItem>
+                <SelectItem value="$">$ USD</SelectItem>
+                <SelectItem value="€">€ EUR</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Currency symbol used across the app.</p>
+          </div>
           <div className="space-y-2">
             <Label>Payment Link</Label>
             <Input
