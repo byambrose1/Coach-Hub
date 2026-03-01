@@ -266,7 +266,7 @@ export default function Dashboard() {
     .slice(0, 5);
 
   const lowSessionPackages = packages.filter(
-    (p) => p.status === "active" && (p.totalSessions - (p.usedSessions || 0)) <= 2
+    (p) => p.status === "active" && (p.totalSessions - (p.usedSessions || 0)) <= 2 && clientMap.has(p.clientId)
   );
 
   const activeClients = clients.filter((c) => c.status === "active").length;
@@ -398,15 +398,20 @@ export default function Dashboard() {
                   {lowSessionPackages.map((pkg) => {
                     const remaining = pkg.totalSessions - (pkg.usedSessions || 0);
                     return (
-                      <div key={pkg.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-b-0" data-testid={`row-low-package-${pkg.id}`}>
+                      <a
+                        key={pkg.id}
+                        href={`/clients?client=${pkg.clientId}`}
+                        className="flex items-center justify-between gap-2 py-2 border-b last:border-b-0 hover:bg-accent/50 rounded px-1 -mx-1 transition-colors cursor-pointer"
+                        data-testid={`row-low-package-${pkg.id}`}
+                      >
                         <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{clientMap.get(pkg.clientId) || "Unknown"}</p>
+                          <p className="text-sm font-medium truncate">{clientMap.get(pkg.clientId)}</p>
                           <p className="text-xs text-muted-foreground">{pkg.name}</p>
                         </div>
                         <Badge variant="destructive" className="text-xs flex-shrink-0">
                           {remaining} left
                         </Badge>
-                      </div>
+                      </a>
                     );
                   })}
                 </div>

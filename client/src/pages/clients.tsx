@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -926,6 +926,15 @@ export default function Clients() {
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const clientId = params.get("client");
+    if (clientId && clients.length > 0) {
+      const match = clients.find((c) => c.id === clientId);
+      if (match) setSelectedClient(match);
+    }
+  }, [clients]);
 
   const filtered = clients.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
