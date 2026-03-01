@@ -40,6 +40,7 @@ export default function PlatformAdminCoach() {
   });
 
   const { data: authUser } = useQuery<any>({ queryKey: ["/api/auth/user"] });
+  const isOwnAccount = authUser?.id === coachId;
 
   const planMutation = useMutation({
     mutationFn: async (plan: string) => {
@@ -111,15 +112,22 @@ export default function PlatformAdminCoach() {
             <Crown className="h-3 w-3 mr-1" />
             {plan || "free"}
           </Badge>
-          <Button
-            onClick={() => impersonateMutation.mutate()}
-            disabled={impersonateMutation.isPending || isCurrentlyImpersonating}
-            variant="outline"
-            data-testid="button-impersonate"
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            {isCurrentlyImpersonating ? "Currently Impersonating" : "View as Coach"}
-          </Button>
+          {!isOwnAccount && (
+            <Button
+              onClick={() => impersonateMutation.mutate()}
+              disabled={impersonateMutation.isPending || isCurrentlyImpersonating}
+              variant="outline"
+              data-testid="button-impersonate"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              {isCurrentlyImpersonating ? "Currently Impersonating" : "View as Coach"}
+            </Button>
+          )}
+          {isOwnAccount && (
+            <Badge variant="outline" className="text-xs text-muted-foreground">
+              Your account
+            </Badge>
+          )}
         </div>
       </div>
 
