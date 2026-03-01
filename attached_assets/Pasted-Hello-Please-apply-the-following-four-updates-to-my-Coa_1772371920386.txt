@@ -1,0 +1,31 @@
+Hello! Please apply the following four updates to my Coach Hub application. The project is a coaching management software for trainers to manage their clients.
+1. Implement GoCardless for Recurring Monthly Payments
+I need to allow trainers to set up recurring monthly payments (Direct Debits) for their clients. Please implement this using the GoCardless API. The user flow should be as follows:
+Backend:
+Add a new endpoint (e.g., /api/payments/create-mandate-link) that takes a clientId and amount.
+This endpoint should use the GoCardless API to generate a new one-time mandate link for the specified amount.
+Store the GoCardless API key securely using Replit's Secrets/environment variables (process.env.GOCARDLESS_API_KEY).
+Add a new field to the Client model in the database called gocardlessMandateStatus (String, default: 'inactive').
+Create a webhook endpoint (/api/webhooks/gocardless) to listen for updates from GoCardless. When a mandate is successfully activated or a payment is collected, update the gocardlessMandateStatus and payment history for the relevant client.
+Frontend:
+In the client's profile page, add a "Set Up Monthly Payment" button.
+When a trainer clicks this button, it should prompt them to enter a monthly amount.
+On submission, it should call the /api/payments/create-mandate-link endpoint.
+Display the returned mandate link to the trainer, with a "Copy Link" button so they can send it to their client.
+On the client's profile, display the gocardlessMandateStatus (e.g., "Monthly: Active" or "Monthly: Inactive").
+2. Relocate the Payment Link UI
+The current "Payments" page has a payment link feature that is no longer needed there. Please perform the following UI change:
+Remove the entire section for creating or managing payment links from the main "Payments" page.
+Move this functionality into the "Settings" page. It should be in a new section called "Payment Settings".
+3. Add a Terms and Conditions Pop-up
+I need to ensure all trainers agree to the Terms and Conditions before using the app.
+Create a new pop-up or modal component that displays the Terms and Conditions text. You can use placeholder text for now.
+This pop-up should appear automatically for any user who has not yet accepted the terms.
+It must contain a checkbox that says "I have read and agree to the Terms and Conditions" and a "Continue" button.
+The "Continue" button should only become active after the checkbox is ticked.
+Add a new boolean field to the User or Trainer model called hasAcceptedTerms (default: false). When a user clicks "Continue", set this field to true so the pop-up does not appear for them again.
+4. Add Email Notifications for Booked Sessions
+When a trainer books a new session for a client, the client should automatically receive an email notification.
+When a new session is successfully created in the backend, trigger an email to be sent to the client's email address.
+The email should contain the key details: Session Date, Time, and the Trainer's Name.
+Please use a suitable email service for this (e.g., Resend, SendGrid, or another simple API-based service). Use Replit Secrets to store the email provider's API key.
