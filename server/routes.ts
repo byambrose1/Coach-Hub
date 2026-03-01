@@ -6,12 +6,30 @@ import { isAuthenticated } from "./replit_integrations/auth";
 import { sendInvoiceEmail, sendBookingNotificationEmail, sendSessionCancellationEmail, sendSessionRescheduleEmail, sendParqEmail } from "./email";
 import { createMandateLink } from "./payments";
 
-function getUserId(req: any): string {
+declare module "express-session" {
+  interface SessionData {
+    impersonatedUserId?: string;
+    impersonatedUserName?: string;
+  }
+}
+
+const PLAN_TIER: Record<string, number> = {
+  free: 1,
+  starter: 2,
+  professional: 3,
+  business: 4,
+};
+
+function getRealUserId(req: any): string {
   return req.user?.claims?.sub || "";
 }
 
+function getUserId(req: any): string {
+  return (req.session as any)?.impersonatedUserId || getRealUserId(req);
+}
+
 function isOwner(req: any): boolean {
-  const userId = getUserId(req);
+  const userId = getRealUserId(req);
   const ownerId = process.env.OWNER_USER_ID;
   return !!ownerId && userId === ownerId;
 }
@@ -132,6 +150,71 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/platform-admin/config", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const config = await storage.getPlatformConfig();
+      res.json(config);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.put("/api/platform-admin/config", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const config = await storage.upsertPlatformConfig(req.body);
+      res.json(config);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/platform-admin/coaches/:coachId", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const detail = await storage.getCoachDetail(req.params.coachId);
+      if (!detail) return res.status(404).json({ message: "Coach not found" });
+      res.json(detail);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/platform-admin/coaches/:coachId/plan", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const { plan } = req.body;
+      if (!["free", "starter", "professional", "business"].includes(plan)) {
+        return res.status(400).json({ message: "Invalid plan" });
+      }
+      await storage.updateCoachPlan(req.params.coachId, plan);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/platform-admin/impersonate/:userId", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const targetUserId = req.params.userId;
+      const detail = await storage.getCoachDetail(targetUserId);
+      if (!detail) return res.status(404).json({ message: "Coach not found" });
+      (req.session as any).impersonatedUserId = targetUserId;
+      (req.session as any).impersonatedUserName = detail.coach.firstName || detail.coach.email || "Coach";
+      res.json({ success: true, name: (req.session as any).impersonatedUserName });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/platform-admin/stop-impersonate", isAuthenticated, async (req, res) => {
+    delete (req.session as any).impersonatedUserId;
+    delete (req.session as any).impersonatedUserName;
+    res.json({ success: true });
+  });
+
   // --- Clients ---
   app.get("/api/clients", async (req, res) => {
     const userId = getUserId(req);
@@ -149,6 +232,55 @@ export async function registerRoutes(
     const userId = getUserId(req);
     const parsed = insertClientSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+
+    // Enforce tier limits
+    try {
+      const [existingClients, coachSettings, config] = await Promise.all([
+        storage.getClients(userId),
+        storage.getSettings(userId),
+        storage.getPlatformConfig(),
+      ]);
+      const plan = coachSettings?.subscriptionPlan || "free";
+      const tier = PLAN_TIER[plan] || 1;
+      const tierMaxMap: Record<number, number> = {
+        1: config.tier1MaxClients ?? 5,
+        2: config.tier2MaxClients ?? 10,
+        3: config.tier3MaxClients ?? 20,
+        4: config.tier4MaxClients ?? 50,
+      };
+      const currentMax = tierMaxMap[tier];
+      if (existingClients.length >= currentMax) {
+        const nextTier = Math.min(tier + 1, 4);
+        const nextTierMax = tierMaxMap[nextTier];
+        const tierPriceMap: Record<number, string> = {
+          1: config.tier1Price ?? "0",
+          2: config.tier2Price ?? "1.99",
+          3: config.tier3Price ?? "4.99",
+          4: config.tier4Price ?? "7.99",
+        };
+        const tierLinkMap: Record<number, string> = {
+          1: config.tier1PaymentLink ?? "",
+          2: config.tier2PaymentLink ?? "",
+          3: config.tier3PaymentLink ?? "",
+          4: config.tier4PaymentLink ?? "",
+        };
+        const planNames: Record<number, string> = { 1: "free", 2: "starter", 3: "professional", 4: "business" };
+        return res.status(402).json({
+          code: "CLIENT_LIMIT_EXCEEDED",
+          currentCount: existingClients.length,
+          currentPlan: plan,
+          currentMax,
+          nextTier,
+          nextTierMax,
+          nextTierPrice: tierPriceMap[nextTier],
+          nextTierPlan: planNames[nextTier],
+          paymentLink: tierLinkMap[nextTier],
+        });
+      }
+    } catch (err) {
+      console.error("Tier check error:", err);
+    }
+
     const client = await storage.createClient(userId, parsed.data);
     res.status(201).json(client);
   });

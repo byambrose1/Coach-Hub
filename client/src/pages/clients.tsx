@@ -16,6 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { Client, Session, Package as PackageType, SessionNote, ClientForm } from "@shared/schema";
+import { UpgradePopup } from "@/components/upgrade-popup";
 
 function formatDateUK(dateStr: string): string {
   try {
@@ -25,7 +26,11 @@ function formatDateUK(dateStr: string): string {
   }
 }
 
-function NewClientDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function NewClientDialog({ open, onOpenChange, onUpgradeRequired }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onUpgradeRequired: (info: any) => void;
+}) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: "",
@@ -38,7 +43,23 @@ function NewClientDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
 
   const mutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const res = await apiRequest("POST", "/api/clients", data);
+      const res = await fetch("/api/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (res.status === 402) {
+        const info = await res.json();
+        const err: any = new Error("limit");
+        err.isLimitError = true;
+        err.info = info;
+        throw err;
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to add client");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -47,7 +68,12 @@ function NewClientDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
       toast({ title: "Client added successfully" });
       setFormData({ name: "", email: "", phone: "", notes: "", sessionType: "1:1", status: "active" });
     },
-    onError: (err: Error) => {
+    onError: (err: any) => {
+      if (err?.isLimitError) {
+        onOpenChange(false);
+        onUpgradeRequired(err.info);
+        return;
+      }
       toast({ title: "Error adding client", description: err.message, variant: "destructive" });
     },
   });
@@ -895,6 +921,7 @@ export default function Clients() {
   const [newClientOpen, setNewClientOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [upgradeInfo, setUpgradeInfo] = useState<any>(null);
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -1000,8 +1027,9 @@ export default function Clients() {
         </div>
       )}
 
-      <NewClientDialog open={newClientOpen} onOpenChange={setNewClientOpen} />
+      <NewClientDialog open={newClientOpen} onOpenChange={setNewClientOpen} onUpgradeRequired={setUpgradeInfo} />
       {selectedClient && <ClientDetail client={selectedClient} onClose={() => setSelectedClient(null)} />}
+      <UpgradePopup open={!!upgradeInfo} onClose={() => setUpgradeInfo(null)} upgradeInfo={upgradeInfo} />
     </div>
   );
 }

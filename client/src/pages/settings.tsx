@@ -404,24 +404,41 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-base">Subscription</CardTitle>
-              <CardDescription>Your current plan and subscription status</CardDescription>
+              <CardDescription>Your current plan and client limits</CardDescription>
             </div>
             <Badge variant={settings?.subscriptionStatus === "active" ? "default" : "secondary"} data-testid="badge-subscription-status">
               {settings?.subscriptionStatus || "trial"}
             </Badge>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between gap-4 p-3 rounded-md bg-accent">
-            <div>
-              <p className="text-sm font-medium capitalize">{settings?.subscriptionPlan || "Free"} Plan</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {settings?.subscriptionPlan === "free"
-                  ? "Basic features included. Upgrade for email notifications and advanced compliance."
-                  : "All features unlocked."}
-              </p>
-            </div>
-          </div>
+        <CardContent className="space-y-3">
+          {(() => {
+            const plan = settings?.subscriptionPlan || "free";
+            const limits: Record<string, { max: number; price: string; next?: string }> = {
+              free: { max: 5, price: "Free", next: "Starter (£1.99/mo, up to 10 clients)" },
+              starter: { max: 10, price: "£1.99/month", next: "Professional (£4.99/mo, up to 20 clients)" },
+              professional: { max: 20, price: "£4.99/month", next: "Business (£7.99/mo, up to 50 clients)" },
+              business: { max: 50, price: "£7.99/month" },
+            };
+            const info = limits[plan] || limits.free;
+            return (
+              <>
+                <div className="flex items-center justify-between gap-4 p-3 rounded-md bg-accent">
+                  <div>
+                    <p className="text-sm font-medium capitalize">{plan} Plan — {info.price}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Up to {info.max} clients on this plan
+                    </p>
+                  </div>
+                </div>
+                {info.next && (
+                  <p className="text-xs text-muted-foreground">
+                    Need more? Upgrade to {info.next}. Contact your administrator or add a 6th client to see upgrade options.
+                  </p>
+                )}
+              </>
+            );
+          })()}
         </CardContent>
       </Card>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery, useMutation } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,7 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2, ShieldCheck, AlertTriangle, X } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Schedule from "@/pages/schedule";
@@ -17,6 +17,7 @@ import SettingsPage from "@/pages/settings";
 import Landing from "@/pages/landing";
 import Admin from "@/pages/admin";
 import PlatformAdmin from "@/pages/platform-admin";
+import PlatformAdminCoach from "@/pages/platform-admin-coach";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -81,6 +82,43 @@ function TermsModal() {
   );
 }
 
+function ImpersonationBanner() {
+  const [, navigate] = useLocation();
+  const { data: authUser } = useQuery<any>({ queryKey: ["/api/auth/user"] });
+
+  const stopMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/platform-admin/stop-impersonate", {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      navigate("/platform-admin");
+    },
+  });
+
+  if (!authUser?.isImpersonating) return null;
+
+  return (
+    <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-between text-sm font-medium z-50 flex-shrink-0">
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4" />
+        <span>Viewing as: <strong>{authUser.impersonatedUserName}</strong></span>
+      </div>
+      <button
+        onClick={() => stopMutation.mutate()}
+        disabled={stopMutation.isPending}
+        className="flex items-center gap-1 underline hover:no-underline"
+        data-testid="button-stop-impersonate"
+      >
+        <X className="h-4 w-4" />
+        Exit
+      </button>
+    </div>
+  );
+}
+
 function Router() {
   return (
     <Switch>
@@ -91,6 +129,7 @@ function Router() {
       <Route path="/settings" component={SettingsPage} />
       <Route path="/admin" component={Admin} />
       <Route path="/platform-admin" component={PlatformAdmin} />
+      <Route path="/platform-admin/coaches/:coachId" component={PlatformAdminCoach} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -106,6 +145,7 @@ function AuthenticatedApp() {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
+          <ImpersonationBanner />
           <header className="flex items-center gap-2 p-2 border-b h-12 flex-shrink-0">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
           </header>

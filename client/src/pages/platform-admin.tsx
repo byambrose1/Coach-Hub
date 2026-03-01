@@ -1,11 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Users, Calendar, FileText, TrendingUp, Activity, ShieldCheck, AlertCircle, Clock } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import type { User } from "@shared/schema";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import {
+  Users, Activity, FileText, DollarSign, ShieldAlert,
+  Link2, Crown, Search, ExternalLink, Save, ChevronRight
+} from "lucide-react";
+import { format } from "date-fns";
+import { useState } from "react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface PlatformStats {
   totalUsers: number;
@@ -17,31 +25,44 @@ interface PlatformStats {
   activeUsersThisMonth: number;
 }
 
-function StatCard({ title, value, icon: Icon, sub, color = "blue" }: {
+interface User {
+  id: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+  createdAt?: string;
+}
+
+interface PlatformConfig {
+  tier1MaxClients: number;
+  tier1Price: string;
+  tier1PaymentLink: string;
+  tier2MaxClients: number;
+  tier2Price: string;
+  tier2PaymentLink: string;
+  tier3MaxClients: number;
+  tier3Price: string;
+  tier3PaymentLink: string;
+  tier4MaxClients: number;
+  tier4Price: string;
+  tier4PaymentLink: string;
+}
+
+function StatCard({ title, value, icon: Icon, color = "text-primary" }: {
   title: string;
   value: string | number;
-  icon: React.ComponentType<{ className?: string }>;
-  sub?: string;
-  color?: "blue" | "green" | "amber" | "red" | "purple";
+  icon: any;
+  color?: string;
 }) {
-  const colors = {
-    blue: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
-    green: "bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400",
-    amber: "bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400",
-    red: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400",
-    purple: "bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400",
-  };
   return (
     <Card>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
+      <CardContent className="pt-5 pb-4">
+        <div className="flex items-center gap-3">
+          <Icon className={`h-8 w-8 ${color}`} />
           <div>
-            <p className="text-sm text-muted-foreground mb-1">{title}</p>
-            <p className="text-3xl font-bold">{value}</p>
-            {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
-          </div>
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colors[color]}`}>
-            <Icon className="w-5 h-5" />
+            <p className="text-2xl font-bold">{value}</p>
+            <p className="text-xs text-muted-foreground">{title}</p>
           </div>
         </div>
       </CardContent>
@@ -50,173 +71,276 @@ function StatCard({ title, value, icon: Icon, sub, color = "blue" }: {
 }
 
 export default function PlatformAdmin() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [configDraft, setConfigDraft] = useState<Partial<PlatformConfig> | null>(null);
+
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<PlatformStats>({
     queryKey: ["/api/platform-admin/stats"],
-    retry: false,
   });
 
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/platform-admin/users"],
-    retry: false,
-    enabled: !!stats,
   });
 
-  const today = format(new Date(), "EEEE, d MMMM yyyy");
+  const { data: config, isLoading: configLoading } = useQuery<PlatformConfig>({
+    queryKey: ["/api/platform-admin/config"],
+  });
+
+  const configMutation = useMutation({
+    mutationFn: async (data: Partial<PlatformConfig>) => {
+      await apiRequest("PUT", "/api/platform-admin/config", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/platform-admin/config"] });
+      setConfigDraft(null);
+      toast({ title: "Tier configuration saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save configuration", variant: "destructive" });
+    },
+  });
 
   if (statsError) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-          <ShieldCheck className="w-8 h-8 text-destructive" />
-        </div>
-        <h1 className="text-xl font-bold">Access Denied</h1>
-        <p className="text-muted-foreground text-center max-w-sm">
-          This area is restricted to the platform owner only.
-        </p>
+      <div className="min-h-screen flex items-center justify-center p-8">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-8 pb-8 text-center">
+            <ShieldAlert className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-bold mb-2">Access Denied</h2>
+            <p className="text-muted-foreground text-sm">This page is restricted to the platform owner.</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  if (statsLoading) {
-    return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
-        </div>
-      </div>
-    );
+  const filteredUsers = users.filter(u => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const name = `${u.firstName || ""} ${u.lastName || ""}`.toLowerCase();
+    return name.includes(q) || (u.email || "").toLowerCase().includes(q);
+  });
+
+  const currentConfig = configDraft || config || {};
+
+  function updateDraft(field: keyof PlatformConfig, value: string | number) {
+    setConfigDraft(prev => ({
+      ...(prev || config || {}),
+      [field]: value,
+    }));
+  }
+
+  function saveConfig() {
+    if (!configDraft) return;
+    const merged = { ...config, ...configDraft };
+    configMutation.mutate(merged);
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-h-screen bg-background p-6 space-y-8 max-w-5xl mx-auto">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-          <ShieldCheck className="w-5 h-5 text-primary" />
-        </div>
+        <Crown className="h-7 w-7 text-amber-500" />
         <div>
           <h1 className="text-2xl font-bold">Platform Admin</h1>
-          <p className="text-sm text-muted-foreground">{today} · Owner access only</p>
+          <p className="text-sm text-muted-foreground">Owner-only dashboard</p>
         </div>
       </div>
 
-      {/* Platform Stats */}
+      {/* Stats */}
       <div>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-          <Users className="w-4 h-4" /> Coaches / Users
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard title="Total Coaches" value={stats?.totalUsers ?? 0} icon={Users} color="blue" sub="registered accounts" />
-          <StatCard title="New This Month" value={stats?.newUsersThisMonth ?? 0} icon={Users} color="green" />
-          <StatCard title="Active This Month" value={stats?.activeUsersThisMonth ?? 0} icon={Activity} color="purple" sub="with sessions" />
-          <StatCard title="Total Clients" value={stats?.totalClients ?? 0} icon={Users} color="amber" sub="across all coaches" />
-        </div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Platform Overview</h2>
+        {statsLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <Card key={i}><CardContent className="pt-5 pb-4 h-20 animate-pulse bg-muted rounded" /></Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard title="Total Coaches" value={stats?.totalUsers || 0} icon={Users} color="text-blue-500" />
+            <StatCard title="New This Month" value={stats?.newUsersThisMonth || 0} icon={Activity} color="text-green-500" />
+            <StatCard title="Active Coaches" value={stats?.activeUsersThisMonth || 0} icon={Activity} color="text-violet-500" />
+            <StatCard title="Total Clients" value={stats?.totalClients || 0} icon={Users} color="text-orange-500" />
+            <StatCard title="Total Sessions" value={stats?.totalSessions || 0} icon={Activity} color="text-cyan-500" />
+            <StatCard title="Total Invoices" value={stats?.totalInvoices || 0} icon={FileText} color="text-pink-500" />
+            <StatCard title="Platform Revenue" value={`£${(stats?.totalRevenue || 0).toFixed(2)}`} icon={DollarSign} color="text-amber-500" />
+          </div>
+        )}
       </div>
 
+      {/* Tier Config */}
       <div>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4" /> Platform Activity
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <StatCard title="Total Sessions" value={stats?.totalSessions ?? 0} icon={Calendar} color="blue" sub="across all coaches" />
-          <StatCard title="Total Invoices" value={stats?.totalInvoices ?? 0} icon={FileText} color="amber" />
-          <StatCard
-            title="Total Revenue Processed"
-            value={`£${(stats?.totalRevenue ?? 0).toFixed(0)}`}
-            icon={TrendingUp}
-            color="green"
-            sub="paid invoices"
-          />
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Subscription Tiers & Payment Links
+          </h2>
+          {configDraft && (
+            <Button size="sm" onClick={saveConfig} disabled={configMutation.isPending} data-testid="button-save-config">
+              <Save className="h-4 w-4 mr-2" />
+              {configMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          )}
         </div>
-      </div>
-
-      {/* User List */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Users className="w-4 h-4 text-primary" />
-            Registered Coaches ({users.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {usersLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14" />)}
-            </div>
-          ) : users.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No registered coaches yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {users.map((user) => (
-                <div key={user.id} className="flex items-center justify-between gap-3 py-3 border-b last:border-0">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="w-9 h-9">
-                      {user.profileImageUrl && <AvatarImage src={user.profileImageUrl} />}
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                        {(user.firstName?.[0] || user.email?.[0] || "C").toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">
-                        {user.firstName && user.lastName
-                          ? `${user.firstName} ${user.lastName}`
-                          : user.firstName || user.email || "Unknown"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{user.email}</p>
-                    </div>
+        <Card>
+          <CardContent className="pt-5 space-y-6">
+            {configLoading ? (
+              <div className="animate-pulse space-y-4">
+                {[1, 2, 3, 4].map(i => <div key={i} className="h-16 bg-muted rounded" />)}
+              </div>
+            ) : (
+              [
+                { tier: 1, label: "Free", priceField: "tier1Price", maxField: "tier1MaxClients", linkField: "tier1PaymentLink" },
+                { tier: 2, label: "Starter", priceField: "tier2Price", maxField: "tier2MaxClients", linkField: "tier2PaymentLink" },
+                { tier: 3, label: "Professional", priceField: "tier3Price", maxField: "tier3MaxClients", linkField: "tier3PaymentLink" },
+                { tier: 4, label: "Business", priceField: "tier4Price", maxField: "tier4MaxClients", linkField: "tier4PaymentLink" },
+              ].map(({ tier, label, priceField, maxField, linkField }) => (
+                <div key={tier} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Tier {tier} — {label}</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">Max clients</p>
+                    <Input
+                      type="number"
+                      value={(currentConfig as any)[maxField] ?? ""}
+                      onChange={e => updateDraft(maxField as keyof PlatformConfig, parseInt(e.target.value) || 0)}
+                      className="mt-1"
+                      data-testid={`input-tier${tier}-max`}
+                    />
                   </div>
-                  <div className="flex items-center gap-2 text-right">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Joined</p>
-                      <p className="text-xs font-medium">
-                        {user.createdAt
-                          ? format(new Date(user.createdAt), "dd/MM/yyyy")
-                          : "—"}
-                      </p>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className="text-xs"
-                    >
-                      Coach
-                    </Badge>
+                  <div>
+                    <Label className="text-xs text-muted-foreground invisible">Price</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">Price (£/month)</p>
+                    <Input
+                      value={(currentConfig as any)[priceField] ?? ""}
+                      onChange={e => updateDraft(priceField as keyof PlatformConfig, e.target.value)}
+                      className="mt-1"
+                      placeholder="0"
+                      data-testid={`input-tier${tier}-price`}
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="text-xs text-muted-foreground invisible">Link</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">Payment link (Stripe, GoCardless, etc.)</p>
+                    <Input
+                      value={(currentConfig as any)[linkField] ?? ""}
+                      onChange={e => updateDraft(linkField as keyof PlatformConfig, e.target.value)}
+                      className="mt-1"
+                      placeholder="https://buy.stripe.com/..."
+                      data-testid={`input-tier${tier}-link`}
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ))
+            )}
+            <p className="text-xs text-muted-foreground pt-2 border-t">
+              When a coach hits their client limit, a popup appears with the relevant upgrade payment link. After payment, manually update their plan on the coach detail page.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* System Info */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Activity className="w-4 h-4 text-primary" />
-            System
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex justify-between items-center py-2 border-b">
-            <span className="text-sm text-muted-foreground">Auth Provider</span>
-            <Badge variant="outline" className="text-xs">Replit Auth (OIDC)</Badge>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b">
-            <span className="text-sm text-muted-foreground">Email Provider</span>
-            <Badge variant="outline" className="text-xs">Brevo Transactional</Badge>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b">
-            <span className="text-sm text-muted-foreground">Payment Provider</span>
-            <Badge variant="outline" className="text-xs">GoCardless (Sandbox)</Badge>
-          </div>
-          <div className="flex justify-between items-center py-2">
-            <span className="text-sm text-muted-foreground">Database</span>
-            <Badge variant="outline" className="text-xs">PostgreSQL (Drizzle ORM)</Badge>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Coaches List */}
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Registered Coaches</h2>
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or email..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-coaches"
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {usersLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => <div key={i} className="h-14 animate-pulse bg-muted rounded" />)}
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                {search ? "No coaches match your search" : "No coaches registered yet"}
+              </p>
+            ) : (
+              <div className="divide-y">
+                {filteredUsers.map(user => (
+                  <div
+                    key={user.id}
+                    className="flex items-center gap-4 py-3 cursor-pointer hover:bg-muted/50 rounded-lg px-2 -mx-2 transition-colors"
+                    onClick={() => navigate(`/platform-admin/coaches/${user.id}`)}
+                    data-testid={`row-coach-${user.id}`}
+                  >
+                    {user.profileImageUrl ? (
+                      <img src={user.profileImageUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
+                    ) : (
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                        {(user.firstName?.[0] || user.email?.[0] || "?").toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">
+                        {user.firstName || user.lastName
+                          ? `${user.firstName || ""} ${user.lastName || ""}`.trim()
+                          : user.email || "Unknown"}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    </div>
+                    <div className="text-right flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground hidden sm:block">
+                        Joined {user.createdAt ? format(new Date(user.createdAt), "dd/MM/yyyy") : "—"}
+                      </p>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* System Status */}
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">System</h2>
+        <Card>
+          <CardContent className="pt-4 pb-4 space-y-3">
+            {[
+              { label: "Auth Provider", value: "Replit Auth (OIDC)", url: "https://replit.com", status: "operational" },
+              { label: "Email Provider", value: "Brevo (transactional)", url: "https://app.brevo.com", status: "operational" },
+              { label: "Payment Provider", value: "GoCardless (direct debit)", url: "https://manage.gocardless.com", status: "operational" },
+              { label: "Database", value: "PostgreSQL / Drizzle ORM", url: null, status: "operational" },
+            ].map(item => (
+              <div key={item.label} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-2 w-2 rounded-full bg-green-500" />
+                  <div>
+                    <p className="text-sm font-medium">{item.label}</p>
+                    <p className="text-xs text-muted-foreground">{item.value}</p>
+                  </div>
+                </div>
+                {item.url ? (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                    data-testid={`link-system-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                  >
+                    Dashboard
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <Badge variant="outline" className="text-xs text-green-600 border-green-200">operational</Badge>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { eq, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
-  clients, trainingSessions, packages, sessionNotes, settings, clientForms, referrals, invoices, users,
+  clients, trainingSessions, packages, sessionNotes, settings, clientForms, referrals, invoices, users, platformConfig,
   type Client, type InsertClient,
   type Session, type InsertSession,
   type Package, type InsertPackage,
@@ -10,7 +10,7 @@ import {
   type ClientForm, type InsertClientForm,
   type Referral, type InsertReferral,
   type Invoice, type InsertInvoice,
-  type User,
+  type User, type PlatformConfig,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -59,6 +59,21 @@ export interface IStorage {
   // Platform admin (owner only)
   getAllUsers(): Promise<User[]>;
   getPlatformStats(): Promise<PlatformStats>;
+  getPlatformConfig(): Promise<PlatformConfig>;
+  upsertPlatformConfig(data: Partial<PlatformConfig>): Promise<PlatformConfig>;
+  getCoachDetail(coachId: string): Promise<CoachDetail | undefined>;
+  updateCoachPlan(coachId: string, plan: string): Promise<void>;
+}
+
+export interface CoachDetail {
+  coach: User;
+  clients: Client[];
+  stats: {
+    totalClients: number;
+    totalSessions: number;
+    totalRevenue: number;
+  };
+  plan: string;
 }
 
 export interface PlatformStats {
@@ -234,6 +249,53 @@ export class DatabaseStorage implements IStorage {
   // Platform admin
   async getAllUsers(): Promise<User[]> {
     return db.select().from(users).orderBy(users.createdAt);
+  }
+
+  async getPlatformConfig(): Promise<PlatformConfig> {
+    const rows = await db.select().from(platformConfig).where(eq(platformConfig.id, "default"));
+    if (rows[0]) return rows[0];
+    const created = await db.insert(platformConfig).values({ id: "default" }).returning();
+    return created[0];
+  }
+
+  async upsertPlatformConfig(data: Partial<PlatformConfig>): Promise<PlatformConfig> {
+    const existing = await db.select().from(platformConfig).where(eq(platformConfig.id, "default"));
+    if (existing[0]) {
+      const rows = await db.update(platformConfig).set(data).where(eq(platformConfig.id, "default")).returning();
+      return rows[0];
+    }
+    const rows = await db.insert(platformConfig).values({ id: "default", ...data }).returning();
+    return rows[0];
+  }
+
+  async getCoachDetail(coachId: string): Promise<CoachDetail | undefined> {
+    const [allUsers, coachClients, coachSessions, coachInvoices, coachSettings] = await Promise.all([
+      db.select().from(users).where(eq(users.id, coachId)),
+      db.select().from(clients).where(eq(clients.userId, coachId)),
+      db.select().from(trainingSessions).where(eq(trainingSessions.userId, coachId)),
+      db.select().from(invoices).where(eq(invoices.userId, coachId)),
+      db.select().from(settings).where(eq(settings.id, coachId)),
+    ]);
+    const coach = allUsers[0];
+    if (!coach) return undefined;
+    const totalRevenue = coachInvoices
+      .filter(inv => inv.status === "paid")
+      .reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
+    return {
+      coach,
+      clients: coachClients,
+      stats: { totalClients: coachClients.length, totalSessions: coachSessions.length, totalRevenue },
+      plan: coachSettings[0]?.subscriptionPlan || "free",
+    };
+  }
+
+  async updateCoachPlan(coachId: string, plan: string): Promise<void> {
+    const existing = await db.select().from(settings).where(eq(settings.id, coachId));
+    if (existing[0]) {
+      await db.update(settings).set({ subscriptionPlan: plan, subscriptionStatus: plan === "free" ? "trial" : "active" }).where(eq(settings.id, coachId));
+    } else {
+      await db.insert(settings).values({ id: coachId, trainerName: "Coach", subscriptionPlan: plan, subscriptionStatus: plan === "free" ? "trial" : "active" });
+    }
   }
 
   async getPlatformStats(): Promise<PlatformStats> {

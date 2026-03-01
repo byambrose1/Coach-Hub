@@ -40,8 +40,31 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - **Schedule**: Month/Week/Day calendar views with toggle, day detail dialog, book sessions (1:1, group, online, outdoor), mark complete/cancel. UK date format.
 - **Clients**: Client profiles with edit dialog (phone/email save fix), PARQ health forms tab, session history, editable packages (inline edit total/used sessions), full notes CRUD (create/edit/delete within profile with "edited" indicator)
 - **Payments**: Revenue Overview card (week/month toggle, breakdown by monthly billing vs block bookings + session count), session packages (block & monthly billing) with edit sessions, full invoice management (view detail, edit, download PDF, send/mark sent, mark paid), Monthly Payments tab with GoCardless direct debit mandate management per client, configurable currency (£/$/€), summary stats
-- **Settings**: Profile, cancellation policy, currency selector, payment settings, email notifications (stub), session reminders, HIPAA compliance, data retention, subscription info, account deletion
+- **Settings**: Profile, cancellation policy, currency selector, payment settings, email notifications (stub), session reminders, HIPAA compliance, data retention, subscription plan display (shows current tier limits), account deletion
 - **Admin**: Comprehensive admin overview page at /admin — account info, subscription status, client/session/invoice/revenue stats, system info (auth/email/payment providers)
+
+## Subscription Tier System
+- Free: 1-5 clients (no payment)
+- Starter: 6-10 clients (£1.99/month)
+- Professional: 11-20 clients (£4.99/month)
+- Business: 21-50 clients (£7.99/month)
+- POST /api/clients returns 402 with upgrade info when limit is hit
+- Frontend shows UpgradePopup with payment link when 402 returned
+- `subscriptionPlan` field in settings tracks current tier: "free" | "starter" | "professional" | "business"
+- Platform owner manually upgrades coach plans in platform admin coach detail page
+
+## Platform Config (Editable in Platform Admin)
+- `platform_config` table stores tier limits, prices, and payment links
+- All tier settings editable by owner in /platform-admin
+- Payment links support any provider (Stripe, GoCardless, etc.)
+
+## Platform Admin Features (/platform-admin)
+- Platform stats overview
+- Configurable tier limits and payment links
+- Searchable coach list (clickable rows)
+- Coach detail page at /platform-admin/coaches/:coachId — shows clients, stats, subscription plan management
+- Coach impersonation: owner can view the app as any coach; amber banner shows while impersonating with exit button
+- System status links (Brevo, GoCardless dashboards)
 
 ## Removed Features
 - **Notes page**: Removed from sidebar. Notes now live within each client's profile (Notes tab).
