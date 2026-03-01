@@ -22,9 +22,155 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, User, FileText, CreditCard, Bell, Shield, Trash2, Mail, Phone, MapPin, Receipt } from "lucide-react";
+import { Save, User, FileText, CreditCard, Bell, Shield, Trash2, Mail, Phone, MapPin, Receipt, Crown, ArrowUp, ArrowDown, ExternalLink, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Settings } from "@shared/schema";
+
+interface Tier {
+  name: string;
+  label: string;
+  max: number;
+  price: string;
+  paymentLink: string;
+}
+
+const PLAN_ORDER = ["free", "starter", "professional", "business"];
+
+function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
+  const { toast } = useToast();
+  const currentPlan = settings?.subscriptionPlan || "free";
+  const currentTierIndex = PLAN_ORDER.indexOf(currentPlan);
+
+  const { data: tiers = [], isLoading: tiersLoading } = useQuery<Tier[]>({
+    queryKey: ["/api/subscription/tiers"],
+    enabled: !!settings,
+  });
+
+  const { data: clients = [] } = useQuery<any[]>({ queryKey: ["/api/clients"] });
+
+  const planMutation = useMutation({
+    mutationFn: async (plan: string) => {
+      const res = await fetch("/api/settings/plan", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to change plan");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({ title: "Plan updated successfully" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Cannot downgrade", description: err.message, variant: "destructive" });
+    },
+  });
+
+  if (tiersLoading) {
+    return <Card><CardContent className="pt-6 h-32 animate-pulse bg-muted rounded" /></Card>;
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <Crown className="h-4 w-4 text-amber-500" />
+          <CardTitle className="text-base">Subscription Plan</CardTitle>
+        </div>
+        <CardDescription>
+          You currently have {clients.length} client{clients.length !== 1 ? "s" : ""}. Upgrade for more capacity, or downgrade if you're within the limit.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {tiers.map((tier, i) => {
+          const isCurrent = tier.name === currentPlan;
+          const isUpgrade = i > currentTierIndex;
+          const isDowngrade = i < currentTierIndex;
+          const canDowngrade = isDowngrade && clients.length <= tier.max;
+          const blockedDowngrade = isDowngrade && clients.length > tier.max;
+
+          return (
+            <div
+              key={tier.name}
+              className={`flex items-center justify-between gap-3 p-3 rounded-lg border transition-colors ${
+                isCurrent
+                  ? "border-primary bg-primary/5"
+                  : "border-border bg-background"
+              }`}
+              data-testid={`tier-card-${tier.name}`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                {isCurrent ? (
+                  <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                    <Check className="h-3.5 w-3.5 text-primary-foreground" />
+                  </div>
+                ) : (
+                  <div className="h-6 w-6 rounded-full border-2 border-muted flex-shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`font-medium text-sm ${isCurrent ? "text-primary" : ""}`}>
+                      {tier.label}
+                    </span>
+                    {isCurrent && <Badge className="text-xs h-4">Current</Badge>}
+                    <span className="text-xs text-muted-foreground">
+                      Up to {tier.max} clients
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {tier.price === "0" ? "Free" : `£${tier.price}/month`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0">
+                {isCurrent ? (
+                  <span className="text-xs text-muted-foreground">Active</span>
+                ) : isUpgrade ? (
+                  tier.paymentLink ? (
+                    <a href={tier.paymentLink} target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="default" className="gap-1.5 text-xs" data-testid={`button-upgrade-${tier.name}`}>
+                        <ArrowUp className="h-3 w-3" />
+                        Upgrade
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </a>
+                  ) : (
+                    <Button size="sm" variant="outline" disabled className="text-xs opacity-50">
+                      No link set
+                    </Button>
+                  )
+                ) : canDowngrade ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs"
+                    onClick={() => planMutation.mutate(tier.name)}
+                    disabled={planMutation.isPending}
+                    data-testid={`button-downgrade-${tier.name}`}
+                  >
+                    <ArrowDown className="h-3 w-3" />
+                    Downgrade
+                  </Button>
+                ) : blockedDowngrade ? (
+                  <span className="text-xs text-muted-foreground text-right max-w-[120px]">
+                    Remove {clients.length - tier.max} client{clients.length - tier.max !== 1 ? "s" : ""} first
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+        <p className="text-xs text-muted-foreground pt-1">
+          Upgrades are processed via external payment. After payment, your plan will be updated automatically or by your administrator.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -399,48 +545,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Subscription</CardTitle>
-              <CardDescription>Your current plan and client limits</CardDescription>
-            </div>
-            <Badge variant={settings?.subscriptionStatus === "active" ? "default" : "secondary"} data-testid="badge-subscription-status">
-              {settings?.subscriptionStatus || "trial"}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {(() => {
-            const plan = settings?.subscriptionPlan || "free";
-            const limits: Record<string, { max: number; price: string; next?: string }> = {
-              free: { max: 5, price: "Free", next: "Starter (£1.99/mo, up to 10 clients)" },
-              starter: { max: 10, price: "£1.99/month", next: "Professional (£4.99/mo, up to 20 clients)" },
-              professional: { max: 20, price: "£4.99/month", next: "Business (£7.99/mo, up to 50 clients)" },
-              business: { max: 50, price: "£7.99/month" },
-            };
-            const info = limits[plan] || limits.free;
-            return (
-              <>
-                <div className="flex items-center justify-between gap-4 p-3 rounded-md bg-accent">
-                  <div>
-                    <p className="text-sm font-medium capitalize">{plan} Plan — {info.price}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Up to {info.max} clients on this plan
-                    </p>
-                  </div>
-                </div>
-                {info.next && (
-                  <p className="text-xs text-muted-foreground">
-                    Need more? Upgrade to {info.next}. Contact your administrator or add a 6th client to see upgrade options.
-                  </p>
-                )}
-              </>
-            );
-          })()}
-        </CardContent>
-      </Card>
+      <SubscriptionSection settings={settings} />
 
       <Card className="border-destructive/50">
         <CardHeader className="pb-3">

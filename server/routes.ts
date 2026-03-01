@@ -199,6 +199,9 @@ export async function registerRoutes(
     if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
     try {
       const targetUserId = req.params.userId;
+      if (targetUserId === getRealUserId(req)) {
+        return res.status(400).json({ message: "Cannot impersonate yourself" });
+      }
       const detail = await storage.getCoachDetail(targetUserId);
       if (!detail) return res.status(404).json({ message: "Coach not found" });
       (req.session as any).impersonatedUserId = targetUserId;
@@ -213,6 +216,60 @@ export async function registerRoutes(
     delete (req.session as any).impersonatedUserId;
     delete (req.session as any).impersonatedUserName;
     res.json({ success: true });
+  });
+
+  // --- Subscription tiers (public, authenticated coaches) ---
+  app.get("/api/subscription/tiers", isAuthenticated, async (req, res) => {
+    try {
+      const config = await storage.getPlatformConfig();
+      res.json([
+        { name: "free", label: "Free", max: config.tier1MaxClients ?? 5, price: config.tier1Price ?? "0", paymentLink: config.tier1PaymentLink ?? "" },
+        { name: "starter", label: "Starter", max: config.tier2MaxClients ?? 10, price: config.tier2Price ?? "1.99", paymentLink: config.tier2PaymentLink ?? "" },
+        { name: "professional", label: "Professional", max: config.tier3MaxClients ?? 20, price: config.tier3Price ?? "4.99", paymentLink: config.tier3PaymentLink ?? "" },
+        { name: "business", label: "Business", max: config.tier4MaxClients ?? 50, price: config.tier4Price ?? "7.99", paymentLink: config.tier4PaymentLink ?? "" },
+      ]);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/settings/plan", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { plan } = req.body;
+      if (!["free", "starter", "professional", "business"].includes(plan)) {
+        return res.status(400).json({ message: "Invalid plan" });
+      }
+      const [config, existingClients, currentSettings] = await Promise.all([
+        storage.getPlatformConfig(),
+        storage.getClients(userId),
+        storage.getSettings(userId),
+      ]);
+      const tierMaxMap: Record<string, number> = {
+        free: config.tier1MaxClients ?? 5,
+        starter: config.tier2MaxClients ?? 10,
+        professional: config.tier3MaxClients ?? 20,
+        business: config.tier4MaxClients ?? 50,
+      };
+      const targetMax = tierMaxMap[plan];
+      const currentPlan = currentSettings?.subscriptionPlan || "free";
+      const isDowngrade = PLAN_TIER[plan] < PLAN_TIER[currentPlan];
+      if (isDowngrade && existingClients.length > targetMax) {
+        return res.status(400).json({
+          message: `You have ${existingClients.length} clients. The ${plan} plan only allows ${targetMax}. Remove ${existingClients.length - targetMax} client(s) first.`,
+          currentCount: existingClients.length,
+          targetMax,
+        });
+      }
+      const updated = await storage.upsertSettings(userId, {
+        ...currentSettings,
+        subscriptionPlan: plan,
+        subscriptionStatus: plan === "free" ? "trial" : "active",
+      });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   // --- Clients ---

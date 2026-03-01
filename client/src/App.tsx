@@ -98,7 +98,7 @@ function ImpersonationBanner() {
     },
   });
 
-  if (!authUser?.isImpersonating) return null;
+  if (!authUser?.isImpersonating || authUser?.impersonatedUserId === authUser?.id) return null;
 
   return (
     <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-between text-sm font-medium z-50 flex-shrink-0">

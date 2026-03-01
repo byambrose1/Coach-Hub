@@ -9,8 +9,15 @@ export function registerAuthRoutes(app: Express): void {
     try {
       const userId = req.user.claims.sub;
       const user = await authStorage.getUser(userId);
-      const impersonatedUserId = (req.session as any)?.impersonatedUserId;
-      const impersonatedUserName = (req.session as any)?.impersonatedUserName;
+      let impersonatedUserId = (req.session as any)?.impersonatedUserId;
+      let impersonatedUserName = (req.session as any)?.impersonatedUserName;
+      // Auto-clear self-impersonation
+      if (impersonatedUserId === userId) {
+        delete (req.session as any).impersonatedUserId;
+        delete (req.session as any).impersonatedUserName;
+        impersonatedUserId = undefined;
+        impersonatedUserName = undefined;
+      }
       res.json({
         ...user,
         isImpersonating: !!impersonatedUserId,
