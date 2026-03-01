@@ -7,6 +7,7 @@ export * from "./models/auth";
 
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull().default(""),
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
@@ -24,6 +25,7 @@ export type Client = typeof clients.$inferSelect;
 
 export const trainingSessions = pgTable("training_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull().default(""),
   clientId: varchar("client_id").notNull(),
   title: text("title").notNull(),
   date: text("date").notNull(),
@@ -41,6 +43,7 @@ export type Session = typeof trainingSessions.$inferSelect;
 
 export const packages = pgTable("packages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull().default(""),
   clientId: varchar("client_id").notNull(),
   name: text("name").notNull(),
   totalSessions: integer("total_sessions").notNull(),
@@ -58,6 +61,7 @@ export type Package = typeof packages.$inferSelect;
 
 export const sessionNotes = pgTable("session_notes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull().default(""),
   sessionId: varchar("session_id"),
   clientId: varchar("client_id").notNull(),
   content: text("content").notNull(),
@@ -99,6 +103,7 @@ export type Settings = typeof settings.$inferSelect;
 
 export const clientForms = pgTable("client_forms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull().default(""),
   clientId: varchar("client_id").notNull(),
   formType: text("form_type").notNull(),
   title: text("title").notNull(),
@@ -114,6 +119,7 @@ export type ClientForm = typeof clientForms.$inferSelect;
 
 export const referrals = pgTable("referrals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull().default(""),
   referrerClientId: varchar("referrer_client_id").notNull(),
   referredClientId: varchar("referred_client_id"),
   referredName: text("referred_name").notNull(),
@@ -132,6 +138,7 @@ export type Referral = typeof referrals.$inferSelect;
 
 export const invoices = pgTable("invoices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull().default(""),
   clientId: varchar("client_id").notNull(),
   packageId: varchar("package_id"),
   invoiceNumber: text("invoice_number").notNull(),

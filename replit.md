@@ -12,12 +12,26 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - **State**: TanStack React Query
 
 ## Project Structure
-- `client/src/pages/` - Landing, Dashboard, Schedule, Clients, Payments, Settings
+- `client/src/pages/` - Landing, Dashboard, Schedule, Clients, Payments, Settings, Admin, PlatformAdmin
 - `client/src/components/` - AppSidebar, shadcn UI components
 - `client/src/hooks/use-auth.ts` - Authentication hook (fetches /api/auth/user)
-- `server/` - Express server, routes, storage layer, database connection, seed data
+- `server/` - Express server, routes, storage layer, database connection
 - `server/replit_integrations/auth/` - Replit Auth setup (passport, OIDC, session store)
 - `shared/schema.ts` - Drizzle schema definitions
+
+## Multi-User Architecture
+- Every data table (clients, training_sessions, packages, session_notes, client_forms, invoices, referrals) has a `userId` column
+- All API routes extract the authenticated user's ID from `req.user.claims.sub` and scope all queries to that userId
+- Settings are stored per-user (id = userId in the settings table)
+- Each coach who logs in sees only their own data — fully isolated
+- The `users` table (from Replit Auth) tracks all registered coaches
+
+## Platform Owner Admin
+- URL: `/platform-admin` (hidden, not in sidebar)
+- Protected server-side: only accessible if `req.user.claims.sub === process.env.OWNER_USER_ID`
+- API endpoints: `GET /api/platform-admin/stats`, `GET /api/platform-admin/users`
+- Shows: total coaches, new signups, active users, total clients/sessions/invoices/revenue platform-wide
+- `OWNER_USER_ID` env var is set to the platform owner's Replit user ID
 
 ## Key Features
 - **Auth**: Replit Auth (OIDC) login/logout, route protection via isAuthenticated middleware

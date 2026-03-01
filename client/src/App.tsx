@@ -16,6 +16,7 @@ import Payments from "@/pages/payments";
 import SettingsPage from "@/pages/settings";
 import Landing from "@/pages/landing";
 import Admin from "@/pages/admin";
+import PlatformAdmin from "@/pages/platform-admin";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -89,6 +90,7 @@ function Router() {
       <Route path="/payments" component={Payments} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/admin" component={Admin} />
+      <Route path="/platform-admin" component={PlatformAdmin} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -2,8 +2,8 @@ import { storage } from "./storage";
 import { format, addDays, subDays } from "date-fns";
 
 export async function seedDatabase() {
-  const existingClients = await storage.getClients();
-  if (existingClients.length > 0) return;
+  // Seeding disabled for multi-user deployment — each coach starts with their own fresh account
+  return;
 
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");

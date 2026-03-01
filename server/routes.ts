@@ -6,6 +6,16 @@ import { isAuthenticated } from "./replit_integrations/auth";
 import { sendInvoiceEmail, sendBookingNotificationEmail, sendSessionCancellationEmail, sendSessionRescheduleEmail, sendParqEmail } from "./email";
 import { createMandateLink } from "./payments";
 
+function getUserId(req: any): string {
+  return req.user?.claims?.sub || "";
+}
+
+function isOwner(req: any): boolean {
+  const userId = getUserId(req);
+  const ownerId = process.env.OWNER_USER_ID;
+  return !!ownerId && userId === ownerId;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -21,13 +31,12 @@ export async function registerRoutes(
   app.use("/api/invoices", isAuthenticated);
 
   // --- GoCardless & Payments ---
-  app.post("/api/payments/create-mandate-link", async (req, res) => {
+  app.post("/api/payments/create-mandate-link", isAuthenticated, async (req, res) => {
     try {
       const { clientId } = req.body;
       const client = await storage.getClient(clientId);
       if (!client) return res.status(404).json({ message: "Client not found" });
       if (!client.email) return res.status(400).json({ message: "Client has no email" });
-
       const link = await createMandateLink(clientId, client.name, client.email);
       res.json({ link });
     } catch (err: any) {
@@ -43,11 +52,12 @@ export async function registerRoutes(
   // --- PARQ Email ---
   app.post("/api/parq/send-email", isAuthenticated, async (req, res) => {
     try {
+      const userId = getUserId(req);
       const { clientId } = req.body;
       const client = await storage.getClient(clientId);
       if (!client) return res.status(404).json({ message: "Client not found" });
       if (!client.email) return res.status(400).json({ message: "Client has no email address" });
-      const s = await storage.getSettings();
+      const s = await storage.getSettings(userId);
       await sendParqEmail({
         clientName: client.name,
         clientEmail: client.email,
@@ -61,16 +71,17 @@ export async function registerRoutes(
     }
   });
 
-  // --- Admin ---
-  app.get("/api/admin/stats", isAuthenticated, async (_req, res) => {
+  // --- Coach-level admin (per-user stats) ---
+  app.get("/api/admin/stats", isAuthenticated, async (req, res) => {
     try {
-      const [clients, sessions, packages, invoices, notes, forms] = await Promise.all([
-        storage.getClients(),
-        storage.getSessions(),
-        storage.getPackages(),
-        storage.getInvoices(),
-        storage.getNotes(),
-        storage.getClientForms(),
+      const userId = getUserId(req);
+      const [clientList, sessions, packages, invoices, notes, forms] = await Promise.all([
+        storage.getClients(userId),
+        storage.getSessions(userId),
+        storage.getPackages(userId),
+        storage.getInvoices(userId),
+        storage.getNotes(userId),
+        storage.getClientForms(userId),
       ]);
       const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -79,9 +90,9 @@ export async function registerRoutes(
       const monthStartStr = monthStart.toISOString().split("T")[0];
       const todayStr = now.toISOString().split("T")[0];
 
-      const stats = {
-        totalClients: clients.length,
-        activeClients: clients.filter(c => c.status === "active").length,
+      res.json({
+        totalClients: clientList.length,
+        activeClients: clientList.filter(c => c.status === "active").length,
         totalSessions: sessions.length,
         sessionsThisWeek: sessions.filter(s => s.date >= weekAgoStr && s.date <= todayStr).length,
         sessionsThisMonth: sessions.filter(s => s.date >= monthStartStr && s.date <= todayStr).length,
@@ -94,17 +105,38 @@ export async function registerRoutes(
         monthlySubscribers: packages.filter(p => p.billingType === "monthly" && p.status === "active").length,
         totalNotes: notes.length,
         totalForms: forms.length,
-      };
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // --- Platform Owner Admin ---
+  app.get("/api/platform-admin/stats", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const stats = await storage.getPlatformStats();
       res.json(stats);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
+  app.get("/api/platform-admin/users", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const allUsers = await storage.getAllUsers();
+      res.json(allUsers);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // --- Clients ---
-  app.get("/api/clients", async (_req, res) => {
-    const clients = await storage.getClients();
-    res.json(clients);
+  app.get("/api/clients", async (req, res) => {
+    const userId = getUserId(req);
+    const clientList = await storage.getClients(userId);
+    res.json(clientList);
   });
 
   app.get("/api/clients/:id", async (req, res) => {
@@ -114,9 +146,10 @@ export async function registerRoutes(
   });
 
   app.post("/api/clients", async (req, res) => {
+    const userId = getUserId(req);
     const parsed = insertClientSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
-    const client = await storage.createClient(parsed.data);
+    const client = await storage.createClient(userId, parsed.data);
     res.status(201).json(client);
   });
 
@@ -132,8 +165,9 @@ export async function registerRoutes(
   });
 
   // --- Sessions ---
-  app.get("/api/sessions", async (_req, res) => {
-    const sessions = await storage.getSessions();
+  app.get("/api/sessions", async (req, res) => {
+    const userId = getUserId(req);
+    const sessions = await storage.getSessions(userId);
     res.json(sessions);
   });
 
@@ -144,14 +178,14 @@ export async function registerRoutes(
   });
 
   app.post("/api/sessions", async (req, res) => {
+    const userId = getUserId(req);
     const parsed = insertSessionSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
-    const session = await storage.createSession(parsed.data);
-    
-    // Trigger notification
+    const session = await storage.createSession(userId, parsed.data);
+
     try {
       const client = await storage.getClient(session.clientId);
-      const s = await storage.getSettings();
+      const s = await storage.getSettings(userId);
       if (client?.email) {
         await sendBookingNotificationEmail({
           clientName: client.name,
@@ -176,7 +210,8 @@ export async function registerRoutes(
     if (!session) return res.status(404).json({ message: "Session not found" });
 
     if (req.body.status === "completed") {
-      const pkgs = await storage.getPackages();
+      const userId = session.userId || "";
+      const pkgs = await storage.getPackages(userId);
       const activePackage = pkgs.find(
         (p) => p.clientId === session.clientId && p.status === "active" && (p.totalSessions - (p.usedSessions || 0)) > 0
       );
@@ -187,10 +222,9 @@ export async function registerRoutes(
       }
     }
 
-    // Send email notifications for cancellations and reschedules
     try {
       const client = await storage.getClient(session.clientId);
-      const s = await storage.getSettings();
+      const s = await storage.getSettings(session.userId || "");
       if (client?.email && existing) {
         const emailData = {
           clientName: client.name,
@@ -229,37 +263,37 @@ export async function registerRoutes(
   });
 
   // --- Packages ---
-  app.get("/api/packages", async (_req, res) => {
-    const packages = await storage.getPackages();
-    res.json(packages);
+  app.get("/api/packages", async (req, res) => {
+    const userId = getUserId(req);
+    const pkgs = await storage.getPackages(userId);
+    res.json(pkgs);
   });
 
   app.post("/api/packages", async (req, res) => {
+    const userId = getUserId(req);
     const parsed = insertPackageSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
-    const pkg = await storage.createPackage(parsed.data);
+    const pkg = await storage.createPackage(userId, parsed.data);
     res.status(201).json(pkg);
   });
 
   app.patch("/api/packages/:id", async (req, res) => {
     const pkg = await storage.updatePackage(req.params.id, req.body);
     if (!pkg) return res.status(404).json({ message: "Package not found" });
-    
-    // If billing type changed to monthly, ensure we have a next billing date if not provided
     if (req.body.billingType === "monthly" && !req.body.nextBillingDate && !pkg.nextBillingDate) {
       const nextMonth = new Date();
       nextMonth.setMonth(nextMonth.getMonth() + 1);
-      await storage.updatePackage(req.params.id, { 
-        nextBillingDate: nextMonth.toISOString().split("T")[0] 
+      await storage.updatePackage(req.params.id, {
+        nextBillingDate: nextMonth.toISOString().split("T")[0],
       });
     }
-    
     res.json(pkg);
   });
 
   // --- Notes ---
-  app.get("/api/notes", async (_req, res) => {
-    const notes = await storage.getNotes();
+  app.get("/api/notes", async (req, res) => {
+    const userId = getUserId(req);
+    const notes = await storage.getNotes(userId);
     res.json(notes);
   });
 
@@ -270,9 +304,10 @@ export async function registerRoutes(
   });
 
   app.post("/api/notes", async (req, res) => {
+    const userId = getUserId(req);
     const parsed = insertSessionNoteSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
-    const note = await storage.createNote(parsed.data);
+    const note = await storage.createNote(userId, parsed.data);
     res.status(201).json(note);
   });
 
@@ -288,10 +323,11 @@ export async function registerRoutes(
   });
 
   // --- Settings ---
-  app.get("/api/settings", async (_req, res) => {
-    let s = await storage.getSettings();
+  app.get("/api/settings", async (req, res) => {
+    const userId = getUserId(req);
+    let s = await storage.getSettings(userId);
     if (!s) {
-      s = await storage.upsertSettings({
+      s = await storage.upsertSettings(userId, {
         trainerName: "Coach",
         cancellationPolicy: "",
         paymentLink: "",
@@ -303,13 +339,15 @@ export async function registerRoutes(
   });
 
   app.put("/api/settings", async (req, res) => {
-    const s = await storage.upsertSettings(req.body);
+    const userId = getUserId(req);
+    const s = await storage.upsertSettings(userId, req.body);
     res.json(s);
   });
 
   // --- Client Forms ---
-  app.get("/api/forms", async (_req, res) => {
-    const forms = await storage.getClientForms();
+  app.get("/api/forms", async (req, res) => {
+    const userId = getUserId(req);
+    const forms = await storage.getClientForms(userId);
     res.json(forms);
   });
 
@@ -320,9 +358,10 @@ export async function registerRoutes(
   });
 
   app.post("/api/forms", async (req, res) => {
+    const userId = getUserId(req);
     const parsed = insertClientFormSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
-    const form = await storage.createClientForm(parsed.data);
+    const form = await storage.createClientForm(userId, parsed.data);
     res.status(201).json(form);
   });
 
@@ -338,15 +377,17 @@ export async function registerRoutes(
   });
 
   // --- Referrals ---
-  app.get("/api/referrals", async (_req, res) => {
-    const refs = await storage.getReferrals();
+  app.get("/api/referrals", async (req, res) => {
+    const userId = getUserId(req);
+    const refs = await storage.getReferrals(userId);
     res.json(refs);
   });
 
   app.post("/api/referrals", async (req, res) => {
+    const userId = getUserId(req);
     const parsed = insertReferralSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
-    const ref = await storage.createReferral(parsed.data);
+    const ref = await storage.createReferral(userId, parsed.data);
     res.status(201).json(ref);
   });
 
@@ -357,15 +398,17 @@ export async function registerRoutes(
   });
 
   // --- Invoices ---
-  app.get("/api/invoices", async (_req, res) => {
-    const invs = await storage.getInvoices();
+  app.get("/api/invoices", async (req, res) => {
+    const userId = getUserId(req);
+    const invs = await storage.getInvoices(userId);
     res.json(invs);
   });
 
   app.post("/api/invoices", async (req, res) => {
+    const userId = getUserId(req);
     const parsed = insertInvoiceSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
-    const inv = await storage.createInvoice(parsed.data);
+    const inv = await storage.createInvoice(userId, parsed.data);
     res.status(201).json(inv);
   });
 
@@ -379,12 +422,10 @@ export async function registerRoutes(
     try {
       const inv = await storage.getInvoice(req.params.id);
       if (!inv) return res.status(404).json({ message: "Invoice not found" });
-
       const client = await storage.getClient(inv.clientId);
       if (!client) return res.status(404).json({ message: "Client not found" });
       if (!client.email) return res.status(400).json({ message: "Client has no email address" });
-
-      const s = await storage.getSettings();
+      const s = await storage.getSettings(inv.userId || "");
       const currency = s?.currency || "£";
 
       await sendInvoiceEmail({
