@@ -71,7 +71,26 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 ## Email (Brevo)
 - Invoice sending uses Brevo transactional email API (`@getbrevo/brevo` SDK)
 - API key stored in `BREVO_API_KEY` environment secret
-- Email service: `server/email.ts` - `sendInvoiceEmail()` function
+- Email service: `server/email.ts` - `sendInvoiceEmail()` and `sendBookingNotificationEmail()`
 - Sender email comes from `settings.trainerEmail`; sender name from `settings.businessName` or `settings.trainerName`
 - Important: The sender email must be a verified sender in your Brevo account
 - POST `/api/invoices/:id/send` triggers email delivery and marks invoice as "sent"
+- Booking notification emails fire automatically on POST /api/sessions if client has email
+
+## GoCardless (Monthly Payments)
+- `gocardless-nodejs` package installed; `server/payments.ts` with `createMandateLink()`
+- Requires `GOCARDLESS_API_KEY` environment secret (not yet configured)
+- "Set Up Monthly Payment" button in client profile generates a redirect link for direct debit mandate setup
+- Uses `createRequire(import.meta.url)` to handle CJS package in ESM context
+- Currently configured to use Sandbox environment
+- POST `/api/payments/create-mandate-link` endpoint
+
+## Terms & Conditions
+- `hasAcceptedTerms` field in settings table
+- `TermsModal` in `App.tsx` shown once on first login until accepted
+- Accepts: checkbox + "Continue" button saves `hasAcceptedTerms: true` to settings
+- Modal is non-dismissable until accepted (the `onOpenChange` does nothing)
+
+## API Routes (additional)
+- POST /api/payments/create-mandate-link
+- POST /api/webhooks/gocardless
