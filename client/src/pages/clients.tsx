@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save } from "lucide-react";
+import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save, CreditCard, Copy } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { Client, Session, Package as PackageType, SessionNote, ClientForm } from "@shared/schema";
 
@@ -153,6 +153,9 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState("");
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+
+  const [mandateLink, setMandateLink] = useState<string | null>(null);
+  const [isCreatingMandate, setIsMandateLoading] = useState(false);
 
   const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
   const [editPkgTotal, setEditPkgTotal] = useState(0);
@@ -310,6 +313,20 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
     },
   });
 
+  const createMandateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/payments/create-mandate-link", { clientId: client.id });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setMandateLink(data.link);
+      toast({ title: "Mandate link created" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to create link", description: err.message, variant: "destructive" });
+    }
+  });
+
   const handleCloseDialog = () => {
     setIsEditing(false);
     setShowDeleteConfirm(false);
@@ -371,6 +388,9 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="secondary" className="text-xs">{currentClient.sessionType || "1:1"}</Badge>
                   <Badge variant={currentClient.status === "active" ? "default" : "secondary"} className="text-xs">{currentClient.status}</Badge>
+                  <Badge variant={currentClient.gocardlessMandateStatus === "active" ? "default" : "secondary"} className="text-xs">
+                    Monthly: {currentClient.gocardlessMandateStatus || "inactive"}
+                  </Badge>
                 </div>
               </div>
             </DialogTitle>
@@ -424,6 +444,34 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                 <p className="text-xl font-bold">{upcomingCount}</p>
                 <p className="text-xs text-muted-foreground">Upcoming</p>
               </div>
+            </div>
+
+            <div className="pt-2">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start" 
+                onClick={() => createMandateMutation.mutate()}
+                disabled={createMandateMutation.isPending}
+              >
+                <CreditCard className="w-4 h-4 mr-2" />
+                {createMandateMutation.isPending ? "Generating Link..." : "Set Up Monthly Payment"}
+              </Button>
+              {mandateLink && (
+                <div className="mt-2 p-2 bg-muted rounded-md flex items-center justify-between gap-2">
+                  <p className="text-xs truncate flex-1">{mandateLink}</p>
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className="h-8 w-8"
+                    onClick={() => {
+                      navigator.clipboard.writeText(mandateLink);
+                      toast({ title: "Link copied to clipboard" });
+                    }}
+                  >
+                    <Copy className="w-3 h-3" />
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 

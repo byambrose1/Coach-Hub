@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema } from "@shared/schema";
 import { isAuthenticated } from "./replit_integrations/auth";
-import { sendInvoiceEmail } from "./email";
+import { sendInvoiceEmail, sendBookingNotificationEmail } from "./email";
+import { createMandateLink } from "./payments";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -18,6 +19,27 @@ export async function registerRoutes(
   app.use("/api/forms", isAuthenticated);
   app.use("/api/referrals", isAuthenticated);
   app.use("/api/invoices", isAuthenticated);
+
+  // --- GoCardless & Payments ---
+  app.post("/api/payments/create-mandate-link", async (req, res) => {
+    try {
+      const { clientId } = req.body;
+      const client = await storage.getClient(clientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!client.email) return res.status(400).json({ message: "Client has no email" });
+
+      const link = await createMandateLink(clientId, client.name, client.email);
+      res.json({ link });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/webhooks/gocardless", async (req, res) => {
+    // Simplistic webhook implementation
+    console.log("GoCardless webhook received:", req.body);
+    res.status(204).send();
+  });
 
   // --- Clients ---
   app.get("/api/clients", async (_req, res) => {
@@ -65,6 +87,26 @@ export async function registerRoutes(
     const parsed = insertSessionSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const session = await storage.createSession(parsed.data);
+    
+    // Trigger notification
+    try {
+      const client = await storage.getClient(session.clientId);
+      const s = await storage.getSettings();
+      if (client?.email) {
+        await sendBookingNotificationEmail({
+          clientName: client.name,
+          clientEmail: client.email,
+          sessionDate: session.date,
+          sessionTime: session.startTime,
+          trainerName: s?.trainerName || "Coach",
+          businessName: s?.businessName || "",
+          trainerEmail: s?.trainerEmail || undefined,
+        });
+      }
+    } catch (err) {
+      console.error("Notification error:", err);
+    }
+
     res.status(201).json(session);
   });
 

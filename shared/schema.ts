@@ -15,6 +15,7 @@ export const clients = pgTable("clients", {
   status: text("status").default("active"),
   referredBy: varchar("referred_by"),
   referralCode: text("referral_code"),
+  gocardlessMandateStatus: text("gocardless_mandate_status").default("inactive"),
 });
 
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true });
@@ -89,6 +90,7 @@ export const settings = pgTable("settings", {
   dataRetentionDays: integer("data_retention_days").default(365),
   termsAccepted: boolean("terms_accepted").default(false),
   currency: text("currency").default("£"),
+  hasAcceptedTerms: boolean("has_accepted_terms").default(false),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({ id: true });

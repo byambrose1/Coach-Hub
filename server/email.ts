@@ -105,18 +105,77 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
 
   try {
     console.log(`Attempting to send invoice email to ${clientEmail} via Brevo...`);
-    const response = await brevo.transactionalEmails.sendTransacEmail({
+    await brevo.transactionalEmails.sendTransacEmail({
       subject: `Invoice ${invoiceNumber} from ${senderName}`,
       htmlContent,
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
     });
-    console.log(`Brevo response:`, JSON.stringify(response));
+    console.log(`Invoice email sent successfully to ${clientEmail}`);
   } catch (error: any) {
     console.error(`Failed to send email via Brevo:`, error);
-    if (error.response) {
-      console.error(`Brevo error response body:`, JSON.stringify(error.response.body));
-    }
     throw error;
+  }
+}
+
+export async function sendBookingNotificationEmail(data: {
+  clientName: string;
+  clientEmail: string;
+  sessionDate: string;
+  sessionTime: string;
+  trainerName: string;
+  businessName?: string;
+  trainerEmail?: string;
+}): Promise<void> {
+  const { clientName, clientEmail, sessionDate, sessionTime, trainerName, businessName, trainerEmail } = data;
+  
+  const senderName = businessName || trainerName || "FitTrack";
+  const senderEmail = trainerEmail || "noreply@fittrack.app";
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f7; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; padding: 30px; }
+    .header { color: #2563eb; text-align: center; margin-bottom: 30px; }
+    .details { background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0; }
+    .footer { text-align: center; font-size: 12px; color: #888; margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Session Booked!</h1>
+    </div>
+    <p>Hi ${clientName},</p>
+    <p>A new session has been scheduled for you by <strong>${trainerName}</strong>.</p>
+    
+    <div class="details">
+      <p><strong>Date:</strong> ${sessionDate}</p>
+      <p><strong>Time:</strong> ${sessionTime}</p>
+    </div>
+    
+    <p>We look forward to seeing you then!</p>
+    
+    <div class="footer">
+      <p>Sent via FitTrack by ${senderName}</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    await brevo.transactionalEmails.sendTransacEmail({
+      subject: `New Session Booked: ${sessionDate}`,
+      htmlContent,
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: clientEmail, name: clientName }],
+    });
+    console.log(`Booking notification sent to ${clientEmail}`);
+  } catch (error) {
+    console.error("Failed to send booking notification:", error);
   }
 }

@@ -51,6 +51,7 @@ export default function SettingsPage() {
     dataRetentionDays: 365,
     termsAccepted: false,
     currency: "£",
+    hasAcceptedTerms: false,
   });
 
   useEffect(() => {
@@ -73,6 +74,7 @@ export default function SettingsPage() {
         dataRetentionDays: settings.dataRetentionDays || 365,
         termsAccepted: settings.termsAccepted || false,
         currency: settings.currency || "£",
+        hasAcceptedTerms: settings.hasAcceptedTerms || false,
       });
     }
   }, [settings]);
@@ -198,25 +200,11 @@ export default function SettingsPage() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <CreditCard className="w-4 h-4" />
-            Payment
+            <Shield className="w-4 h-4" />
+            Payment Settings
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Currency</Label>
-            <Select value={formData.currency} onValueChange={(v) => setFormData({ ...formData, currency: v })}>
-              <SelectTrigger className="max-w-[120px]" data-testid="select-currency">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="£">£ GBP</SelectItem>
-                <SelectItem value="$">$ USD</SelectItem>
-                <SelectItem value="€">€ EUR</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">Currency symbol used across the app.</p>
-          </div>
           <div className="space-y-2">
             <Label>Payment Link</Label>
             <Input
@@ -235,6 +223,31 @@ export default function SettingsPage() {
               onChange={(e) => setFormData({ ...formData, acceptedPaymentMethods: e.target.value })}
               data-testid="input-payment-methods"
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="w-4 h-4" />
+            App Configuration
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Currency</Label>
+            <Select value={formData.currency} onValueChange={(v) => setFormData({ ...formData, currency: v })}>
+              <SelectTrigger className="max-w-[120px]" data-testid="select-currency">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="£">£ GBP</SelectItem>
+                <SelectItem value="$">$ USD</SelectItem>
+                <SelectItem value="€">€ EUR</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Currency symbol used across the app.</p>
           </div>
           <div className="space-y-2">
             <Label className="flex items-center gap-1"><Receipt className="w-3 h-3" /> Invoice Number Prefix</Label>

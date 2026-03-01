@@ -801,30 +801,6 @@ export default function Payments() {
         </Card>
       </div>
 
-      {settings?.paymentLink && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-                  <CreditCard className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Payment Link</p>
-                  <p className="text-xs text-muted-foreground truncate max-w-xs">{settings.paymentLink}</p>
-                </div>
-              </div>
-              <Button variant="secondary" size="sm" asChild>
-                <a href={settings.paymentLink} target="_blank" rel="noopener noreferrer" data-testid="link-payment">
-                  <ExternalLink className="w-3 h-3 mr-1" />
-                  Open
-                </a>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <Tabs defaultValue="packages">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <TabsList data-testid="tabs-payments">
