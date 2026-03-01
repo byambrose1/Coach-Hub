@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save, CreditCard, Copy } from "lucide-react";
+import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { Client, Session, Package as PackageType, SessionNote, ClientForm } from "@shared/schema";
 
@@ -153,9 +153,6 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState("");
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
-
-  const [mandateLink, setMandateLink] = useState<string | null>(null);
-  const [isCreatingMandate, setIsMandateLoading] = useState(false);
 
   const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
   const [editPkgTotal, setEditPkgTotal] = useState(0);
@@ -313,17 +310,16 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
     },
   });
 
-  const createMandateMutation = useMutation({
+  const sendParqEmailMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/payments/create-mandate-link", { clientId: client.id });
+      const res = await apiRequest("POST", "/api/parq/send-email", { clientId: client.id });
       return res.json();
     },
-    onSuccess: (data) => {
-      setMandateLink(data.link);
-      toast({ title: "Mandate link created" });
+    onSuccess: () => {
+      toast({ title: "PAR-Q email sent", description: `PAR-Q form sent to ${currentClient.email}` });
     },
     onError: (err: Error) => {
-      toast({ title: "Failed to create link", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to send email", description: err.message, variant: "destructive" });
     }
   });
 
@@ -446,33 +442,6 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
               </div>
             </div>
 
-            <div className="pt-2">
-              <Button 
-                variant="outline" 
-                className="w-full justify-start" 
-                onClick={() => createMandateMutation.mutate()}
-                disabled={createMandateMutation.isPending}
-              >
-                <CreditCard className="w-4 h-4 mr-2" />
-                {createMandateMutation.isPending ? "Generating Link..." : "Set Up Monthly Payment"}
-              </Button>
-              {mandateLink && (
-                <div className="mt-2 p-2 bg-muted rounded-md flex items-center justify-between gap-2">
-                  <p className="text-xs truncate flex-1">{mandateLink}</p>
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    className="h-8 w-8"
-                    onClick={() => {
-                      navigator.clipboard.writeText(mandateLink);
-                      toast({ title: "Link copied to clipboard" });
-                    }}
-                  >
-                    <Copy className="w-3 h-3" />
-                  </Button>
-                </div>
-              )}
-            </div>
           </div>
 
           <Tabs defaultValue="sessions" className="mt-2">
@@ -700,17 +669,30 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
             </TabsContent>
 
             <TabsContent value="forms" className="mt-3 space-y-3">
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setParqAnswers({});
-                  setShowParqForm(true);
-                }}
-                data-testid="button-new-parq-form"
-              >
-                <ClipboardCheck className="w-4 h-4 mr-1" />
-                New PARQ Form
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setParqAnswers({});
+                    setShowParqForm(true);
+                  }}
+                  data-testid="button-new-parq-form"
+                >
+                  <ClipboardCheck className="w-4 h-4 mr-1" />
+                  New PARQ Form
+                </Button>
+                {currentClient.email && (
+                  <Button
+                    variant="outline"
+                    onClick={() => sendParqEmailMutation.mutate()}
+                    disabled={sendParqEmailMutation.isPending}
+                    data-testid="button-send-parq-email"
+                  >
+                    <Mail className="w-4 h-4 mr-1" />
+                    {sendParqEmailMutation.isPending ? "Sending..." : "Email PAR-Q to Client"}
+                  </Button>
+                )}
+              </div>
               {clientForms.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No forms yet</p>
               ) : (

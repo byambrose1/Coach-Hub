@@ -1,11 +1,171 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Calendar, Users, Clock, AlertTriangle, Plus, ChevronRight } from "lucide-react";
 import { format, isToday, isTomorrow, parseISO } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Session, Client, Package } from "@shared/schema";
+
+function QuickBookDialog({ open, onOpenChange, clients }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  clients: Client[];
+}) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    clientId: "",
+    title: "",
+    date: format(new Date(), "yyyy-MM-dd"),
+    startTime: "09:00",
+    endTime: "10:00",
+    sessionType: "1:1",
+    location: "",
+    notes: "",
+  });
+
+  const selectedClient = clients.find((c) => c.id === formData.clientId);
+
+  const mutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const title = data.title || (selectedClient ? `Session with ${selectedClient.name}` : "Training Session");
+      const res = await apiRequest("POST", "/api/sessions", { ...data, title });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      onOpenChange(false);
+      toast({ title: "Session booked!" });
+      setFormData({
+        clientId: "",
+        title: "",
+        date: format(new Date(), "yyyy-MM-dd"),
+        startTime: "09:00",
+        endTime: "10:00",
+        sessionType: "1:1",
+        location: "",
+        notes: "",
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error booking session", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Quick Book Session</DialogTitle>
+          <DialogDescription>Book a session without leaving the dashboard.</DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => { e.preventDefault(); mutation.mutate(formData); }}
+          className="space-y-4"
+        >
+          <div className="space-y-2">
+            <Label>Client</Label>
+            <Select value={formData.clientId} onValueChange={(v) => setFormData({ ...formData, clientId: v })}>
+              <SelectTrigger data-testid="select-quickbook-client">
+                <SelectValue placeholder="Select a client" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                data-testid="input-quickbook-date"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={formData.sessionType} onValueChange={(v) => setFormData({ ...formData, sessionType: v })}>
+                <SelectTrigger data-testid="select-quickbook-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1:1">1:1</SelectItem>
+                  <SelectItem value="group">Group</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="outdoor">Outdoor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Start Time</Label>
+              <Input
+                type="time"
+                value={formData.startTime}
+                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                data-testid="input-quickbook-start"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>End Time</Label>
+              <Input
+                type="time"
+                value={formData.endTime}
+                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                data-testid="input-quickbook-end"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Location (optional)</Label>
+            <Input
+              placeholder="Gym, Park, Zoom..."
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              data-testid="input-quickbook-location"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Notes (optional)</Label>
+            <Textarea
+              placeholder="Session notes..."
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="min-h-[60px]"
+              data-testid="input-quickbook-notes"
+            />
+          </div>
+
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={!formData.clientId || mutation.isPending}
+            data-testid="button-submit-quickbook"
+          >
+            {mutation.isPending ? "Booking..." : "Book Session"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function StatCard({ title, value, icon: Icon, subtitle, href }: { title: string; value: string | number; icon: any; subtitle?: string; href?: string }) {
   const card = (
@@ -77,6 +237,7 @@ function SessionRow({ session, clientName }: { session: Session; clientName: str
 }
 
 export default function Dashboard() {
+  const [quickBookOpen, setQuickBookOpen] = useState(false);
   const today = format(new Date(), "yyyy-MM-dd");
 
   const { data: sessions = [], isLoading: sessionsLoading } = useQuery<Session[]>({
@@ -139,11 +300,9 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold" data-testid="text-dashboard-title">Dashboard</h1>
           <p className="text-muted-foreground text-sm">{format(new Date(), "EEEE, d MMMM yyyy")}</p>
         </div>
-        <Button asChild data-testid="button-quick-book">
-          <a href="/schedule?new=true">
-            <Plus className="w-4 h-4 mr-1" />
-            Quick Book
-          </a>
+        <Button onClick={() => setQuickBookOpen(true)} data-testid="button-quick-book">
+          <Plus className="w-4 h-4 mr-1" />
+          Quick Book
         </Button>
       </div>
 
@@ -179,8 +338,8 @@ export default function Dashboard() {
               <div className="text-center py-8">
                 <Calendar className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">No sessions scheduled for today</p>
-                <Button variant="secondary" size="sm" className="mt-3" asChild>
-                  <a href="/schedule?new=true">Book a Session</a>
+                <Button variant="secondary" size="sm" className="mt-3" onClick={() => setQuickBookOpen(true)}>
+                  Book a Session
                 </Button>
               </div>
             ) : (
@@ -256,6 +415,8 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      <QuickBookDialog open={quickBookOpen} onOpenChange={setQuickBookOpen} clients={clients} />
     </div>
   );
 }

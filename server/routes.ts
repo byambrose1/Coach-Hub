@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema } from "@shared/schema";
 import { isAuthenticated } from "./replit_integrations/auth";
-import { sendInvoiceEmail, sendBookingNotificationEmail } from "./email";
+import { sendInvoiceEmail, sendBookingNotificationEmail, sendSessionCancellationEmail, sendSessionRescheduleEmail, sendParqEmail } from "./email";
 import { createMandateLink } from "./payments";
 
 export async function registerRoutes(
@@ -36,9 +36,69 @@ export async function registerRoutes(
   });
 
   app.post("/api/webhooks/gocardless", async (req, res) => {
-    // Simplistic webhook implementation
     console.log("GoCardless webhook received:", req.body);
     res.status(204).send();
+  });
+
+  // --- PARQ Email ---
+  app.post("/api/parq/send-email", isAuthenticated, async (req, res) => {
+    try {
+      const { clientId } = req.body;
+      const client = await storage.getClient(clientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!client.email) return res.status(400).json({ message: "Client has no email address" });
+      const s = await storage.getSettings();
+      await sendParqEmail({
+        clientName: client.name,
+        clientEmail: client.email,
+        trainerName: s?.trainerName || "Coach",
+        businessName: s?.businessName || "",
+        trainerEmail: s?.trainerEmail || undefined,
+      });
+      res.json({ message: "PAR-Q email sent successfully" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // --- Admin ---
+  app.get("/api/admin/stats", isAuthenticated, async (_req, res) => {
+    try {
+      const [clients, sessions, packages, invoices, notes, forms] = await Promise.all([
+        storage.getClients(),
+        storage.getSessions(),
+        storage.getPackages(),
+        storage.getInvoices(),
+        storage.getNotes(),
+        storage.getClientForms(),
+      ]);
+      const now = new Date();
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const weekAgoStr = weekAgo.toISOString().split("T")[0];
+      const monthStartStr = monthStart.toISOString().split("T")[0];
+      const todayStr = now.toISOString().split("T")[0];
+
+      const stats = {
+        totalClients: clients.length,
+        activeClients: clients.filter(c => c.status === "active").length,
+        totalSessions: sessions.length,
+        sessionsThisWeek: sessions.filter(s => s.date >= weekAgoStr && s.date <= todayStr).length,
+        sessionsThisMonth: sessions.filter(s => s.date >= monthStartStr && s.date <= todayStr).length,
+        totalInvoices: invoices.length,
+        pendingInvoices: invoices.filter(i => i.status === "pending").length,
+        paidInvoicesThisMonth: invoices.filter(i => i.status === "paid" && i.paidDate && i.paidDate >= monthStartStr).length,
+        totalRevenue: invoices.filter(i => i.status === "paid").reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0),
+        monthlyRevenue: invoices.filter(i => i.status === "paid" && i.paidDate && i.paidDate >= monthStartStr).reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0),
+        activePackages: packages.filter(p => p.status === "active").length,
+        monthlySubscribers: packages.filter(p => p.billingType === "monthly" && p.status === "active").length,
+        totalNotes: notes.length,
+        totalForms: forms.length,
+      };
+      res.json(stats);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   // --- Clients ---
@@ -111,6 +171,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/sessions/:id", async (req, res) => {
+    const existing = await storage.getSession(req.params.id);
     const session = await storage.updateSession(req.params.id, req.body);
     if (!session) return res.status(404).json({ message: "Session not found" });
 
@@ -124,6 +185,39 @@ export async function registerRoutes(
           usedSessions: (activePackage.usedSessions || 0) + 1,
         });
       }
+    }
+
+    // Send email notifications for cancellations and reschedules
+    try {
+      const client = await storage.getClient(session.clientId);
+      const s = await storage.getSettings();
+      if (client?.email && existing) {
+        const emailData = {
+          clientName: client.name,
+          clientEmail: client.email,
+          trainerName: s?.trainerName || "Coach",
+          businessName: s?.businessName || "",
+          trainerEmail: s?.trainerEmail || undefined,
+        };
+
+        if (req.body.status === "cancelled" && existing.status !== "cancelled") {
+          await sendSessionCancellationEmail({
+            ...emailData,
+            sessionDate: session.date,
+            sessionTime: session.startTime,
+          });
+        } else if ((req.body.date && req.body.date !== existing.date) || (req.body.startTime && req.body.startTime !== existing.startTime)) {
+          await sendSessionRescheduleEmail({
+            ...emailData,
+            newDate: session.date,
+            newTime: session.startTime,
+            oldDate: existing.date,
+            oldTime: existing.startTime,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Notification error:", err);
     }
 
     res.json(session);

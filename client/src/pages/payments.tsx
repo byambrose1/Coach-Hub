@@ -13,9 +13,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Package, CreditCard, ExternalLink, AlertTriangle, FileText, Clock, CheckCircle, Pencil, Download, Send, Eye, PoundSterling } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import type { Client, Package as PackageType, Settings, Invoice } from "@shared/schema";
+import { Plus, Package, CreditCard, AlertTriangle, FileText, Clock, CheckCircle, Pencil, Download, Send, PoundSterling, TrendingUp, Users, Copy, Calendar, RefreshCw } from "lucide-react";
+import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import type { Client, Package as PackageType, Settings, Invoice, Session } from "@shared/schema";
 
 function formatDateUK(dateStr: string): string {
   try {
@@ -688,10 +688,14 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
 }
 
 export default function Payments() {
+  const { toast } = useToast();
   const [newPackageOpen, setNewPackageOpen] = useState(false);
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [editingPkg, setEditingPkg] = useState<PackageType | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+  const [revenueScope, setRevenueScope] = useState<"week" | "month">("month");
+  const [mandateLinks, setMandateLinks] = useState<Record<string, string>>({});
+  const [generatingMandateFor, setGeneratingMandateFor] = useState<string | null>(null);
 
   const { data: clients = [], isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -705,11 +709,37 @@ export default function Payments() {
     queryKey: ["/api/invoices"],
   });
 
+  const { data: sessions = [] } = useQuery<Session[]>({
+    queryKey: ["/api/sessions"],
+  });
+
   const { data: settings } = useQuery<Settings>({
     queryKey: ["/api/settings"],
   });
 
   const currency = settings?.currency || "£";
+
+  const generateMandateLink = async (client: Client) => {
+    if (!client.email) {
+      toast({ title: "Client has no email address", variant: "destructive" });
+      return;
+    }
+    setGeneratingMandateFor(client.id);
+    try {
+      const res = await apiRequest("POST", "/api/payments/create-mandate-link", { clientId: client.id });
+      const data = await res.json();
+      if (data.link) {
+        setMandateLinks(prev => ({ ...prev, [client.id]: data.link }));
+        toast({ title: "Payment link generated" });
+      } else {
+        throw new Error(data.message || "No link returned");
+      }
+    } catch (err: any) {
+      toast({ title: "Failed to generate link", description: err.message, variant: "destructive" });
+    } finally {
+      setGeneratingMandateFor(null);
+    }
+  };
 
   const markPaidMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -742,6 +772,51 @@ export default function Payments() {
   };
 
   const { monthlyRevenue, pendingInvoices, pendingTotal } = calculateRevenue();
+
+  // Revenue scope calculations
+  const now = new Date();
+  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+  const monthStart = startOfMonth(now);
+  const monthEnd = endOfMonth(now);
+  const weekStartStr = format(weekStart, "yyyy-MM-dd");
+  const weekEndStr = format(weekEnd, "yyyy-MM-dd");
+  const monthStartStr = format(monthStart, "yyyy-MM-dd");
+  const monthEndStr = format(monthEnd, "yyyy-MM-dd");
+
+  const scopeStart = revenueScope === "week" ? weekStartStr : monthStartStr;
+  const scopeEnd = revenueScope === "week" ? weekEndStr : monthEndStr;
+
+  const paidInvoicesInScope = invoices.filter(inv =>
+    inv.status === "paid" && inv.paidDate && inv.paidDate >= scopeStart && inv.paidDate <= scopeEnd
+  );
+
+  const clientPkgMap = new Map(packages.map(p => [p.clientId, p]));
+
+  const scopeMonthlyRevenue = paidInvoicesInScope
+    .filter(inv => {
+      const pkg = clientPkgMap.get(inv.clientId);
+      return pkg?.billingType === "monthly";
+    })
+    .reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
+
+  const scopeBlockRevenue = paidInvoicesInScope
+    .filter(inv => {
+      const pkg = clientPkgMap.get(inv.clientId);
+      return !pkg || pkg.billingType === "block";
+    })
+    .reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
+
+  const scopeTotalRevenue = paidInvoicesInScope.reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
+
+  const sessionsInScope = sessions.filter(s =>
+    s.date >= scopeStart && s.date <= scopeEnd && s.status !== "cancelled"
+  );
+
+  const monthlyClients = packages
+    .filter(p => p.billingType === "monthly" && p.status === "active")
+    .map(p => ({ pkg: p, client: clients.find(c => c.id === p.clientId) }))
+    .filter(item => item.client);
 
   if (isLoading) {
     return (
@@ -801,11 +876,56 @@ export default function Payments() {
         </Card>
       </div>
 
+      {/* Revenue Overview */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary" />
+              Revenue Overview
+            </CardTitle>
+            <div className="flex border rounded-lg overflow-hidden">
+              <button
+                className={`px-3 py-1 text-sm font-medium transition-colors ${revenueScope === "week" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                onClick={() => setRevenueScope("week")}
+                data-testid="button-scope-week"
+              >This Week</button>
+              <button
+                className={`px-3 py-1 text-sm font-medium transition-colors ${revenueScope === "month" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                onClick={() => setRevenueScope("month")}
+                data-testid="button-scope-month"
+              >This Month</button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Total Revenue</p>
+              <p className="text-2xl font-bold text-primary" data-testid="stat-scope-total">{currency}{scopeTotalRevenue.toFixed(0)}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Monthly Billing</p>
+              <p className="text-2xl font-bold text-green-600" data-testid="stat-scope-monthly">{currency}{scopeMonthlyRevenue.toFixed(0)}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Block Bookings</p>
+              <p className="text-2xl font-bold text-blue-600" data-testid="stat-scope-block">{currency}{scopeBlockRevenue.toFixed(0)}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Sessions</p>
+              <p className="text-2xl font-bold" data-testid="stat-scope-sessions">{sessionsInScope.length}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="packages">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <TabsList data-testid="tabs-payments">
             <TabsTrigger value="packages" data-testid="tab-packages">Packages</TabsTrigger>
             <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
+            <TabsTrigger value="monthly" data-testid="tab-monthly">Monthly Payments</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
             <Button onClick={() => setNewPackageOpen(true)} data-testid="button-add-package">
@@ -982,6 +1102,112 @@ export default function Payments() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="monthly" className="space-y-4 mt-4">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <div>
+              <p className="font-medium">Monthly Payment Clients</p>
+              <p className="text-sm text-muted-foreground">Manage GoCardless direct debit mandates for clients on monthly billing.</p>
+            </div>
+            <Badge variant="outline" className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              {monthlyClients.length} on monthly billing
+            </Badge>
+          </div>
+          {monthlyClients.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <CreditCard className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="font-medium mb-1">No monthly billing clients</p>
+                <p className="text-sm">Create a package with monthly billing to manage direct debit mandates here.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {monthlyClients.map(({ pkg, client }) => {
+                const link = mandateLinks[client!.id];
+                return (
+                  <Card key={pkg.id} data-testid={`card-monthly-client-${client!.id}`}>
+                    <CardContent className="p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <Users className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium" data-testid={`text-monthly-client-name-${client!.id}`}>{client!.name}</p>
+                            <p className="text-sm text-muted-foreground">{pkg.name}</p>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {pkg.monthlyRate && (
+                                <Badge variant="secondary" className="text-xs" data-testid={`badge-monthly-rate-${pkg.id}`}>
+                                  {currency}{pkg.monthlyRate}/month
+                                </Badge>
+                              )}
+                              {pkg.nextBillingDate && (
+                                <Badge variant="outline" className="text-xs flex items-center gap-1" data-testid={`badge-next-billing-${pkg.id}`}>
+                                  <Calendar className="w-3 h-3" />
+                                  Next billing: {formatDateUK(pkg.nextBillingDate)}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          {link ? (
+                            <div className="flex items-center gap-2">
+                              <div className="max-w-[180px] truncate text-xs text-muted-foreground border rounded px-2 py-1"
+                                data-testid={`text-mandate-link-${client!.id}`}>
+                                {link}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(link);
+                                }}
+                                data-testid={`button-copy-link-${client!.id}`}
+                              >
+                                <Copy className="w-3 h-3 mr-1" />
+                                Copy
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setMandateLinks(prev => { const n = { ...prev }; delete n[client!.id]; return n; })}
+                                data-testid={`button-refresh-link-${client!.id}`}
+                              >
+                                <RefreshCw className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => generateMandateLink(client!)}
+                              disabled={generatingMandateFor === client!.id}
+                              data-testid={`button-generate-mandate-${client!.id}`}
+                            >
+                              {generatingMandateFor === client!.id ? (
+                                <>
+                                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <CreditCard className="w-3 h-3 mr-1" />
+                                  Set Up Direct Debit
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>

@@ -25,8 +25,9 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - **Dashboard**: Today's schedule, stats (Active Clients is clickable → /clients), upcoming sessions, low session alerts. UK date format.
 - **Schedule**: Month/Week/Day calendar views with toggle, day detail dialog, book sessions (1:1, group, online, outdoor), mark complete/cancel. UK date format.
 - **Clients**: Client profiles with edit dialog (phone/email save fix), PARQ health forms tab, session history, editable packages (inline edit total/used sessions), full notes CRUD (create/edit/delete within profile with "edited" indicator)
-- **Payments**: Session packages (block & monthly billing) with edit sessions, full invoice management (view detail, edit, download PDF, send/mark sent, mark paid), configurable currency (£/$/€), summary stats
+- **Payments**: Revenue Overview card (week/month toggle, breakdown by monthly billing vs block bookings + session count), session packages (block & monthly billing) with edit sessions, full invoice management (view detail, edit, download PDF, send/mark sent, mark paid), Monthly Payments tab with GoCardless direct debit mandate management per client, configurable currency (£/$/€), summary stats
 - **Settings**: Profile, cancellation policy, currency selector, payment settings, email notifications (stub), session reminders, HIPAA compliance, data retention, subscription info, account deletion
+- **Admin**: Comprehensive admin overview page at /admin — account info, subscription status, client/session/invoice/revenue stats, system info (auth/email/payment providers)
 
 ## Removed Features
 - **Notes page**: Removed from sidebar. Notes now live within each client's profile (Notes tab).
@@ -71,11 +72,14 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 ## Email (Brevo)
 - Invoice sending uses Brevo transactional email API (`@getbrevo/brevo` SDK)
 - API key stored in `BREVO_API_KEY` environment secret
-- Email service: `server/email.ts` - `sendInvoiceEmail()` and `sendBookingNotificationEmail()`
+- Email service: `server/email.ts` - `sendInvoiceEmail()`, `sendBookingNotificationEmail()`, `sendSessionCancellationEmail()`, `sendSessionRescheduleEmail()`, `sendParqEmail()`
 - Sender email comes from `settings.trainerEmail`; sender name from `settings.businessName` or `settings.trainerName`
 - Important: The sender email must be a verified sender in your Brevo account
 - POST `/api/invoices/:id/send` triggers email delivery and marks invoice as "sent"
 - Booking notification emails fire automatically on POST /api/sessions if client has email
+- Cancellation emails fire automatically on PATCH /api/sessions/:id when status changes to "cancelled"
+- Reschedule emails fire automatically on PATCH /api/sessions/:id when date or startTime changes
+- PAR-Q email: POST /api/parq/send-email sends the PAR-Q questions to the client via Brevo
 
 ## GoCardless (Monthly Payments)
 - `gocardless-nodejs` package installed; `server/payments.ts` with `createMandateLink()`

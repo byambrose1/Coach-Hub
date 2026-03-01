@@ -1,4 +1,4 @@
-import { Calendar, Users, CreditCard, Settings, LayoutDashboard, LogOut } from "lucide-react";
+import { Calendar, Users, CreditCard, Settings, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -24,6 +24,7 @@ const navItems = [
 
 const bottomItems = [
   { title: "Settings", url: "/settings", icon: Settings },
+  { title: "Admin", url: "/admin", icon: ShieldCheck },
 ];
 
 export function AppSidebar() {
