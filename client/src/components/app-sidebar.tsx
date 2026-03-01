@@ -24,7 +24,6 @@ const navItems = [
 
 const bottomItems = [
   { title: "Settings", url: "/settings", icon: Settings },
-  { title: "Admin", url: "/admin", icon: ShieldCheck },
 ];
 
 export function AppSidebar() {
