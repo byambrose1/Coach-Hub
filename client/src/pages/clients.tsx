@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save } from "lucide-react";
+import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save, Download } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { Client, Session, Package as PackageType, SessionNote, ClientForm } from "@shared/schema";
 import { UpgradePopup } from "@/components/upgrade-popup";
@@ -349,6 +349,60 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
     }
   });
 
+  const handleExportData = async () => {
+    try {
+      const res = await fetch(`/api/clients/${client.id}/export`, { credentials: "include" });
+      const data = await res.json();
+      const lines: string[] = [];
+      lines.push(`DATA EXPORT — ${currentClient.name}`);
+      lines.push(`Exported: ${format(new Date(), "dd/MM/yyyy HH:mm")}`);
+      lines.push("=".repeat(50));
+      lines.push("");
+      lines.push("PERSONAL INFORMATION");
+      lines.push(`Name: ${data.client.name}`);
+      lines.push(`Email: ${data.client.email || "—"}`);
+      lines.push(`Phone: ${data.client.phone || "—"}`);
+      lines.push(`Session Type: ${data.client.sessionType || "—"}`);
+      lines.push(`Status: ${data.client.status}`);
+      lines.push(`Notes: ${data.client.notes || "—"}`);
+      lines.push("");
+      lines.push(`SESSIONS (${data.sessions.length})`);
+      data.sessions.forEach((s: any) => {
+        lines.push(`  ${formatDateUK(s.date)} ${s.startTime}–${s.endTime} — ${s.title} [${s.status}]`);
+      });
+      lines.push("");
+      lines.push(`PACKAGES (${data.packages.length})`);
+      data.packages.forEach((p: any) => {
+        lines.push(`  ${p.name} — ${p.usedSessions}/${p.totalSessions} sessions used [${p.status}]`);
+      });
+      lines.push("");
+      lines.push(`NOTES (${data.notes.length})`);
+      data.notes.forEach((n: any) => {
+        lines.push(`  ${formatDateUK(n.date)}: ${n.content}`);
+      });
+      lines.push("");
+      lines.push(`HEALTH FORMS (${data.forms.length})`);
+      data.forms.forEach((f: any) => {
+        lines.push(`  ${formatDateUK(f.date)} — ${f.title} [${f.status}]`);
+      });
+      lines.push("");
+      lines.push(`INVOICES (${data.invoices.length})`);
+      data.invoices.forEach((i: any) => {
+        lines.push(`  ${i.invoiceNumber} — ${i.amount} [${i.status}]`);
+      });
+      const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${currentClient.name.replace(/\s+/g, "_")}_data_export.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Data exported", description: "Client data downloaded as a text file." });
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    }
+  };
+
   const handleCloseDialog = () => {
     setIsEditing(false);
     setShowDeleteConfirm(false);
@@ -397,6 +451,15 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                     data-testid="button-edit-client"
                   >
                     <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={handleExportData}
+                    title="Export client data"
+                    data-testid="button-export-client"
+                  >
+                    <Download className="w-4 h-4" />
                   </Button>
                   <Button
                     size="icon"

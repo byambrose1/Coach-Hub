@@ -353,6 +353,23 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  app.get("/api/clients/:id/export", async (req, res) => {
+    const userId = getUserId(req);
+    const client = await storage.getClient(req.params.id);
+    if (!client || client.userId !== userId) return res.status(404).json({ message: "Client not found" });
+    const sessions = await storage.getSessions(userId);
+    const clientSessions = sessions.filter(s => s.clientId === client.id);
+    const pkgs = await storage.getPackages(userId);
+    const clientPackages = pkgs.filter(p => p.clientId === client.id);
+    const notes = await storage.getNotes(userId);
+    const clientNotes = notes.filter(n => n.clientId === client.id);
+    const forms = await storage.getClientForms(userId);
+    const clientForms = forms.filter(f => f.clientId === client.id);
+    const invoices = await storage.getInvoices(userId);
+    const clientInvoices = invoices.filter(i => i.clientId === client.id);
+    res.json({ client, sessions: clientSessions, packages: clientPackages, notes: clientNotes, forms: clientForms, invoices: clientInvoices });
+  });
+
   // --- Sessions ---
   app.get("/api/sessions", async (req, res) => {
     const userId = getUserId(req);

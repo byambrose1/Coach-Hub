@@ -107,6 +107,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteClient(id: string): Promise<void> {
+    await db.delete(invoices).where(eq(invoices.clientId, id));
+    await db.delete(sessionNotes).where(eq(sessionNotes.clientId, id));
+    await db.delete(clientForms).where(eq(clientForms.clientId, id));
+    await db.delete(packages).where(eq(packages.clientId, id));
+    await db.delete(trainingSessions).where(eq(trainingSessions.clientId, id));
+    await db.delete(referrals).where(eq(referrals.referrerClientId, id));
+    await db.delete(referrals).where(eq(referrals.referredClientId, id));
     await db.delete(clients).where(eq(clients.id, id));
   }
 
