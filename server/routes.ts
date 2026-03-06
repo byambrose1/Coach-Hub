@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema } from "@shared/schema";
 import { isAuthenticated } from "./replit_integrations/auth";
-import { sendInvoiceEmail, sendBookingNotificationEmail, sendSessionCancellationEmail, sendSessionRescheduleEmail, sendParqEmail } from "./email";
+import { sendInvoiceEmail, sendBookingNotificationEmail, sendSessionCancellationEmail, sendSessionRescheduleEmail, sendParqEmail, sendLowSessionsEmail } from "./email";
 import { createMandateLink } from "./payments";
 
 declare module "express-session" {
@@ -477,6 +477,33 @@ export async function registerRoutes(
       });
     }
     res.json(pkg);
+  });
+
+  app.post("/api/packages/:id/notify-low-sessions", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const pkg = await storage.getPackage(req.params.id);
+      if (!pkg) return res.status(404).json({ message: "Package not found" });
+      const client = await storage.getClient(pkg.clientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!client.email) return res.status(400).json({ message: "Client has no email address" });
+      const settings = await storage.getSettings(userId);
+      const remaining = pkg.totalSessions - (pkg.usedSessions || 0);
+      await sendLowSessionsEmail({
+        clientName: client.name,
+        clientEmail: client.email,
+        packageName: pkg.name,
+        remainingSessions: remaining,
+        trainerName: settings?.trainerName || "Your Trainer",
+        businessName: settings?.businessName || undefined,
+        trainerEmail: settings?.trainerEmail || undefined,
+        paymentLink: settings?.paymentLink || undefined,
+      });
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Failed to send low sessions notification:", err);
+      res.status(500).json({ message: err.message || "Failed to send notification" });
+    }
   });
 
   // --- Notes ---

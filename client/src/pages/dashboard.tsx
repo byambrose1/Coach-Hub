@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar, Users, Clock, AlertTriangle, Plus, ChevronRight } from "lucide-react";
+import { Calendar, Users, Clock, AlertTriangle, Plus, ChevronRight, Bell } from "lucide-react";
 import { format, isToday, isTomorrow, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -236,6 +236,36 @@ function SessionRow({ session, clientName }: { session: Session; clientName: str
   );
 }
 
+function NotifyButton({ packageId }: { packageId: string }) {
+  const { toast } = useToast();
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/packages/${packageId}/notify-low-sessions`, {});
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to send");
+      }
+    },
+    onSuccess: () => toast({ title: "Notification sent", description: "Client has been emailed about their remaining sessions." }),
+    onError: (err: Error) => toast({ title: "Could not send notification", description: err.message, variant: "destructive" }),
+  });
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="h-7 px-2 text-xs flex-shrink-0"
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); mutation.mutate(); }}
+      disabled={mutation.isPending || mutation.isSuccess}
+      data-testid={`button-notify-${packageId}`}
+      title="Email client about low sessions"
+    >
+      <Bell className="w-3 h-3 mr-1" />
+      {mutation.isPending ? "..." : mutation.isSuccess ? "Sent" : "Notify"}
+    </Button>
+  );
+}
+
 export default function Dashboard() {
   const [quickBookOpen, setQuickBookOpen] = useState(false);
   const today = format(new Date(), "yyyy-MM-dd");
@@ -398,20 +428,21 @@ export default function Dashboard() {
                   {lowSessionPackages.map((pkg) => {
                     const remaining = pkg.totalSessions - (pkg.usedSessions || 0);
                     return (
-                      <a
-                        key={pkg.id}
-                        href={`/clients?client=${pkg.clientId}`}
-                        className="flex items-center justify-between gap-2 py-2 border-b last:border-b-0 hover:bg-accent/50 rounded px-1 -mx-1 transition-colors cursor-pointer"
-                        data-testid={`row-low-package-${pkg.id}`}
-                      >
-                        <div className="min-w-0">
+                      <div key={pkg.id} className="flex items-center gap-2 py-2 border-b last:border-b-0" data-testid={`row-low-package-${pkg.id}`}>
+                        <a
+                          href={`/clients?client=${pkg.clientId}`}
+                          className="flex-1 min-w-0 hover:opacity-75 transition-opacity"
+                        >
                           <p className="text-sm font-medium truncate">{clientMap.get(pkg.clientId)}</p>
                           <p className="text-xs text-muted-foreground">{pkg.name}</p>
+                        </a>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Badge variant="destructive" className="text-xs">
+                            {remaining} left
+                          </Badge>
+                          <NotifyButton packageId={pkg.id} />
                         </div>
-                        <Badge variant="destructive" className="text-xs flex-shrink-0">
-                          {remaining} left
-                        </Badge>
-                      </a>
+                      </div>
                     );
                   })}
                 </div>

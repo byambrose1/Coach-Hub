@@ -216,6 +216,66 @@ export async function sendSessionRescheduleEmail(data: {
   }
 }
 
+export async function sendLowSessionsEmail(data: {
+  clientName: string;
+  clientEmail: string;
+  packageName: string;
+  remainingSessions: number;
+  trainerName: string;
+  businessName?: string;
+  trainerEmail?: string;
+  paymentLink?: string;
+}): Promise<void> {
+  const { clientName, clientEmail, packageName, remainingSessions, trainerName, businessName, trainerEmail, paymentLink } = data;
+  const senderName = businessName || trainerName || "FitTrack";
+  const senderEmail = trainerEmail || "noreply@fittrack.app";
+  const sessionWord = remainingSessions === 1 ? "session" : "sessions";
+
+  const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
+    .container{max-width:600px;margin:0 auto;background:#fff}
+    .header{background:#dc2626;color:white;padding:30px;text-align:center}
+    .header h1{margin:0;font-size:24px}
+    .body{padding:30px}
+    .alert-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:20px;text-align:center;margin:20px 0}
+    .count{font-size:48px;font-weight:700;color:#dc2626;line-height:1}
+    .count-label{font-size:14px;color:#991b1b;margin-top:4px}
+    .package-name{background:#f9fafb;border-radius:6px;padding:10px 16px;display:inline-block;font-size:14px;color:#555;margin:10px 0}
+    .renew-button{display:inline-block;background:#2563eb;color:white;padding:12px 30px;border-radius:6px;text-decoration:none;font-weight:600;margin:20px 0}
+    .footer{padding:20px 30px;background:#f9fafb;text-align:center;font-size:12px;color:#888}
+  </style></head><body>
+  <div class="container">
+    <div class="header"><h1>${senderName}</h1></div>
+    <div class="body">
+      <p>Hi ${clientName},</p>
+      <p>This is a friendly reminder that your session package is running low.</p>
+      <div class="alert-box">
+        <div class="count">${remainingSessions}</div>
+        <div class="count-label">${sessionWord} remaining</div>
+      </div>
+      <p style="text-align:center;"><span class="package-name">${packageName}</span></p>
+      <p style="color:#555;font-size:14px;">To keep your training on track, please get in touch with <strong>${trainerName}</strong> to renew or top up your sessions.</p>
+      ${paymentLink ? `<p style="text-align:center;"><a href="${paymentLink}" class="renew-button">Renew Sessions</a></p>` : ""}
+      <p style="color:#333;font-size:14px;">Thank you,<br><strong>${trainerName}</strong></p>
+    </div>
+    <div class="footer"><p>Sent via FitTrack by ${senderName}</p></div>
+  </div>
+  </body></html>`;
+
+  try {
+    await brevo.transactionalEmails.sendTransacEmail({
+      subject: `You have ${remainingSessions} ${sessionWord} remaining — ${packageName}`,
+      htmlContent,
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: clientEmail, name: clientName }],
+    });
+    console.log(`Low sessions notification sent to ${clientEmail}`);
+  } catch (error: any) {
+    console.error("Failed to send low sessions email:", error);
+    throw error;
+  }
+}
+
 export async function sendParqEmail(data: {
   clientName: string;
   clientEmail: string;

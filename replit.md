@@ -117,6 +117,7 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - Cancellation emails fire automatically on PATCH /api/sessions/:id when status changes to "cancelled"
 - Reschedule emails fire automatically on PATCH /api/sessions/:id when date or startTime changes
 - PAR-Q email: POST /api/parq/send-email sends the PAR-Q questions to the client via Brevo
+- Low sessions notification: POST /api/packages/:id/notify-low-sessions — manually triggered from dashboard "Notify" button on each low session alert; sends email to client showing remaining sessions and package name
 
 ## GoCardless (Monthly Payments)
 - `gocardless-nodejs` package installed; `server/payments.ts` with `createMandateLink()`
