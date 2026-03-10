@@ -389,6 +389,21 @@ export async function registerRoutes(
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const session = await storage.createSession(userId, parsed.data);
 
+    // Deduct 1 session from the client's active block package when booked
+    try {
+      const pkgs = await storage.getPackages(userId);
+      const activePackage = pkgs.find(
+        (p) => p.clientId === session.clientId && p.status === "active" && p.billingType === "block" && (p.totalSessions - (p.usedSessions || 0)) > 0
+      );
+      if (activePackage) {
+        await storage.updatePackage(activePackage.id, {
+          usedSessions: (activePackage.usedSessions || 0) + 1,
+        });
+      }
+    } catch (err) {
+      console.error("Package deduction error:", err);
+    }
+
     try {
       const client = await storage.getClient(session.clientId);
       const s = await storage.getSettings(userId);
@@ -415,15 +430,16 @@ export async function registerRoutes(
     const session = await storage.updateSession(req.params.id, req.body);
     if (!session) return res.status(404).json({ message: "Session not found" });
 
-    if (req.body.status === "completed") {
+    // Restore 1 session to the package if a session is cancelled
+    if (req.body.status === "cancelled" && existing?.status !== "cancelled") {
       const userId = session.userId || "";
       const pkgs = await storage.getPackages(userId);
       const activePackage = pkgs.find(
-        (p) => p.clientId === session.clientId && p.status === "active" && (p.totalSessions - (p.usedSessions || 0)) > 0
+        (p) => p.clientId === session.clientId && p.status === "active" && p.billingType === "block"
       );
-      if (activePackage) {
+      if (activePackage && (activePackage.usedSessions || 0) > 0) {
         await storage.updatePackage(activePackage.id, {
-          usedSessions: (activePackage.usedSessions || 0) + 1,
+          usedSessions: (activePackage.usedSessions || 0) - 1,
         });
       }
     }
