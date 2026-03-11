@@ -95,6 +95,7 @@ export const settings = pgTable("settings", {
   termsAccepted: boolean("terms_accepted").default(false),
   currency: text("currency").default("£"),
   hasAcceptedTerms: boolean("has_accepted_terms").default(false),
+  cancellationNoticeHours: integer("cancellation_notice_hours").default(24),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({ id: true });

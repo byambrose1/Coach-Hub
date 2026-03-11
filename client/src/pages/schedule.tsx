@@ -29,7 +29,7 @@ import {
   subDays,
   eachDayOfInterval,
 } from "date-fns";
-import type { Session, Client } from "@shared/schema";
+import type { Session, Client, Settings } from "@shared/schema";
 
 type CalView = "month" | "week" | "day";
 
@@ -193,14 +193,35 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate }: {
   );
 }
 
-function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, updateStatus }: {
+function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, updateStatus, cancellationNoticeHours }: {
   date: Date;
   sessions: Session[];
   clientMap: Map<string, string>;
   onClose: () => void;
   onAddSession: (date: string) => void;
-  updateStatus: (args: { id: string; status: string }) => void;
+  updateStatus: (args: { id: string; status: string; deductSession?: boolean }) => void;
+  cancellationNoticeHours: number;
 }) {
+  const [cancellingSession, setCancellingSession] = useState<Session | null>(null);
+  const [deductSession, setDeductSession] = useState(false);
+
+  const isWithinNoticeWindow = (session: Session): boolean => {
+    const sessionDateTime = new Date(`${session.date}T${session.startTime}:00`);
+    const hoursUntil = (sessionDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
+    return hoursUntil >= 0 && hoursUntil < cancellationNoticeHours;
+  };
+
+  const handleCancelClick = (session: Session) => {
+    setCancellingSession(session);
+    setDeductSession(isWithinNoticeWindow(session));
+  };
+
+  const handleConfirmCancel = () => {
+    if (!cancellingSession) return;
+    updateStatus({ id: cancellingSession.id, status: "cancelled", deductSession });
+    setCancellingSession(null);
+  };
+
   const typeColors: Record<string, string> = {
     "1:1": "bg-primary/10 text-primary border-primary/20",
     "group": "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
@@ -266,7 +287,7 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
                           variant="ghost"
                           size="icon"
                           className="w-7 h-7"
-                          onClick={() => updateStatus({ id: session.id, status: "cancelled" })}
+                          onClick={() => handleCancelClick(session)}
                           data-testid={`button-cancel-${session.id}`}
                           title="Cancel session"
                         >
@@ -297,6 +318,59 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
             </div>
           )}
         </div>
+
+        {cancellingSession && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/5 p-4 space-y-3 mt-2">
+            <p className="text-sm font-medium">Cancel session with {clientMap.get(cancellingSession.clientId) || "client"}?</p>
+            <p className="text-xs text-muted-foreground">{cancellingSession.startTime} – {cancellingSession.endTime}</p>
+
+            {isWithinNoticeWindow(cancellingSession) && (
+              <div className="rounded-md border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 p-3 space-y-2">
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-400">
+                  This is within your {cancellationNoticeHours}-hour cancellation window.
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-500">Deduct this session from the client's package?</p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant={deductSession ? "default" : "outline"}
+                    onClick={() => setDeductSession(true)}
+                    data-testid="button-deduct-yes"
+                  >
+                    Yes, deduct
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={!deductSession ? "default" : "outline"}
+                    onClick={() => setDeductSession(false)}
+                    data-testid="button-deduct-no"
+                  >
+                    No, return it
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleConfirmCancel}
+                data-testid="button-confirm-cancel-session"
+              >
+                Confirm Cancellation
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCancellingSession(null)}
+                data-testid="button-abort-cancel-session"
+              >
+                Keep Session
+              </Button>
+            </div>
+          </div>
+        )}
 
         <Button
           className="w-full mt-2"
@@ -363,13 +437,20 @@ export default function Schedule() {
     queryKey: ["/api/clients"],
   });
 
+  const { data: settings } = useQuery<Settings>({
+    queryKey: ["/api/settings"],
+  });
+
+  const cancellationNoticeHours = settings?.cancellationNoticeHours ?? 24;
+
   const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await apiRequest("PATCH", `/api/sessions/${id}`, { status });
+    mutationFn: async ({ id, status, deductSession }: { id: string; status: string; deductSession?: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/sessions/${id}`, { status, deductSession });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
     },
     onError: (err: Error) => {
       toast({ title: "Error updating session", description: err.message, variant: "destructive" });
@@ -720,6 +801,7 @@ export default function Schedule() {
           onClose={() => setDetailDate(null)}
           onAddSession={handleNewSession}
           updateStatus={(args) => updateStatus.mutate(args)}
+          cancellationNoticeHours={cancellationNoticeHours}
         />
       )}
     </div>

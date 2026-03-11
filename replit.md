@@ -40,7 +40,7 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - **Schedule**: Month/Week/Day calendar views with toggle, day detail dialog, book sessions (1:1, group, online, outdoor), mark complete/cancel. UK date format.
 - **Clients**: Client profiles with edit dialog (phone/email save fix), PARQ health forms tab, session history, editable packages (inline edit total/used sessions), full notes CRUD (create/edit/delete within profile with "edited" indicator)
 - **Payments**: Revenue Overview card (week/month toggle, breakdown by monthly billing vs block bookings + session count), session packages (block & monthly billing) with edit sessions, full invoice management (view detail, edit, download PDF, send/mark sent, mark paid), Monthly Payments tab with GoCardless direct debit mandate management per client, configurable currency (£/$/€), summary stats
-- **Settings**: Profile, cancellation policy, currency selector, payment settings, email notifications (stub), session reminders, HIPAA compliance, data retention, subscription plan display (shows current tier limits), account deletion
+- **Settings**: Profile, cancellation policy (structured: notice hours + editable template), currency selector, payment settings, email notifications (stub), session reminders, HIPAA compliance, data retention, subscription plan display (shows current tier limits), account deletion
 - **Admin**: Comprehensive admin overview page at /admin — account info, subscription status, client/session/invoice/revenue stats, system info (auth/email/payment providers)
 
 ## Subscription Tier System

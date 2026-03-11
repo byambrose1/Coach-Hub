@@ -430,14 +430,16 @@ export async function registerRoutes(
     const session = await storage.updateSession(req.params.id, req.body);
     if (!session) return res.status(404).json({ message: "Session not found" });
 
-    // Restore 1 session to the package if a session is cancelled
+    // Handle session count on cancellation
     if (req.body.status === "cancelled" && existing?.status !== "cancelled") {
       const userId = session.userId || "";
       const pkgs = await storage.getPackages(userId);
       const activePackage = pkgs.find(
         (p) => p.clientId === session.clientId && p.status === "active" && p.billingType === "block"
       );
-      if (activePackage && (activePackage.usedSessions || 0) > 0) {
+      // If deductSession is true, coach chose to keep deduction (late cancel penalty)
+      // Otherwise restore the session back to the package
+      if (!req.body.deductSession && activePackage && (activePackage.usedSessions || 0) > 0) {
         await storage.updatePackage(activePackage.id, {
           usedSessions: (activePackage.usedSessions || 0) - 1,
         });

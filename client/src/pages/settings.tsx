@@ -186,6 +186,7 @@ export default function SettingsPage() {
     trainerPhone: "",
     businessAddress: "",
     cancellationPolicy: "",
+    cancellationNoticeHours: 24,
     paymentLink: "",
     acceptedPaymentMethods: "",
     invoicePrefix: "INV",
@@ -209,6 +210,7 @@ export default function SettingsPage() {
         trainerPhone: settings.trainerPhone || "",
         businessAddress: settings.businessAddress || "",
         cancellationPolicy: settings.cancellationPolicy || "",
+        cancellationNoticeHours: settings.cancellationNoticeHours ?? 24,
         paymentLink: settings.paymentLink || "",
         acceptedPaymentMethods: settings.acceptedPaymentMethods || "",
         invoicePrefix: settings.invoicePrefix || "INV",
@@ -328,17 +330,47 @@ export default function SettingsPage() {
             Cancellation Policy
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Policy Details</Label>
+            <Label>Notice period required (hours)</Label>
+            <div className="flex items-center gap-3">
+              <Input
+                type="number"
+                min={1}
+                max={168}
+                value={formData.cancellationNoticeHours}
+                onChange={(e) => setFormData({ ...formData, cancellationNoticeHours: parseInt(e.target.value) || 24 })}
+                className="w-28"
+                data-testid="input-cancellation-notice-hours"
+              />
+              <span className="text-sm text-muted-foreground">hours</span>
+            </div>
+            <p className="text-xs text-muted-foreground">When a session is cancelled within this window, you'll be prompted to choose whether to deduct the session from the client's package.</p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Policy wording</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setFormData({
+                  ...formData,
+                  cancellationPolicy: `A minimum of ${formData.cancellationNoticeHours} hours' notice is required to cancel or reschedule a session. Cancellations made within ${formData.cancellationNoticeHours} hours of the scheduled start time may result in the session being deducted from your package. We appreciate your understanding and cooperation.`
+                })}
+                data-testid="button-use-policy-template"
+              >
+                Use template
+              </Button>
+            </div>
             <Textarea
-              placeholder="e.g. 24-hour cancellation policy. Late cancellations will be charged the full session fee."
+              placeholder="Your cancellation policy wording..."
               value={formData.cancellationPolicy}
               onChange={(e) => setFormData({ ...formData, cancellationPolicy: e.target.value })}
               className="min-h-[100px]"
               data-testid="input-cancellation-policy"
             />
-            <p className="text-xs text-muted-foreground">This policy will be visible to clients when booking sessions.</p>
+            <p className="text-xs text-muted-foreground">Click "Use template" to auto-fill based on your notice period, then customise as needed.</p>
           </div>
         </CardContent>
       </Card>
