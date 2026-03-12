@@ -51,6 +51,13 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate }: {
     notes: "",
   });
 
+  const handleStartTimeChange = (value: string) => {
+    const [h, m] = value.split(":").map(Number);
+    const endH = (h + 1) % 24;
+    const endTime = `${endH.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+    setFormData({ ...formData, startTime: value, endTime });
+  };
+
   const mutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const res = await apiRequest("POST", "/api/sessions", data);
@@ -149,7 +156,7 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate }: {
               <Input
                 type="time"
                 value={formData.startTime}
-                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                onChange={(e) => handleStartTimeChange(e.target.value)}
                 data-testid="input-start-time"
               />
             </div>
@@ -158,6 +165,7 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate }: {
               <Input
                 type="time"
                 value={formData.endTime}
+                min={formData.startTime}
                 onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                 data-testid="input-end-time"
               />
@@ -621,7 +629,7 @@ export default function Schedule() {
                     className={`min-h-[80px] md:min-h-[100px] border-b border-r p-1 cursor-pointer transition-colors hover:bg-accent/50 ${
                       !inCurrentMonth ? "bg-muted/30" : ""
                     } ${idx % 7 === 0 ? "border-l" : ""}`}
-                    onClick={() => setDetailDate(calDay)}
+                    onClick={() => { setCurrentDay(calDay); setCalView("day"); }}
                     data-testid={`day-cell-${dateStr}`}
                   >
                     <div className="flex items-center justify-between mb-1">
@@ -708,7 +716,7 @@ export default function Schedule() {
                   <div
                     key={dateStr}
                     className={`min-h-[300px] border-r p-1.5 space-y-1 cursor-pointer transition-colors hover:bg-accent/50 ${today ? "bg-primary/5" : ""}`}
-                    onClick={() => setDetailDate(wd)}
+                    onClick={() => { setCurrentDay(wd); setCalView("day"); }}
                     data-testid={`week-day-${dateStr}`}
                   >
                     {daySessions.length === 0 && (
@@ -720,7 +728,7 @@ export default function Schedule() {
                         session={session}
                         clientMap={clientMap}
                         typeColors={typeColors}
-                        onClick={() => setDetailDate(wd)}
+                        onClick={() => { setCurrentDay(wd); setCalView("day"); }}
                       />
                     ))}
                   </div>
