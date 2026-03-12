@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,16 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate }: {
     location: "",
     notes: "",
   });
+
+  // Sync the date whenever the dialog opens or the preselected date changes
+  useEffect(() => {
+    if (open) {
+      setFormData(prev => ({
+        ...prev,
+        date: preselectedDate || format(new Date(), "yyyy-MM-dd"),
+      }));
+    }
+  }, [open, preselectedDate]);
 
   const handleStartTimeChange = (value: string) => {
     const [h, m] = value.split(":").map(Number);
@@ -558,7 +568,17 @@ export default function Schedule() {
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-bold" data-testid="text-schedule-title">Schedule</h1>
-        <Button onClick={() => handleNewSession()} data-testid="button-new-session">
+        <Button
+          onClick={() => {
+            const dateForView = calView === "day"
+              ? format(currentDay, "yyyy-MM-dd")
+              : calView === "week"
+              ? format(currentWeek, "yyyy-MM-dd")
+              : undefined;
+            handleNewSession(dateForView);
+          }}
+          data-testid="button-new-session"
+        >
           <Plus className="w-4 h-4 mr-1" />
           New Session
         </Button>
