@@ -438,7 +438,7 @@ export default function Dashboard() {
                         </a>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <Badge variant="destructive" className="text-xs">
-                            {remaining} left
+                            {remaining} sessions left
                           </Badge>
                           <NotifyButton packageId={pkg.id} />
                         </div>

@@ -33,11 +33,12 @@ import type { Session, Client, Settings } from "@shared/schema";
 
 type CalView = "month" | "week" | "day";
 
-function NewSessionDialog({ open, onOpenChange, clients, preselectedDate }: {
+function NewSessionDialog({ open, onOpenChange, clients, preselectedDate, preselectedTime }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clients: Client[];
   preselectedDate?: string;
+  preselectedTime?: string;
 }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
@@ -51,15 +52,20 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate }: {
     notes: "",
   });
 
-  // Sync the date whenever the dialog opens or the preselected date changes
+  // Sync date and time whenever the dialog opens or preselected values change
   useEffect(() => {
     if (open) {
-      setFormData(prev => ({
-        ...prev,
-        date: preselectedDate || format(new Date(), "yyyy-MM-dd"),
-      }));
+      const newDate = preselectedDate || format(new Date(), "yyyy-MM-dd");
+      const updates: Partial<typeof formData> = { date: newDate };
+      if (preselectedTime) {
+        const [h, m] = preselectedTime.split(":").map(Number);
+        const endH = (h + 1) % 24;
+        updates.startTime = preselectedTime;
+        updates.endTime = `${endH.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+      }
+      setFormData(prev => ({ ...prev, ...updates }));
     }
-  }, [open, preselectedDate]);
+  }, [open, preselectedDate, preselectedTime]);
 
   const handleStartTimeChange = (value: string) => {
     const [h, m] = value.split(":").map(Number);
@@ -444,6 +450,7 @@ export default function Schedule() {
   const [calView, setCalView] = useState<CalView>("month");
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
+  const [selectedTime, setSelectedTime] = useState<string | undefined>(undefined);
   const [detailDate, setDetailDate] = useState<Date | null>(null);
   const { toast } = useToast();
 
@@ -508,8 +515,9 @@ export default function Schedule() {
     "outdoor": "bg-amber-500",
   };
 
-  const handleNewSession = (date?: string) => {
+  const handleNewSession = (date?: string, time?: string) => {
     setSelectedDate(date);
+    setSelectedTime(time);
     setNewSessionOpen(true);
   };
 
@@ -780,7 +788,7 @@ export default function Schedule() {
                       if (hourSessions.length > 0) {
                         setDetailDate(currentDay);
                       } else {
-                        handleNewSession(dateStr);
+                        handleNewSession(dateStr, `${hourStr}:00`);
                       }
                     }}
                     data-testid={`day-hour-${hourStr}`}
@@ -819,6 +827,7 @@ export default function Schedule() {
         onOpenChange={setNewSessionOpen}
         clients={clients}
         preselectedDate={selectedDate}
+        preselectedTime={selectedTime}
       />
 
       {detailDate && (

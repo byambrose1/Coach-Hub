@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save, Download } from "lucide-react";
+import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save, Download, CalendarPlus } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { Client, Session, Package as PackageType, SessionNote, ClientForm } from "@shared/schema";
 import { UpgradePopup } from "@/components/upgrade-popup";
@@ -183,6 +183,38 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
   const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
   const [editPkgTotal, setEditPkgTotal] = useState(0);
   const [editPkgUsed, setEditPkgUsed] = useState(0);
+
+  const [bookSessionOpen, setBookSessionOpen] = useState(false);
+  const [bookFormData, setBookFormData] = useState({
+    date: format(new Date(), "yyyy-MM-dd"),
+    startTime: "09:00",
+    endTime: "10:00",
+    sessionType: "1:1",
+    location: "",
+  });
+
+  const bookSessionMutation = useMutation({
+    mutationFn: async () => {
+      const title = `Session with ${client.name.split(" ")[0]}`;
+      const res = await apiRequest("POST", "/api/sessions", {
+        ...bookFormData,
+        clientId: client.id,
+        title,
+        notes: "",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      setBookSessionOpen(false);
+      toast({ title: "Session booked successfully" });
+      setBookFormData({ date: format(new Date(), "yyyy-MM-dd"), startTime: "09:00", endTime: "10:00", sessionType: "1:1", location: "" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error booking session", description: err.message, variant: "destructive" });
+    },
+  });
 
   const { data: allClients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -469,13 +501,30 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      setBookFormData({ date: format(new Date(), "yyyy-MM-dd"), startTime: "09:00", endTime: "10:00", sessionType: "1:1", location: "" });
+                      setBookSessionOpen(true);
+                    }}
+                    title="Book a session for this client"
+                    data-testid="button-book-session"
+                  >
+                    <CalendarPlus className="w-4 h-4" />
+                  </Button>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="secondary" className="text-xs">{currentClient.sessionType || "1:1"}</Badge>
                   <Badge variant={currentClient.status === "active" ? "default" : "secondary"} className="text-xs">{currentClient.status}</Badge>
-                  <Badge variant={currentClient.gocardlessMandateStatus === "active" ? "default" : "secondary"} className="text-xs">
-                    Monthly: {currentClient.gocardlessMandateStatus || "inactive"}
-                  </Badge>
+                  {clientPackages.some(p => p.billingType === "monthly") && (
+                    <Badge variant={currentClient.gocardlessMandateStatus === "active" ? "default" : "secondary"} className="text-xs">
+                      Direct Debit: {currentClient.gocardlessMandateStatus === "active" ? "active" : "inactive"}
+                    </Badge>
+                  )}
+                  {clientPackages.length > 0 && !clientPackages.some(p => p.billingType === "monthly") && (
+                    <Badge variant="secondary" className="text-xs">Block booking</Badge>
+                  )}
                 </div>
               </div>
             </DialogTitle>
@@ -974,6 +1023,92 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
               return <p className="text-sm text-muted-foreground">{viewingForm.responses}</p>;
             }
           })()}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bookSessionOpen} onOpenChange={setBookSessionOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Book Session — {client.name.split(" ")[0]}</DialogTitle>
+            <DialogDescription>Schedule a new session for this client</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={bookFormData.date}
+                onChange={(e) => setBookFormData({ ...bookFormData, date: e.target.value })}
+                data-testid="input-book-date"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Start Time</Label>
+                <Input
+                  type="time"
+                  value={bookFormData.startTime}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const [h, m] = val.split(":").map(Number);
+                    const endH = (h + 1) % 24;
+                    setBookFormData({
+                      ...bookFormData,
+                      startTime: val,
+                      endTime: `${endH.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`,
+                    });
+                  }}
+                  data-testid="input-book-start-time"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>End Time</Label>
+                <Input
+                  type="time"
+                  value={bookFormData.endTime}
+                  min={bookFormData.startTime}
+                  onChange={(e) => setBookFormData({ ...bookFormData, endTime: e.target.value })}
+                  data-testid="input-book-end-time"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Session Type</Label>
+              <Select value={bookFormData.sessionType} onValueChange={(v) => setBookFormData({ ...bookFormData, sessionType: v })}>
+                <SelectTrigger data-testid="select-book-session-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1:1">1:1</SelectItem>
+                  <SelectItem value="group">Group</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="outdoor">Outdoor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Location (optional)</Label>
+              <Input
+                placeholder="e.g. Main Gym"
+                value={bookFormData.location}
+                onChange={(e) => setBookFormData({ ...bookFormData, location: e.target.value })}
+                data-testid="input-book-location"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                className="flex-1"
+                onClick={() => bookSessionMutation.mutate()}
+                disabled={bookSessionMutation.isPending || !bookFormData.date}
+                data-testid="button-confirm-book-session"
+              >
+                {bookSessionMutation.isPending ? "Booking..." : "Book Session"}
+              </Button>
+              <Button variant="outline" onClick={() => setBookSessionOpen(false)} data-testid="button-cancel-book-session">
+                Cancel
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </>
