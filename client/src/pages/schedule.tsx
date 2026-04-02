@@ -227,17 +227,20 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
   cancellationNoticeHours: number;
 }) {
   const [cancellingSession, setCancellingSession] = useState<Session | null>(null);
-  const [deductSession, setDeductSession] = useState(false);
+  const [deductSession, setDeductSession] = useState(true);
 
-  const isWithinNoticeWindow = (session: Session): boolean => {
+  const getLateCancelType = (session: Session): "past" | "within_window" | null => {
     const sessionDateTime = new Date(`${session.date}T${session.startTime}:00`);
     const hoursUntil = (sessionDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
-    return hoursUntil >= 0 && hoursUntil < cancellationNoticeHours;
+    if (hoursUntil < 0) return "past"; // session time has already passed
+    if (hoursUntil < cancellationNoticeHours) return "within_window"; // upcoming but within notice period
+    return null; // far enough in future, no late cancel concern
   };
 
   const handleCancelClick = (session: Session) => {
     setCancellingSession(session);
-    setDeductSession(isWithinNoticeWindow(session));
+    // Default to deducting for late cancellations (client should be charged)
+    setDeductSession(getLateCancelType(session) !== null);
   };
 
   const handleConfirmCancel = () => {
@@ -348,32 +351,42 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
             <p className="text-sm font-medium">Cancel session with {clientMap.get(cancellingSession.clientId) || "client"}?</p>
             <p className="text-xs text-muted-foreground">{cancellingSession.startTime} – {cancellingSession.endTime}</p>
 
-            {isWithinNoticeWindow(cancellingSession) && (
-              <div className="rounded-md border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 p-3 space-y-2">
-                <p className="text-xs font-medium text-amber-800 dark:text-amber-400">
-                  This is within your {cancellationNoticeHours}-hour cancellation window.
-                </p>
-                <p className="text-xs text-amber-700 dark:text-amber-500">Deduct this session from the client's package?</p>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant={deductSession ? "default" : "outline"}
-                    onClick={() => setDeductSession(true)}
-                    data-testid="button-deduct-yes"
-                  >
-                    Yes, deduct
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={!deductSession ? "default" : "outline"}
-                    onClick={() => setDeductSession(false)}
-                    data-testid="button-deduct-no"
-                  >
-                    No, return it
-                  </Button>
+            {(() => {
+              const lateType = getLateCancelType(cancellingSession);
+              if (!lateType) return null;
+              return (
+                <div className="rounded-md border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 p-3 space-y-2">
+                  <p className="text-xs font-medium text-amber-800 dark:text-amber-400">
+                    {lateType === "past"
+                      ? "This session has already taken place."
+                      : `This is within your ${cancellationNoticeHours}-hour cancellation window.`}
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-500">
+                    {lateType === "past"
+                      ? "The client cancelled after the session time. Do you want to still count this session (charge the slot) or return it to their package?"
+                      : "The client cancelled late. Do you want to still charge this session or return it to their package?"}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={deductSession ? "default" : "outline"}
+                      onClick={() => setDeductSession(true)}
+                      data-testid="button-deduct-yes"
+                    >
+                      Count it (charge)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={!deductSession ? "default" : "outline"}
+                      onClick={() => setDeductSession(false)}
+                      data-testid="button-deduct-no"
+                    >
+                      Return to package
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             <div className="flex gap-2">
               <Button
