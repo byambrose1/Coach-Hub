@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, ChevronLeft, ChevronRight, Clock, MapPin, X, Check } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Clock, MapPin, X, Check, Ban, Trash2 } from "lucide-react";
 import {
   format,
   startOfMonth,
@@ -257,9 +257,11 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
   };
 
   const dateStr = format(date, "yyyy-MM-dd");
-  const daySessions = sessions
+  const allDaySessions = sessions
     .filter((s) => s.date === dateStr && s.status !== "cancelled")
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const blockedSessions = allDaySessions.filter((s) => s.sessionType === "blocked");
+  const daySessions = allDaySessions.filter((s) => s.sessionType !== "blocked");
 
   const cancelledSessions = sessions
     .filter((s) => s.date === dateStr && s.status === "cancelled");
@@ -269,11 +271,42 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
       <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{format(date, "EEEE, d MMMM yyyy")}</DialogTitle>
-          <DialogDescription>{daySessions.length} session{daySessions.length !== 1 ? "s" : ""} scheduled</DialogDescription>
+          <DialogDescription>
+            {blockedSessions.length > 0 && `🚫 ${blockedSessions[0].title} · `}
+            {daySessions.length} session{daySessions.length !== 1 ? "s" : ""} scheduled
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
-          {daySessions.length === 0 && cancelledSessions.length === 0 ? (
+          {blockedSessions.length > 0 && (
+            <div className="rounded-lg border border-gray-200 p-3 bg-gray-50 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-gray-600 min-w-0">
+                <Ban className="w-4 h-4 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-sm">{blockedSessions[0].title}</p>
+                  <p className="text-xs text-muted-foreground">Time blocked off</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-destructive h-7 px-2 flex-shrink-0"
+                onClick={async () => {
+                  for (const b of blockedSessions) {
+                    await apiRequest("DELETE", `/api/sessions/${b.id}`, undefined);
+                  }
+                  queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+                  onClose();
+                }}
+                data-testid="button-remove-block-day"
+              >
+                <X className="w-3.5 h-3.5 mr-1" />
+                Remove
+              </Button>
+            </div>
+          )}
+
+          {daySessions.length === 0 && cancelledSessions.length === 0 && blockedSessions.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No sessions on this day</p>
           ) : (
             daySessions.map((session) => (
@@ -456,12 +489,104 @@ function SessionBlock({ session, clientMap, typeColors, onClick }: {
   );
 }
 
+const BLOCKED_CLIENT_ID = "__blocked__";
+
+function BlockTimeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+  const [label, setLabel] = useState("Holiday");
+  const [startDate, setStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const start = new Date(startDate + "T00:00:00");
+      const end = new Date(endDate + "T00:00:00");
+      if (end < start) throw new Error("End date must be on or after start date");
+      const days = eachDayOfInterval({ start, end });
+      for (const day of days) {
+        await apiRequest("POST", "/api/sessions", {
+          clientId: BLOCKED_CLIENT_ID,
+          title: label || "Unavailable",
+          date: format(day, "yyyy-MM-dd"),
+          startTime: "00:00",
+          endTime: "23:59",
+          sessionType: "blocked",
+          location: "",
+          notes: "",
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      onOpenChange(false);
+      toast({ title: "Time blocked successfully" });
+      setLabel("Holiday");
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error blocking time", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Ban className="w-4 h-4" />
+            Block Time Off
+          </DialogTitle>
+          <DialogDescription>Mark dates as unavailable on your calendar.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Label</Label>
+            <Select value={label} onValueChange={setLabel}>
+              <SelectTrigger data-testid="select-block-label">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Holiday">Holiday</SelectItem>
+                <SelectItem value="Closed">Closed</SelectItem>
+                <SelectItem value="Personal">Personal</SelectItem>
+                <SelectItem value="Sick Leave">Sick Leave</SelectItem>
+                <SelectItem value="Conference">Conference</SelectItem>
+                <SelectItem value="Unavailable">Unavailable</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>From</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} data-testid="input-block-start" />
+            </div>
+            <div className="space-y-2">
+              <Label>To</Label>
+              <Input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} data-testid="input-block-end" />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            All days in this range will appear as unavailable on your calendar.
+          </p>
+        </div>
+        <div className="flex gap-2 mt-2">
+          <Button className="flex-1" onClick={() => mutation.mutate()} disabled={mutation.isPending} data-testid="button-confirm-block">
+            <Ban className="w-4 h-4 mr-2" />
+            {mutation.isPending ? "Blocking..." : "Block Dates"}
+          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Schedule() {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [currentWeek, setCurrentWeek] = useState(() => new Date());
   const [currentDay, setCurrentDay] = useState(() => new Date());
   const [calView, setCalView] = useState<CalView>("month");
   const [newSessionOpen, setNewSessionOpen] = useState(false);
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | undefined>(undefined);
   const [detailDate, setDetailDate] = useState<Date | null>(null);
@@ -519,6 +644,7 @@ export default function Schedule() {
     "group": "bg-emerald-500 text-white",
     "online": "bg-violet-500 text-white",
     "outdoor": "bg-amber-500 text-white",
+    "blocked": "bg-gray-300 text-gray-600",
   };
 
   const typeDotColors: Record<string, string> = {
@@ -526,6 +652,7 @@ export default function Schedule() {
     "group": "bg-emerald-500",
     "online": "bg-violet-500",
     "outdoor": "bg-amber-500",
+    "blocked": "bg-gray-400",
   };
 
   const handleNewSession = (date?: string, time?: string) => {
@@ -589,20 +716,30 @@ export default function Schedule() {
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-bold" data-testid="text-schedule-title">Schedule</h1>
-        <Button
-          onClick={() => {
-            const dateForView = calView === "day"
-              ? format(currentDay, "yyyy-MM-dd")
-              : calView === "week"
-              ? format(currentWeek, "yyyy-MM-dd")
-              : undefined;
-            handleNewSession(dateForView);
-          }}
-          data-testid="button-new-session"
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          New Session
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setBlockDialogOpen(true)}
+            data-testid="button-block-time"
+          >
+            <Ban className="w-4 h-4 mr-1" />
+            Block Time Off
+          </Button>
+          <Button
+            onClick={() => {
+              const dateForView = calView === "day"
+                ? format(currentDay, "yyyy-MM-dd")
+                : calView === "week"
+                ? format(currentWeek, "yyyy-MM-dd")
+                : undefined;
+              handleNewSession(dateForView);
+            }}
+            data-testid="button-new-session"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            New Session
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center justify-center gap-1">
@@ -658,18 +795,21 @@ export default function Schedule() {
             <div className="grid grid-cols-7">
               {calendarDays.map((calDay, idx) => {
                 const dateStr = format(calDay, "yyyy-MM-dd");
-                const daySessions = sessions
-                  .filter((s) => s.date === dateStr && s.status !== "cancelled")
+                const allDaySessions = sessions.filter((s) => s.date === dateStr && s.status !== "cancelled");
+                const blockedSessions = allDaySessions.filter((s) => s.sessionType === "blocked");
+                const daySessions = allDaySessions
+                  .filter((s) => s.sessionType !== "blocked")
                   .sort((a, b) => a.startTime.localeCompare(b.startTime));
+                const isBlocked = blockedSessions.length > 0;
                 const inCurrentMonth = isSameMonth(calDay, currentMonth);
                 const today = isToday(calDay);
 
                 return (
                   <div
                     key={dateStr}
-                    className={`min-h-[80px] md:min-h-[100px] border-b border-r p-1 cursor-pointer transition-colors hover:bg-accent/50 ${
-                      !inCurrentMonth ? "bg-muted/30" : ""
-                    } ${idx % 7 === 0 ? "border-l" : ""}`}
+                    className={`min-h-[80px] md:min-h-[100px] border-b border-r p-1 cursor-pointer transition-colors ${
+                      isBlocked ? "bg-gray-100 hover:bg-gray-200/70" : "hover:bg-accent/50"
+                    } ${!inCurrentMonth ? "bg-muted/30" : ""} ${idx % 7 === 0 ? "border-l" : ""}`}
                     onClick={() => { setCurrentDay(calDay); setCalView("day"); }}
                     data-testid={`day-cell-${dateStr}`}
                   >
@@ -686,8 +826,15 @@ export default function Schedule() {
                       )}
                     </div>
 
+                    {isBlocked && (
+                      <div className="text-[10px] px-1 py-0.5 rounded bg-gray-300 text-gray-600 flex items-center gap-0.5 mb-0.5 truncate hidden md:flex">
+                        <Ban className="w-2.5 h-2.5 flex-shrink-0" />
+                        {blockedSessions[0].title}
+                      </div>
+                    )}
+
                     <div className="space-y-0.5 hidden md:block">
-                      {daySessions.slice(0, 3).map((session) => (
+                      {daySessions.slice(0, isBlocked ? 2 : 3).map((session) => (
                         <div
                           key={session.id}
                           className={`text-[10px] px-1 py-0.5 rounded truncate ${
@@ -700,12 +847,13 @@ export default function Schedule() {
                           {session.startTime} {clientMap.get(session.clientId)?.split(" ")[0] || ""}
                         </div>
                       ))}
-                      {daySessions.length > 3 && (
-                        <p className="text-[10px] text-muted-foreground text-center">+{daySessions.length - 3} more</p>
+                      {daySessions.length > (isBlocked ? 2 : 3) && (
+                        <p className="text-[10px] text-muted-foreground text-center">+{daySessions.length - (isBlocked ? 2 : 3)} more</p>
                       )}
                     </div>
 
                     <div className="flex gap-0.5 mt-1 md:hidden flex-wrap">
+                      {isBlocked && <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />}
                       {daySessions.slice(0, 4).map((session) => (
                         <div
                           key={session.id}
@@ -716,9 +864,6 @@ export default function Schedule() {
                           }`}
                         />
                       ))}
-                      {daySessions.length > 4 && (
-                        <span className="text-[8px] text-muted-foreground">+{daySessions.length - 4}</span>
-                      )}
                     </div>
                   </div>
                 );
@@ -748,19 +893,30 @@ export default function Schedule() {
             <div className="grid grid-cols-7 min-w-[700px]">
               {weekDays.map((wd) => {
                 const dateStr = format(wd, "yyyy-MM-dd");
-                const daySessions = sessions
-                  .filter((s) => s.date === dateStr && s.status !== "cancelled")
+                const allDaySessions = sessions.filter((s) => s.date === dateStr && s.status !== "cancelled");
+                const blockedSessions = allDaySessions.filter((s) => s.sessionType === "blocked");
+                const daySessions = allDaySessions
+                  .filter((s) => s.sessionType !== "blocked")
                   .sort((a, b) => a.startTime.localeCompare(b.startTime));
+                const isBlocked = blockedSessions.length > 0;
                 const today = isToday(wd);
 
                 return (
                   <div
                     key={dateStr}
-                    className={`min-h-[300px] border-r p-1.5 space-y-1 cursor-pointer transition-colors hover:bg-accent/50 ${today ? "bg-primary/5" : ""}`}
+                    className={`min-h-[300px] border-r p-1.5 space-y-1 cursor-pointer transition-colors ${
+                      isBlocked ? "bg-gray-100 hover:bg-gray-200/50" : today ? "bg-primary/5 hover:bg-accent/50" : "hover:bg-accent/50"
+                    }`}
                     onClick={() => { setCurrentDay(wd); setCalView("day"); }}
                     data-testid={`week-day-${dateStr}`}
                   >
-                    {daySessions.length === 0 && (
+                    {isBlocked && (
+                      <div className="text-[10px] px-1.5 py-1 rounded bg-gray-300 text-gray-600 flex items-center gap-1">
+                        <Ban className="w-3 h-3 flex-shrink-0" />
+                        <span className="font-medium truncate">{blockedSessions[0].title}</span>
+                      </div>
+                    )}
+                    {daySessions.length === 0 && !isBlocked && (
                       <p className="text-[10px] text-muted-foreground text-center pt-4">No sessions</p>
                     )}
                     {daySessions.map((session) => (
@@ -783,12 +939,40 @@ export default function Schedule() {
       {calView === "day" && (
         <Card>
           <CardContent className="p-0">
+            {(() => {
+              const dateStr = format(currentDay, "yyyy-MM-dd");
+              const blockedForDay = sessions.filter((s) => s.date === dateStr && s.sessionType === "blocked");
+              if (blockedForDay.length === 0) return null;
+              return (
+                <div className="bg-gray-100 border-b px-4 py-3 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Ban className="w-4 h-4" />
+                    <span className="font-medium text-sm">{blockedForDay[0].title} — Unavailable</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-500 hover:text-destructive h-7 px-2"
+                    onClick={async () => {
+                      for (const b of blockedForDay) {
+                        await apiRequest("DELETE", `/api/sessions/${b.id}`, undefined);
+                      }
+                      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+                    }}
+                    data-testid="button-remove-block"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                    Remove
+                  </Button>
+                </div>
+              );
+            })()}
             <div className="divide-y">
               {HOURS.map((hour) => {
                 const hourStr = hour.toString().padStart(2, "0");
                 const dateStr = format(currentDay, "yyyy-MM-dd");
                 const hourSessions = sessions.filter((s) => {
-                  if (s.date !== dateStr || s.status === "cancelled") return false;
+                  if (s.date !== dateStr || s.status === "cancelled" || s.sessionType === "blocked") return false;
                   const startHour = parseInt(s.startTime.split(":")[0], 10);
                   return startHour === hour;
                 }).sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -833,6 +1017,7 @@ export default function Schedule() {
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Group</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-violet-500" /> Online</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Outdoor</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-gray-400" /> Blocked</span>
       </div>
 
       <NewSessionDialog
@@ -842,6 +1027,8 @@ export default function Schedule() {
         preselectedDate={selectedDate}
         preselectedTime={selectedTime}
       />
+
+      <BlockTimeDialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen} />
 
       {detailDate && (
         <DayDetailDialog

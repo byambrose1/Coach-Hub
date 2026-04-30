@@ -1,7 +1,30 @@
 # FitTrack - Solo Coach Dashboard
 
 ## Overview
-A fitness trainer app designed for solo coaches managing in-person and online clients. Features authentication via Replit Auth, client management with health forms (PARQs), editable notes within client profiles, flexible payment options (block sessions and monthly billing), full invoice management (view/edit/download/send), configurable currency (£/$/€), UK date formats, HIPAA compliance options, and notification settings.
+A fitness trainer app designed for solo coaches managing in-person and online clients. Features authentication via Replit Auth, client management with health forms (PARQs), editable notes within client profiles, flexible payment options (block sessions and monthly billing), full invoice management (view/edit/download/send), configurable currency (£/$/€), UK date formats, HIPAA compliance options, notification settings, mass client email announcements, and calendar availability blocking.
+
+## Landing Page
+- Full marketing landing page (unauthenticated) with violet/orange gradient design
+- Hero section: "Run your coaching business like a pro" + "5 clients included free" CTA
+- Features grid (6 key features), stats bar, testimonials, pricing tiers, footer
+- All CTAs link to `/api/login`
+
+## Mass Email / Announcements
+- "Send Announcement" button in Clients page header
+- `BroadcastEmailDialog`: subject, message, recipient filter (active only / all)
+- Shows live count of eligible recipients (clients with email addresses)
+- Backend: POST `/api/emails/broadcast` → `sendBroadcastEmail()` in `server/email.ts`
+- Sends via Brevo to all matching clients, returns `{ sent, failed }` counts
+
+## Calendar Blocking
+- "Block Time Off" button in Schedule header
+- `BlockTimeDialog`: label (Holiday/Closed/Personal/etc.), from/to date range
+- Creates sessions with `clientId: "__blocked__"` and `sessionType: "blocked"` for each day in range
+- Month view: blocked days show grey background + ban icon strip
+- Week view: blocked days show grey background + ban icon label
+- Day view: shows grey "Unavailable" banner at top with "Remove" button
+- DayDetailDialog: blocked sessions shown separately with a remove option
+- No package deduction or email sent for blocked sessions (client lookup returns undefined → safe)
 
 ## Tech Stack
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS + shadcn/ui

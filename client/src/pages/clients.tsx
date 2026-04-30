@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save, Download, CalendarPlus } from "lucide-react";
+import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save, Download, CalendarPlus, Send, Users2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { Client, Session, Package as PackageType, SessionNote, ClientForm } from "@shared/schema";
 import { UpgradePopup } from "@/components/upgrade-popup";
@@ -1115,8 +1115,120 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
   );
 }
 
+function BroadcastEmailDialog({ open, onOpenChange, clients }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  clients: Client[];
+}) {
+  const { toast } = useToast();
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [recipientFilter, setRecipientFilter] = useState<"all" | "active">("active");
+
+  const eligibleCount = clients.filter((c) => {
+    if (!c.email) return false;
+    if (recipientFilter === "active") return c.status === "active";
+    return true;
+  }).length;
+
+  const broadcastMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/emails/broadcast", { subject, message, recipientFilter });
+      return res.json();
+    },
+    onSuccess: (data: { sent: number; failed: number }) => {
+      toast({
+        title: `Announcement sent`,
+        description: `Delivered to ${data.sent} client${data.sent !== 1 ? "s" : ""}${data.failed > 0 ? ` (${data.failed} failed)` : ""}.`,
+      });
+      onOpenChange(false);
+      setSubject("");
+      setMessage("");
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Send className="w-4 h-4" />
+            Send Announcement to Clients
+          </DialogTitle>
+          <DialogDescription>
+            Send a message to all your clients with email addresses via Brevo.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Recipients</Label>
+            <Select value={recipientFilter} onValueChange={(v: any) => setRecipientFilter(v)}>
+              <SelectTrigger data-testid="select-broadcast-recipients">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active clients only</SelectItem>
+                <SelectItem value="all">All clients</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Users2 className="w-3 h-3" />
+              {eligibleCount} client{eligibleCount !== 1 ? "s" : ""} with email addresses will receive this
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Subject</Label>
+            <Input
+              placeholder="e.g. Holiday notice — studio closed 25-27 Dec"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              data-testid="input-broadcast-subject"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Message</Label>
+            <Textarea
+              placeholder="Write your message here..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={6}
+              data-testid="input-broadcast-message"
+            />
+          </div>
+
+          {eligibleCount === 0 && (
+            <p className="text-sm text-destructive">No clients with email addresses found. Add email addresses to your clients first.</p>
+          )}
+        </div>
+
+        <div className="flex gap-2 mt-2">
+          <Button
+            className="flex-1"
+            disabled={!subject.trim() || !message.trim() || eligibleCount === 0 || broadcastMutation.isPending}
+            onClick={() => broadcastMutation.mutate()}
+            data-testid="button-send-broadcast"
+          >
+            <Send className="w-4 h-4 mr-2" />
+            {broadcastMutation.isPending ? "Sending..." : `Send to ${eligibleCount} client${eligibleCount !== 1 ? "s" : ""}`}
+          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Clients() {
   const [newClientOpen, setNewClientOpen] = useState(false);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [upgradeInfo, setUpgradeInfo] = useState<any>(null);
@@ -1159,10 +1271,16 @@ export default function Clients() {
           <h1 className="text-2xl font-bold" data-testid="text-clients-title">Clients</h1>
           <p className="text-sm text-muted-foreground">{clients.length} total clients</p>
         </div>
-        <Button onClick={() => setNewClientOpen(true)} data-testid="button-add-client">
-          <Plus className="w-4 h-4 mr-1" />
-          Add Client
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setBroadcastOpen(true)} data-testid="button-send-announcement">
+            <Send className="w-4 h-4 mr-1" />
+            Send Announcement
+          </Button>
+          <Button onClick={() => setNewClientOpen(true)} data-testid="button-add-client">
+            <Plus className="w-4 h-4 mr-1" />
+            Add Client
+          </Button>
+        </div>
       </div>
 
       <div className="relative max-w-sm">
@@ -1237,6 +1355,7 @@ export default function Clients() {
       <NewClientDialog open={newClientOpen} onOpenChange={setNewClientOpen} onUpgradeRequired={setUpgradeInfo} />
       {selectedClient && <ClientDetail client={selectedClient} onClose={() => setSelectedClient(null)} />}
       <UpgradePopup open={!!upgradeInfo} onClose={() => setUpgradeInfo(null)} upgradeInfo={upgradeInfo} />
+      <BroadcastEmailDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} clients={clients} />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema } from "@shared/schema";
 import { isAuthenticated } from "./replit_integrations/auth";
-import { sendInvoiceEmail, sendBookingNotificationEmail, sendSessionCancellationEmail, sendSessionRescheduleEmail, sendParqEmail, sendLowSessionsEmail } from "./email";
+import { sendInvoiceEmail, sendBookingNotificationEmail, sendSessionCancellationEmail, sendSessionRescheduleEmail, sendParqEmail, sendLowSessionsEmail, sendBroadcastEmail } from "./email";
 import { createMandateLink } from "./payments";
 
 declare module "express-session" {
@@ -84,6 +84,43 @@ export async function registerRoutes(
         trainerEmail: s?.trainerEmail || undefined,
       });
       res.json({ message: "PAR-Q email sent successfully" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // --- Broadcast Email ---
+  app.post("/api/emails/broadcast", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { subject, message, recipientFilter } = req.body;
+      if (!subject?.trim()) return res.status(400).json({ message: "Subject is required" });
+      if (!message?.trim()) return res.status(400).json({ message: "Message is required" });
+
+      const allClients = await storage.getClients(userId);
+      const s = await storage.getSettings(userId);
+
+      const eligible = allClients.filter((c) => {
+        if (!c.email) return false;
+        if (recipientFilter === "active") return c.status === "active";
+        return true;
+      });
+
+      if (eligible.length === 0) {
+        return res.status(400).json({ message: "No clients with email addresses found" });
+      }
+
+      const recipients = eligible.map((c) => ({ name: c.name, email: c.email! }));
+      const result = await sendBroadcastEmail({
+        subject,
+        message,
+        recipients,
+        trainerName: s?.trainerName || "Coach",
+        businessName: s?.businessName || undefined,
+        trainerEmail: s?.trainerEmail || undefined,
+      });
+
+      res.json(result);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

@@ -276,6 +276,54 @@ export async function sendLowSessionsEmail(data: {
   }
 }
 
+export async function sendBroadcastEmail(data: {
+  subject: string;
+  message: string;
+  recipients: { name: string; email: string }[];
+  trainerName: string;
+  businessName?: string;
+  trainerEmail?: string;
+}): Promise<{ sent: number; failed: number }> {
+  const { subject, message, recipients, trainerName, businessName, trainerEmail } = data;
+  const senderName = businessName || trainerName || "FitTrack";
+  const senderEmail = trainerEmail || "noreply@fittrack.app";
+
+  const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
+    .container{max-width:600px;margin:0 auto;background:#fff}
+    .header{background:#7c3aed;color:white;padding:30px;text-align:center}
+    .header h1{margin:0;font-size:22px}
+    .body{padding:30px;color:#333;font-size:15px;line-height:1.7;white-space:pre-line}
+    .footer{padding:20px 30px;background:#f9fafb;text-align:center;font-size:12px;color:#888}
+  </style></head><body>
+  <div class="container">
+    <div class="header"><h1>${senderName}</h1></div>
+    <div class="body">${message.replace(/\n/g, "<br/>")}</div>
+    <div class="footer"><p>Message from ${trainerName} via FitTrack</p></div>
+  </div>
+  </body></html>`;
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const recipient of recipients) {
+    try {
+      await brevo.transactionalEmails.sendTransacEmail({
+        subject,
+        htmlContent,
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: recipient.email, name: recipient.name }],
+      });
+      sent++;
+    } catch (error) {
+      console.error(`Failed to send broadcast to ${recipient.email}:`, error);
+      failed++;
+    }
+  }
+
+  return { sent, failed };
+}
+
 export async function sendParqEmail(data: {
   clientName: string;
   clientEmail: string;
