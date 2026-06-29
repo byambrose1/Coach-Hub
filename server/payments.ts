@@ -1,13 +1,19 @@
 import { createRequire } from "module";
-const require = createRequire(import.meta.url);
+
+let requireFn: any;
+try {
+  requireFn = createRequire(import.meta.url);
+} catch {
+  requireFn = typeof require !== "undefined" ? require : null;
+}
 
 let client: any = null;
 
 function getClient() {
-  if (!client && process.env.GOCARDLESS_API_KEY) {
+  if (!client && process.env.GOCARDLESS_API_KEY && requireFn) {
     try {
-      const gocardless = require("gocardless-nodejs");
-      const { constants } = require("gocardless-nodejs");
+      const gocardless = requireFn("gocardless-nodejs");
+      const { constants } = requireFn("gocardless-nodejs");
       client = gocardless(process.env.GOCARDLESS_API_KEY, constants.Environments.Sandbox);
     } catch (err) {
       console.warn("GoCardless not available:", err);
