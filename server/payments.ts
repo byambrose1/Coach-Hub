@@ -2,7 +2,11 @@ import { createRequire } from "module";
 
 let requireFn: any;
 try {
-  requireFn = createRequire(import.meta.url);
+  if (typeof __filename !== "undefined") {
+    requireFn = createRequire(__filename);
+  } else if (typeof import.meta !== "undefined" && import.meta.url) {
+    requireFn = createRequire(import.meta.url);
+  }
 } catch {
   requireFn = typeof require !== "undefined" ? require : null;
 }
