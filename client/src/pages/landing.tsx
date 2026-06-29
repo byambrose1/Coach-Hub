@@ -9,7 +9,7 @@ const features = [
   {
     icon: Users,
     title: "Client Management",
-    desc: "Complete client profiles with health forms, session history, and detailed notes — all in one place.",
+    desc: "Complete client profiles with health forms, session history, and detailed notes, all in one place.",
   },
   {
     icon: Calendar,
@@ -19,7 +19,7 @@ const features = [
   {
     icon: CreditCard,
     title: "Payments & Invoices",
-    desc: "Block packages, monthly billing, GoCardless direct debit, professional PDF invoices — handled.",
+    desc: "Block packages, monthly billing, GoCardless direct debit, professional PDF invoices, all handled.",
   },
   {
     icon: ClipboardCheck,
@@ -29,7 +29,7 @@ const features = [
   {
     icon: Bell,
     title: "Automated Emails",
-    desc: "Booking confirmations, cancellation notices, low session alerts — sent automatically via Brevo.",
+    desc: "Booking confirmations, cancellation notices, low session alerts, sent automatically via Brevo.",
   },
   {
     icon: TrendingUp,
@@ -118,7 +118,7 @@ export default function Landing() {
 
         <div className="max-w-6xl mx-auto px-6 pt-20 pb-24 text-center relative">
           <Badge className="mb-6 text-sm px-4 py-1.5 rounded-full font-medium border-0" style={{ background: "linear-gradient(135deg, #ede9fe, #ffedd5)", color: "#7c3aed" }}>
-            🚀 Free for your first 5 clients — no credit card needed
+            🚀 Free for your first 5 clients - no credit card needed
           </Badge>
 
           <h1 className="text-5xl sm:text-6xl font-extrabold leading-tight tracking-tight mb-6 max-w-3xl mx-auto" data-testid="text-landing-title">
@@ -130,13 +130,13 @@ export default function Landing() {
           </h1>
 
           <p className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed">
-            The all-in-one dashboard for solo fitness coaches. Manage clients, schedule sessions, send invoices, and get paid — without the admin headache.
+            The all-in-one dashboard for solo fitness coaches. Manage clients, schedule sessions, send invoices, and get paid without the admin headache.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button asChild size="lg" className="font-bold text-base rounded-full px-8 py-6 shadow-lg hover:shadow-xl transition-all hover:scale-105" style={{ background: "linear-gradient(135deg, #7c3aed, #9333ea)" }}>
               <a href="/api/login" data-testid="button-login-hero">
-                Start free — 5 clients included
+                Start free - 5 clients included
                 <ArrowRight className="w-5 h-5 ml-2" />
               </a>
             </Button>
@@ -181,7 +181,7 @@ export default function Landing() {
             Everything included from day one
           </Badge>
           <h2 className="text-3xl sm:text-4xl font-extrabold mb-4">One dashboard. Zero admin headaches.</h2>
-          <p className="text-gray-500 text-lg max-w-xl mx-auto">Built by coaches, for coaches. Every feature you actually need — none of the bloat.</p>
+          <p className="text-gray-500 text-lg max-w-xl mx-auto">Built by coaches, for coaches. Every feature you actually need, none of the bloat.</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -281,7 +281,7 @@ export default function Landing() {
         <div className="max-w-3xl mx-auto px-6 text-center text-white">
           <h2 className="text-3xl sm:text-4xl font-extrabold mb-4">Ready to run your coaching business smarter?</h2>
           <p className="text-white/80 text-lg mb-8 max-w-xl mx-auto">
-            Join coaches who've ditched the spreadsheets. Start free with 5 clients — no card, no commitment.
+            Join coaches who've ditched the spreadsheets. Start free with 5 clients - no card, no commitment.
           </p>
           <Button asChild size="lg" className="font-bold text-base rounded-full px-8 py-6 bg-white hover:bg-gray-50 transition-all hover:scale-105 shadow-xl" style={{ color: "#7c3aed" }}>
             <a href="/api/login" data-testid="button-login-cta">

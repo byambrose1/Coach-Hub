@@ -99,15 +99,15 @@ export default function Admin() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex justify-between items-center py-2 border-b">
               <span className="text-sm text-muted-foreground">Business Name</span>
-              <span className="text-sm font-medium">{settings?.businessName || settings?.trainerName || "—"}</span>
+              <span className="text-sm font-medium">{settings?.businessName || settings?.trainerName || "-"}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b">
               <span className="text-sm text-muted-foreground">Trainer</span>
-              <span className="text-sm font-medium">{settings?.trainerName || "—"}</span>
+              <span className="text-sm font-medium">{settings?.trainerName || "-"}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b">
               <span className="text-sm text-muted-foreground">Contact Email</span>
-              <span className="text-sm font-medium">{settings?.trainerEmail || "—"}</span>
+              <span className="text-sm font-medium">{settings?.trainerEmail || "-"}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b">
               <span className="text-sm text-muted-foreground">Currency</span>

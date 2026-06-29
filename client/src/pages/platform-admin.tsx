@@ -198,7 +198,7 @@ export default function PlatformAdmin() {
               ].map(({ tier, label, priceField, maxField, linkField }) => (
                 <div key={tier} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                   <div>
-                    <Label className="text-xs text-muted-foreground">Tier {tier} — {label}</Label>
+                    <Label className="text-xs text-muted-foreground">Tier {tier} - {label}</Label>
                     <p className="text-xs text-muted-foreground mt-0.5">Max clients</p>
                     <Input
                       type="number"
@@ -291,7 +291,7 @@ export default function PlatformAdmin() {
                     </div>
                     <div className="text-right flex items-center gap-2">
                       <p className="text-xs text-muted-foreground hidden sm:block">
-                        Joined {user.createdAt ? format(new Date(user.createdAt), "dd/MM/yyyy") : "—"}
+                        Joined {user.createdAt ? format(new Date(user.createdAt), "dd/MM/yyyy") : "-"}
                       </p>
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </div>

@@ -947,7 +947,7 @@ export default function Schedule() {
                 <div className="bg-gray-100 border-b px-4 py-3 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-gray-600">
                     <Ban className="w-4 h-4" />
-                    <span className="font-medium text-sm">{blockedForDay[0].title} — Unavailable</span>
+                    <span className="font-medium text-sm">{blockedForDay[0].title} - Unavailable</span>
                   </div>
                   <Button
                     variant="ghost"

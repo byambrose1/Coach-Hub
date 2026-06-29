@@ -264,7 +264,7 @@ export async function sendLowSessionsEmail(data: {
 
   try {
     await brevo.transactionalEmails.sendTransacEmail({
-      subject: `You have ${remainingSessions} ${sessionWord} remaining — ${packageName}`,
+      subject: `You have ${remainingSessions} ${sessionWord} remaining - ${packageName}`,
       htmlContent,
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],

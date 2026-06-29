@@ -46,7 +46,7 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - Every data table (clients, training_sessions, packages, session_notes, client_forms, invoices, referrals) has a `userId` column
 - All API routes extract the authenticated user's ID from `req.user.claims.sub` and scope all queries to that userId
 - Settings are stored per-user (id = userId in the settings table)
-- Each coach who logs in sees only their own data — fully isolated
+- Each coach who logs in sees only their own data - fully isolated
 - The `users` table (from Replit Auth) tracks all registered coaches
 
 ## Platform Owner Admin
@@ -64,7 +64,7 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - **Clients**: Client profiles with edit dialog (phone/email save fix), PARQ health forms tab, session history, editable packages (inline edit total/used sessions), full notes CRUD (create/edit/delete within profile with "edited" indicator)
 - **Payments**: Revenue Overview card (week/month toggle, breakdown by monthly billing vs block bookings + session count), session packages (block & monthly billing) with edit sessions, full invoice management (view detail, edit, download PDF, send/mark sent, mark paid), Monthly Payments tab with GoCardless direct debit mandate management per client, configurable currency (£/$/€), summary stats
 - **Settings**: Profile, cancellation policy (structured: notice hours + editable template), currency selector, payment settings, email notifications (stub), session reminders, HIPAA compliance, data retention, subscription plan display (shows current tier limits), account deletion
-- **Admin**: Comprehensive admin overview page at /admin — account info, subscription status, client/session/invoice/revenue stats, system info (auth/email/payment providers)
+- **Admin**: Comprehensive admin overview page at /admin - account info, subscription status, client/session/invoice/revenue stats, system info (auth/email/payment providers)
 
 ## Subscription Tier System
 - Free: 1-5 clients (no payment)
@@ -85,7 +85,7 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - Platform stats overview
 - Configurable tier limits and payment links
 - Searchable coach list (clickable rows)
-- Coach detail page at /platform-admin/coaches/:coachId — shows clients, stats, subscription plan management
+- Coach detail page at /platform-admin/coaches/:coachId - shows clients, stats, subscription plan management
 - Coach impersonation: owner can view the app as any coach; amber banner shows while impersonating with exit button
 - System status links (Brevo, GoCardless dashboards)
 
@@ -140,7 +140,7 @@ A fitness trainer app designed for solo coaches managing in-person and online cl
 - Cancellation emails fire automatically on PATCH /api/sessions/:id when status changes to "cancelled"
 - Reschedule emails fire automatically on PATCH /api/sessions/:id when date or startTime changes
 - PAR-Q email: POST /api/parq/send-email sends the PAR-Q questions to the client via Brevo
-- Low sessions notification: POST /api/packages/:id/notify-low-sessions — manually triggered from dashboard "Notify" button on each low session alert; sends email to client showing remaining sessions and package name
+- Low sessions notification: POST /api/packages/:id/notify-low-sessions - manually triggered from dashboard "Notify" button on each low session alert; sends email to client showing remaining sessions and package name
 
 ## GoCardless (Monthly Payments)
 - `gocardless-nodejs` package installed; `server/payments.ts` with `createMandateLink()`

@@ -386,26 +386,26 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
       const res = await fetch(`/api/clients/${client.id}/export`, { credentials: "include" });
       const data = await res.json();
       const lines: string[] = [];
-      lines.push(`DATA EXPORT — ${currentClient.name}`);
+      lines.push(`DATA EXPORT - ${currentClient.name}`);
       lines.push(`Exported: ${format(new Date(), "dd/MM/yyyy HH:mm")}`);
       lines.push("=".repeat(50));
       lines.push("");
       lines.push("PERSONAL INFORMATION");
       lines.push(`Name: ${data.client.name}`);
-      lines.push(`Email: ${data.client.email || "—"}`);
-      lines.push(`Phone: ${data.client.phone || "—"}`);
-      lines.push(`Session Type: ${data.client.sessionType || "—"}`);
+      lines.push(`Email: ${data.client.email || "-"}`);
+      lines.push(`Phone: ${data.client.phone || "-"}`);
+      lines.push(`Session Type: ${data.client.sessionType || "-"}`);
       lines.push(`Status: ${data.client.status}`);
-      lines.push(`Notes: ${data.client.notes || "—"}`);
+      lines.push(`Notes: ${data.client.notes || "-"}`);
       lines.push("");
       lines.push(`SESSIONS (${data.sessions.length})`);
       data.sessions.forEach((s: any) => {
-        lines.push(`  ${formatDateUK(s.date)} ${s.startTime}–${s.endTime} — ${s.title} [${s.status}]`);
+        lines.push(`  ${formatDateUK(s.date)} ${s.startTime}-${s.endTime} - ${s.title} [${s.status}]`);
       });
       lines.push("");
       lines.push(`PACKAGES (${data.packages.length})`);
       data.packages.forEach((p: any) => {
-        lines.push(`  ${p.name} — ${p.usedSessions}/${p.totalSessions} sessions used [${p.status}]`);
+        lines.push(`  ${p.name} - ${p.usedSessions}/${p.totalSessions} sessions used [${p.status}]`);
       });
       lines.push("");
       lines.push(`NOTES (${data.notes.length})`);
@@ -415,12 +415,12 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
       lines.push("");
       lines.push(`HEALTH FORMS (${data.forms.length})`);
       data.forms.forEach((f: any) => {
-        lines.push(`  ${formatDateUK(f.date)} — ${f.title} [${f.status}]`);
+        lines.push(`  ${formatDateUK(f.date)} - ${f.title} [${f.status}]`);
       });
       lines.push("");
       lines.push(`INVOICES (${data.invoices.length})`);
       data.invoices.forEach((i: any) => {
-        lines.push(`  ${i.invoiceNumber} — ${i.amount} [${i.status}]`);
+        lines.push(`  ${i.invoiceNumber} - ${i.amount} [${i.status}]`);
       });
       const blob = new Blob([lines.join("\n")], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
@@ -1029,7 +1029,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
       <Dialog open={bookSessionOpen} onOpenChange={setBookSessionOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Book Session — {client.name.split(" ")[0]}</DialogTitle>
+            <DialogTitle>Book Session - {client.name.split(" ")[0]}</DialogTitle>
             <DialogDescription>Schedule a new session for this client</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -1184,7 +1184,7 @@ function BroadcastEmailDialog({ open, onOpenChange, clients }: {
           <div className="space-y-2">
             <Label>Subject</Label>
             <Input
-              placeholder="e.g. Holiday notice — studio closed 25-27 Dec"
+              placeholder="e.g. Holiday notice - studio closed 25-27 Dec"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               data-testid="input-broadcast-subject"
