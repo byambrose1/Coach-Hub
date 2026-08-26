@@ -20,6 +20,23 @@ const PLAN_TIER: Record<string, number> = {
   business: 4,
 };
 
+const ACTIVATION_EVENTS = new Set([
+  "signup_started",
+  "signup_completed",
+  "first_client_created",
+  "first_booking_created",
+  "first_parq_form_sent",
+  "first_invoice_created",
+  "first_payment_initiated",
+]);
+
+function getPublicSiteUrl(req: any) {
+  const configured = process.env.PUBLIC_SITE_URL || process.env.VITE_SITE_URL;
+  if (configured) return configured.replace(/\/$/, "");
+  const host = req.get("host");
+  return `${req.protocol}://${host}`;
+}
+
 function getRealUserId(req: any): string {
   return req.user?.claims?.sub || "";
 }
@@ -38,6 +55,39 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  app.get("/robots.txt", (req, res) => {
+    const siteUrl = getPublicSiteUrl(req);
+    res.type("text/plain").send([
+      "User-agent: *",
+      "Allow: /",
+      "Disallow: /api/",
+      "Disallow: /admin",
+      "Disallow: /platform-admin",
+      "Disallow: /settings",
+      "Disallow: /clients",
+      "Disallow: /schedule",
+      "Disallow: /payments",
+      `Sitemap: ${siteUrl}/sitemap.xml`,
+      "",
+    ].join("\n"));
+  });
+
+  app.get("/sitemap.xml", (req, res) => {
+    const siteUrl = getPublicSiteUrl(req);
+    const publicPaths = ["/", "/pricing", "/privacy", "/terms", "/support"];
+    const urls = publicPaths.map((pathname) => `  <url><loc>${siteUrl}${pathname}</loc></url>`).join("\n");
+    res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`);
+  });
+
+  app.post("/api/activation-events", isAuthenticated, (req, res) => {
+    const { event } = req.body || {};
+    if (typeof event !== "string" || !ACTIVATION_EVENTS.has(event)) {
+      return res.status(400).json({ message: "Unknown activation event" });
+    }
+    // No health, client, or payment details are accepted or logged here.
+    console.log(`[activation] ${event}`);
+    return res.status(204).send();
+  });
 
   app.use("/api/clients", isAuthenticated);
   app.use("/api/sessions", isAuthenticated);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery, useMutation } from "@tanstack/react-query";
@@ -23,6 +23,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Settings } from "@shared/schema";
 import { apiRequest } from "./lib/queryClient";
+import { PrivacyPage, TermsPage, SupportPage } from "@/pages/public";
+import { trackActivationEvent } from "@/lib/activation";
 
 function TermsModal() {
   const { data: settings } = useQuery<Settings>({ queryKey: ["/api/settings"] });
@@ -53,10 +55,10 @@ function TermsModal() {
             <ShieldCheck className="w-5 h-5 text-primary" />
             Terms and Conditions
           </DialogTitle>
-          <DialogDescription>Please review and accept our terms to continue using Coach Hub.</DialogDescription>
+          <DialogDescription>Please review and accept the FitTrack terms to continue.</DialogDescription>
         </DialogHeader>
         <div className="max-h-[300px] overflow-y-auto p-4 border rounded-md text-sm space-y-4">
-          <p><strong>1. Introduction</strong><br/>Welcome to Coach Hub. By using our service, you agree to these terms.</p>
+          <p><strong>1. Introduction</strong><br/>Welcome to FitTrack. By using our service, you agree to the terms published at <a href="/terms" className="text-primary underline">/terms</a>.</p>
           <p><strong>2. Use of Service</strong><br/>You are responsible for maintaining the confidentiality of your account and for all activities that occur under your account.</p>
           <p><strong>3. Data Protection</strong><br/>We value your privacy. Your data is handled in accordance with our Privacy Policy.</p>
           <p><strong>4. Payments</strong><br/>Monthly recurring payments are handled via GoCardless. By setting up mandates, you agree to their terms of service.</p>
@@ -135,6 +137,18 @@ function Router() {
   );
 }
 
+function PublicRouter() {
+  return (
+    <Switch>
+      <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/terms" component={TermsPage} />
+      <Route path="/support" component={SupportPage} />
+      <Route path="/pricing" component={Landing} />
+      <Route component={Landing} />
+    </Switch>
+  );
+}
+
 function AuthenticatedApp() {
   const style = {
     "--sidebar-width": "16rem",
@@ -160,6 +174,7 @@ function AuthenticatedApp() {
 
 function AppContent() {
   const { isLoading, isAuthenticated } = useAuth();
+  const trackedSignup = useRef(false);
 
   if (isLoading) {
     return (
@@ -170,7 +185,12 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
-    return <Landing />;
+    return <PublicRouter />;
+  }
+
+  if (!trackedSignup.current) {
+    trackedSignup.current = true;
+    trackActivationEvent("signup_completed");
   }
 
   return <AuthenticatedApp />;
