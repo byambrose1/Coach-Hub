@@ -16,6 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, Package, CreditCard, AlertTriangle, FileText, Clock, CheckCircle, Pencil, Download, Send, PoundSterling, TrendingUp, Users, Copy, Calendar, RefreshCw } from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import type { Client, Package as PackageType, Settings, Invoice, Session } from "@shared/schema";
+import { trackActivationEvent } from "@/lib/activation";
 
 function formatDateUK(dateStr: string): string {
   try {
@@ -180,6 +181,7 @@ function NewInvoiceDialog({ open, onOpenChange, clients, currency }: {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       onOpenChange(false);
       toast({ title: "Invoice created successfully" });
+      trackActivationEvent("first_invoice_created");
       setFormData({
         clientId: "",
         invoiceNumber: `INV-${String(Math.floor(1000 + Math.random() * 9000))}`,
@@ -731,6 +733,7 @@ export default function Payments() {
       if (data.link) {
         setMandateLinks(prev => ({ ...prev, [client.id]: data.link }));
         toast({ title: "Payment link generated" });
+        trackActivationEvent("first_payment_initiated");
       } else {
         throw new Error(data.message || "No link returned");
       }

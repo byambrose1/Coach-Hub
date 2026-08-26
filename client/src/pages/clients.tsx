@@ -17,6 +17,7 @@ import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, T
 import { format, parseISO } from "date-fns";
 import type { Client, Session, Package as PackageType, SessionNote, ClientForm } from "@shared/schema";
 import { UpgradePopup } from "@/components/upgrade-popup";
+import { trackActivationEvent } from "@/lib/activation";
 
 function formatDateUK(dateStr: string): string {
   try {
@@ -66,6 +67,7 @@ function NewClientDialog({ open, onOpenChange, onUpgradeRequired }: {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       onOpenChange(false);
       toast({ title: "Client added successfully" });
+      trackActivationEvent("first_client_created");
       setFormData({ name: "", email: "", phone: "", notes: "", sessionType: "1:1", status: "active" });
     },
     onError: (err: any) => {
@@ -209,6 +211,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       setBookSessionOpen(false);
       toast({ title: "Session booked successfully" });
+      trackActivationEvent("first_booking_created");
       setBookFormData({ date: format(new Date(), "yyyy-MM-dd"), startTime: "09:00", endTime: "10:00", sessionType: "1:1", location: "" });
     },
     onError: (err: Error) => {
@@ -295,6 +298,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
       setShowParqForm(false);
       setParqAnswers({});
       toast({ title: "PARQ form submitted" });
+      trackActivationEvent("first_parq_form_sent");
     },
     onError: (err: Error) => {
       toast({ title: "Error submitting form", description: err.message, variant: "destructive" });
@@ -375,6 +379,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
     },
     onSuccess: () => {
       toast({ title: "PAR-Q email sent", description: `PAR-Q form sent to ${currentClient.email}` });
+      trackActivationEvent("first_parq_form_sent");
     },
     onError: (err: Error) => {
       toast({ title: "Failed to send email", description: err.message, variant: "destructive" });

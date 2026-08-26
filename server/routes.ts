@@ -37,6 +37,10 @@ function getPublicSiteUrl(req: any) {
   return `${req.protocol}://${host}`;
 }
 
+function getRouteParam(value: string | string[]) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function getRealUserId(req: any): string {
   return req.user?.claims?.sub || "";
 }
@@ -79,10 +83,13 @@ export async function registerRoutes(
     res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`);
   });
 
-  app.post("/api/activation-events", isAuthenticated, (req, res) => {
+  app.post("/api/activation-events", (req, res) => {
     const { event } = req.body || {};
     if (typeof event !== "string" || !ACTIVATION_EVENTS.has(event)) {
       return res.status(400).json({ message: "Unknown activation event" });
+    }
+    if (event !== "signup_started" && !req.isAuthenticated?.()) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
     // No health, client, or payment details are accepted or logged here.
     console.log(`[activation] ${event}`);
@@ -260,7 +267,7 @@ export async function registerRoutes(
   app.get("/api/platform-admin/coaches/:coachId", isAuthenticated, async (req, res) => {
     if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
     try {
-      const detail = await storage.getCoachDetail(req.params.coachId);
+      const detail = await storage.getCoachDetail(getRouteParam(req.params.coachId));
       if (!detail) return res.status(404).json({ message: "Coach not found" });
       res.json(detail);
     } catch (err: any) {
@@ -275,7 +282,7 @@ export async function registerRoutes(
       if (!["free", "starter", "professional", "business"].includes(plan)) {
         return res.status(400).json({ message: "Invalid plan" });
       }
-      await storage.updateCoachPlan(req.params.coachId, plan);
+      await storage.updateCoachPlan(getRouteParam(req.params.coachId), plan);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -285,7 +292,7 @@ export async function registerRoutes(
   app.post("/api/platform-admin/impersonate/:userId", isAuthenticated, async (req, res) => {
     if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
     try {
-      const targetUserId = req.params.userId;
+      const targetUserId = getRouteParam(req.params.userId);
       if (targetUserId === getRealUserId(req)) {
         return res.status(400).json({ message: "Cannot impersonate yourself" });
       }
@@ -604,7 +611,7 @@ export async function registerRoutes(
   app.post("/api/packages/:id/notify-low-sessions", isAuthenticated, async (req, res) => {
     try {
       const userId = getUserId(req);
-      const pkg = await storage.getPackage(req.params.id);
+      const pkg = await storage.getPackage(getRouteParam(req.params.id));
       if (!pkg) return res.status(404).json({ message: "Package not found" });
       const client = await storage.getClient(pkg.clientId);
       if (!client) return res.status(404).json({ message: "Client not found" });

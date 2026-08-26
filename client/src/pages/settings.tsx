@@ -520,15 +520,15 @@ export default function SettingsPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Shield className="w-4 h-4" />
-            Privacy & Compliance
+            Privacy controls
           </CardTitle>
-          <CardDescription>HIPAA compliance and data protection settings</CardDescription>
+          <CardDescription>Review how you collect and manage client information in FitTrack.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <Label>HIPAA Compliance Mode</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">Enable enhanced data protection for health information</p>
+              <Label>Health information review</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">Record that you have reviewed how you collect PARQ and other client health information.</p>
             </div>
             <Switch
               checked={formData.hipaaCompliant}
@@ -539,12 +539,12 @@ export default function SettingsPage() {
 
           {formData.hipaaCompliant && (
             <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-3 space-y-2">
-              <p className="text-xs font-medium text-blue-800 dark:text-blue-200">HIPAA Compliance Enabled</p>
+              <p className="text-xs font-medium text-blue-800 dark:text-blue-200">Privacy review recorded</p>
               <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-disc pl-4">
-                <li>Client health data (PARQ forms) is stored securely</li>
-                <li>Access to health records is logged</li>
-                <li>Data encryption is applied to sensitive fields</li>
-                <li>Automatic data retention policy is enforced</li>
+                <li>PARQ responses are stored in the relevant client record.</li>
+                <li>Individual client records can be exported from the client profile.</li>
+                <li>Review your retention and access practices for your own coaching business.</li>
+                <li>This reminder is not a certification of legal or regulatory compliance.</li>
               </ul>
             </div>
           )}

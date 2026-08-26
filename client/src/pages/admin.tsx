@@ -120,9 +120,9 @@ export default function Admin() {
               </Badge>
             </div>
             <div className="flex justify-between items-center py-2 border-b">
-              <span className="text-sm text-muted-foreground">HIPAA Compliant</span>
+              <span className="text-sm text-muted-foreground">Privacy review</span>
               <Badge variant={settings?.hipaaCompliant ? "default" : "secondary"} className="text-xs">
-                {settings?.hipaaCompliant ? "Enabled" : "Disabled"}
+                {settings?.hipaaCompliant ? "Recorded" : "Not recorded"}
               </Badge>
             </div>
             <div className="flex justify-between items-center py-2 border-b">

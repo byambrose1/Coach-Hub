@@ -14,6 +14,8 @@ import { format, isToday, isTomorrow, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Session, Client, Package } from "@shared/schema";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
+import { trackActivationEvent } from "@/lib/activation";
 
 function QuickBookDialog({ open, onOpenChange, clients }: {
   open: boolean;
@@ -44,6 +46,7 @@ function QuickBookDialog({ open, onOpenChange, clients }: {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       onOpenChange(false);
       toast({ title: "Session booked!" });
+      trackActivationEvent("first_booking_created");
       setFormData({
         clientId: "",
         title: "",
@@ -335,6 +338,8 @@ export default function Dashboard() {
           Quick Book
         </Button>
       </div>
+
+      <OnboardingChecklist />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Today's Sessions" value={todaySessions.length} icon={Calendar} subtitle={`${completedToday} completed`} />

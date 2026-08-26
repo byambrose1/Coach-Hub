@@ -27,15 +27,19 @@ import { PrivacyPage, TermsPage, SupportPage } from "@/pages/public";
 import { trackActivationEvent } from "@/lib/activation";
 
 function TermsModal() {
-  const { data: settings } = useQuery<Settings>({ queryKey: ["/api/settings"] });
+  const { isAuthenticated } = useAuth();
+  const { data: settings } = useQuery<Settings>({
+    queryKey: ["/api/settings"],
+    enabled: isAuthenticated,
+  });
   const [open, setOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
-    if (settings && !settings.hasAcceptedTerms) {
+    if (isAuthenticated && settings && !settings.hasAcceptedTerms) {
       setOpen(true);
     }
-  }, [settings]);
+  }, [isAuthenticated, settings]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -57,17 +61,14 @@ function TermsModal() {
           </DialogTitle>
           <DialogDescription>Please review and accept the FitTrack terms to continue.</DialogDescription>
         </DialogHeader>
-        <div className="max-h-[300px] overflow-y-auto p-4 border rounded-md text-sm space-y-4">
-          <p><strong>1. Introduction</strong><br/>Welcome to FitTrack. By using our service, you agree to the terms published at <a href="/terms" className="text-primary underline">/terms</a>.</p>
-          <p><strong>2. Use of Service</strong><br/>You are responsible for maintaining the confidentiality of your account and for all activities that occur under your account.</p>
-          <p><strong>3. Data Protection</strong><br/>We value your privacy. Your data is handled in accordance with our Privacy Policy.</p>
-          <p><strong>4. Payments</strong><br/>Monthly recurring payments are handled via GoCardless. By setting up mandates, you agree to their terms of service.</p>
-          <p><em>(Placeholder text for full Terms & Conditions)</em></p>
+        <div className="p-4 border rounded-md text-sm space-y-3">
+          <p>Review the current <a href="/terms" className="text-primary underline">FitTrack Terms</a> and <a href="/privacy" className="text-primary underline">Privacy information</a> before continuing.</p>
+          <p className="text-muted-foreground">The legal operator details and final terms are clearly marked for owner review before public launch.</p>
         </div>
         <div className="flex items-center space-x-2 py-4">
           <Checkbox id="terms" checked={agreed} onCheckedChange={(v) => setAgreed(!!v)} />
           <label htmlFor="terms" className="text-sm font-medium leading-none cursor-pointer">
-            I have read and agree to the Terms and Conditions
+            I have read and agree to the FitTrack Terms
           </label>
         </div>
         <DialogFooter>
@@ -176,6 +177,13 @@ function AppContent() {
   const { isLoading, isAuthenticated } = useAuth();
   const trackedSignup = useRef(false);
 
+  useEffect(() => {
+    if (isAuthenticated && !trackedSignup.current) {
+      trackedSignup.current = true;
+      trackActivationEvent("signup_completed");
+    }
+  }, [isAuthenticated]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -186,11 +194,6 @@ function AppContent() {
 
   if (!isAuthenticated) {
     return <PublicRouter />;
-  }
-
-  if (!trackedSignup.current) {
-    trackedSignup.current = true;
-    trackActivationEvent("signup_completed");
   }
 
   return <AuthenticatedApp />;

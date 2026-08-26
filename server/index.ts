@@ -26,6 +26,7 @@ app.use(express.urlencoded({ extended: false }));
 // Replit auth redirect, Google Fonts, Vite HMR, Brevo/GoCardless redirects,
 // and same-origin API calls used by the application.
 app.use((_req, res, next) => {
+  const isDevelopment = process.env.NODE_ENV !== "production";
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
@@ -35,9 +36,9 @@ app.use((_req, res, next) => {
       "default-src 'self'",
       "base-uri 'self'",
       "object-src 'none'",
-      "frame-ancestors 'self'",
+      "frame-ancestors 'self' https://replit.com https://*.replit.com https://*.replit.dev",
       "form-action 'self' https:",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",

@@ -1,315 +1,142 @@
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
-  Users, Calendar, CreditCard, FileText, CheckCircle2, Zap,
-  ClipboardCheck, Bell, TrendingUp, Star, ArrowRight, Dumbbell
+  ArrowRight, CalendarDays, CheckCircle2, ChevronDown, ClipboardCheck, CreditCard,
+  Dumbbell, FileText, Menu, ShieldCheck, Sparkles, TrendingUp, Users, X, Zap,
 } from "lucide-react";
+import { Link } from "wouter";
+import { getPublicSiteUrl, OWNER_INPUT_REQUIRED, pricingTiers, siteConfig } from "@/config/site";
+import { trackActivationEvent } from "@/lib/activation";
 
 const features = [
-  {
-    icon: Users,
-    title: "Client Management",
-    desc: "Complete client profiles with health forms, session history, and detailed notes, all in one place.",
-  },
-  {
-    icon: Calendar,
-    title: "Smart Scheduling",
-    desc: "Month, week, and day views. Click any slot to instantly book. Block time off for holidays in seconds.",
-  },
-  {
-    icon: CreditCard,
-    title: "Payments & Invoices",
-    desc: "Block packages, monthly billing, GoCardless direct debit, professional PDF invoices, all handled.",
-  },
-  {
-    icon: ClipboardCheck,
-    title: "Health & PARQ Forms",
-    desc: "Digital health screening built-in. Send, collect, and store PAR-Q forms for every client.",
-  },
-  {
-    icon: Bell,
-    title: "Automated Emails",
-    desc: "Booking confirmations, cancellation notices, low session alerts, sent automatically via Brevo.",
-  },
-  {
-    icon: TrendingUp,
-    title: "Revenue Dashboard",
-    desc: "Track weekly and monthly revenue, package performance, and outstanding invoices at a glance.",
-  },
+  { icon: Users, title: "Know every client at a glance", description: "Keep profiles, contact details, notes, packages, and session history together instead of scattered across documents." },
+  { icon: CalendarDays, title: "Make the week easier to run", description: "Book sessions, manage your calendar, and keep availability visible without rebuilding a spreadsheet each week." },
+  { icon: CreditCard, title: "Invoice and collect payments clearly", description: "Create invoices, see outstanding balances, and set up GoCardless direct debit workflows when your account is configured." },
+  { icon: ClipboardCheck, title: "Collect PARQ forms in the workflow", description: "Create, store, and send PARQ forms from the client record, with the information your coaching process needs." },
+  { icon: Zap, title: "Keep routine messages moving", description: "Use booking, cancellation, invoice, PARQ, and low-session email workflows without manually writing the same message every time." },
+  { icon: TrendingUp, title: "See the business, not just the bookings", description: "Track revenue, packages, and invoices from a dashboard built around the decisions solo coaches make." },
 ];
 
-const tiers = [
-  {
-    name: "Free",
-    price: "£0",
-    period: "forever",
-    highlight: false,
-    badge: null,
-    clients: "Up to 5 clients",
-    desc: "Everything you need to get started. No card required.",
-    features: ["5 client profiles", "Session scheduling", "Block packages", "PARQ forms", "Basic invoicing"],
-  },
-  {
-    name: "Starter",
-    price: "£1.99",
-    period: "/ month",
-    highlight: false,
-    badge: null,
-    clients: "Up to 10 clients",
-    desc: "For coaches just starting to grow.",
-    features: ["10 client profiles", "All Free features", "Email notifications", "Direct debit setup", "Revenue tracking"],
-  },
-  {
-    name: "Professional",
-    price: "£4.99",
-    period: "/ month",
-    highlight: true,
-    badge: "Most Popular",
-    clients: "Up to 20 clients",
-    desc: "For coaches running a serious business.",
-    features: ["20 client profiles", "All Starter features", "Mass client emails", "Full invoice management", "HIPAA/GDPR tools"],
-  },
-  {
-    name: "Business",
-    price: "£7.99",
-    period: "/ month",
-    highlight: false,
-    badge: null,
-    clients: "Up to 50 clients",
-    desc: "For large rosters and growing teams.",
-    features: ["50 client profiles", "All Professional features", "Priority support", "Advanced analytics", "Custom branding"],
-  },
+const faqItems = [
+  ["Who is FitTrack for?", "FitTrack is designed for independent fitness coaches who want one place to manage a small client roster, sessions, forms, invoices, and payment workflows."],
+  ["What is included in the Free plan?", "The Free plan supports up to five client records with scheduling, PARQ forms, basic invoicing, and client data export. It does not require a card to start."],
+  ["How do client limits work?", "Each plan has a maximum number of client records. When you reach the limit, FitTrack shows an upgrade prompt before another client is added. A downgrade is blocked until the client count fits the target plan."],
+  ["Do my clients need a FitTrack login?", "No. Coaches use FitTrack to manage their own workflow. Clients can receive emails and PARQ forms without a FitTrack dashboard login."],
+  ["How do payments and GoCardless work?", "FitTrack can create a GoCardless direct-debit setup link when your account has GoCardless configured. GoCardless handles the payment mandate flow. Check your GoCardless account for its terms and fees."],
+  ["How are PARQ and health details handled?", "PARQ responses are stored against the relevant client record so a coach can manage their workflow. FitTrack is software, not medical advice; collect and use health information only where appropriate for your practice."],
+  ["Can I export or delete data?", "You can export an individual client record from that client's profile. Account deletion is available from Settings. The account retention and backup process is owner review required before launch."],
+  ["What happens if I cancel or downgrade?", "The app prevents a downgrade if your current client count exceeds the new plan limit. Billing, access, and retention details after cancellation are owner review required before public launch."],
+  ["Are VAT or payment-provider fees included?", `Prices are shown monthly. VAT treatment and separate payment-provider fees are ${OWNER_INPUT_REQUIRED}; check the completed pricing and payment terms before subscribing.`],
+  ["How do I contact support?", `Support contact: ${siteConfig.supportEmail}. Do not send health responses, passwords, or payment credentials in a support message.`],
 ];
 
-const testimonials = [
-  { name: "Sarah M.", role: "Personal Trainer, London", text: "FitTrack replaced 3 different apps I was using. Everything's in one place and my clients love the invoices." },
-  { name: "James K.", role: "Strength Coach, Manchester", text: "Setting up direct debit with GoCardless through FitTrack took 5 minutes. I haven't chased a payment since." },
-  { name: "Priya T.", role: "Online Coach, Birmingham", text: "The PARQ forms alone saved me hours every month. My onboarding is completely digital now." },
-];
+function setMeta(name: string, content: string, attribute: "name" | "property" = "name") {
+  let element = document.head.querySelector(`meta[${attribute}="${name}"]`) as HTMLMetaElement | null;
+  if (!element) {
+    element = document.createElement("meta");
+    element.setAttribute(attribute, name);
+    document.head.appendChild(element);
+  }
+  element.content = content;
+}
+
+function ProductPreview() {
+  return (
+    <div className="mx-auto mt-12 max-w-5xl rounded-[1.75rem] border border-slate-200 bg-white p-2 shadow-2xl shadow-violet-200/50 sm:p-3">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
+          <div className="flex items-center gap-2 font-bold text-slate-950"><span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-violet-600 to-orange-500 text-white"><Dumbbell className="h-3.5 w-3.5" aria-hidden="true" /></span>FitTrack</div>
+          <div className="hidden items-center gap-2 sm:flex"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden="true" /><span className="text-xs font-medium text-slate-500">Coach dashboard</span></div>
+        </div>
+        <div className="grid gap-3 p-3 sm:grid-cols-[1.1fr_.9fr] sm:p-5">
+          <section aria-label="Illustrative weekly calendar" className="rounded-xl border border-slate-200 bg-white p-4 text-left">
+            <div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-violet-600">This week</p><p className="font-bold text-slate-950">Your coaching calendar</p></div><span className="rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">3 upcoming</span></div>
+            <div className="grid grid-cols-5 gap-1.5 text-center text-[10px] font-semibold text-slate-500 sm:gap-2 sm:text-xs">
+              {["Mon", "Tue", "Wed", "Thu", "Fri"].map((day, index) => <div key={day} className={`rounded-lg py-1.5 ${index === 2 ? "bg-violet-600 text-white" : "bg-slate-100"}`}>{day}<span className="ml-1 opacity-70">{12 + index}</span></div>)}
+            </div>
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center gap-3 rounded-lg border-l-4 border-violet-500 bg-violet-50 p-2.5"><span className="text-xs font-bold text-violet-700">09:00</span><div><p className="text-xs font-bold text-slate-900">Session with Alex M.</p><p className="text-[11px] text-slate-500">Strength · Studio</p></div></div>
+              <div className="flex items-center gap-3 rounded-lg border-l-4 border-orange-400 bg-orange-50 p-2.5"><span className="text-xs font-bold text-orange-700">17:30</span><div><p className="text-xs font-bold text-slate-900">Session with Sam T.</p><p className="text-[11px] text-slate-500">Online · 1:1</p></div></div>
+            </div>
+          </section>
+          <div className="grid gap-3 text-left">
+            <section aria-label="Illustrative client list" className="rounded-xl border border-slate-200 bg-white p-4"><div className="mb-3 flex items-center justify-between"><p className="text-sm font-bold text-slate-950">Clients</p><span className="text-xs font-semibold text-violet-700">5 / 5 free</span></div><div className="space-y-2">{[["Alex M.", "PARQ complete"], ["Sam T.", "PARQ to send"], ["Morgan K.", "Active package"]].map(([name, status], index) => <div key={name} className="flex items-center gap-2"><span className={`grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold text-white ${index === 1 ? "bg-orange-400" : "bg-violet-500"}`}>{name.split(" ").map((part) => part[0]).join("")}</span><div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-800">{name}</p><p className={`text-[10px] ${index === 1 ? "text-orange-700" : "text-emerald-700"}`}>{status}</p></div></div>)}</div></section>
+            <div className="grid grid-cols-2 gap-3"><section aria-label="Illustrative invoice status" className="rounded-xl bg-slate-950 p-3 text-white"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Outstanding</p><p className="mt-1 text-xl font-extrabold">£120</p><p className="mt-1 text-[10px] text-slate-400">1 invoice due</p></section><section aria-label="Illustrative onboarding status" className="rounded-xl bg-emerald-50 p-3"><p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Setup</p><p className="mt-1 text-xl font-extrabold text-emerald-900">4 / 6</p><p className="mt-1 text-[10px] text-emerald-700">steps complete</p></section></div>
+          </div>
+        </div>
+        <p className="border-t border-slate-200 bg-white px-4 py-2 text-left text-[11px] text-slate-500">Illustrative dashboard preview using FitTrack workflows.</p>
+      </div>
+    </div>
+  );
+}
 
 export default function Landing() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const siteUrl = getPublicSiteUrl();
+    document.title = "FitTrack | Coaching Business Software for Independent Fitness Coaches";
+    setMeta("description", siteConfig.description);
+    setMeta("og:title", "FitTrack | Coaching Business Software for Independent Fitness Coaches", "property");
+    setMeta("og:description", siteConfig.description, "property");
+    setMeta("og:type", "website", "property");
+    setMeta("og:image", `${siteUrl}/fittrack-social.svg`, "property");
+    setMeta("twitter:card", "summary");
+    setMeta("twitter:title", "FitTrack | Coaching Business Software for Independent Fitness Coaches");
+    setMeta("twitter:description", siteConfig.description);
+    setMeta("twitter:image", `${siteUrl}/fittrack-social.svg`);
+    let canonical = document.head.querySelector("link[rel=canonical]") as HTMLLinkElement | null;
+    if (!canonical) { canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.appendChild(canonical); }
+    canonical.href = siteUrl;
+  }, []);
+
+  const startSignup = () => trackActivationEvent("signup_started");
+
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen overflow-x-hidden bg-white text-slate-900">
+      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-6">
+          <a href="/" className="flex items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"><span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-600 to-orange-500 text-white shadow-sm"><Dumbbell className="h-4 w-4" aria-hidden="true" /></span><span className="font-extrabold tracking-tight">FitTrack</span></a>
+          <nav aria-label="Primary navigation" className="hidden items-center gap-1 md:flex">
+            {["How it works", "Features", "Pricing", "FAQ"].map((item) => <a key={item} href={`#${item.toLowerCase().replaceAll(" ", "-")}`} className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">{item}</a>)}
+          </nav>
+          <div className="flex items-center gap-2"><Button asChild size="sm" className="hidden rounded-full bg-violet-600 px-5 font-semibold hover:bg-violet-700 sm:inline-flex"><a href="/api/login" onClick={startSignup}>Start free</a></Button><button type="button" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} className="grid h-10 w-10 place-items-center rounded-md text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 md:hidden" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button></div>
+        </div>
+        {menuOpen && <nav aria-label="Mobile navigation" className="border-t border-slate-200 bg-white px-5 py-3 md:hidden"><div className="mx-auto flex max-w-6xl flex-col gap-1">{["How it works", "Features", "Pricing", "FAQ"].map((item) => <a key={item} href={`#${item.toLowerCase().replaceAll(" ", "-")}`} onClick={() => setMenuOpen(false)} className="rounded-md px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">{item}</a>)}<a href="/api/login" onClick={startSignup} className="mt-2 rounded-full bg-violet-600 px-4 py-2.5 text-center text-sm font-bold text-white">Start free with 5 clients</a></div></nav>}
+      </header>
 
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg, #7c3aed, #f97316)" }}>
-              <Dumbbell className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-lg tracking-tight">FitTrack</span>
+      <main>
+        <section className="relative isolate overflow-hidden"><div className="absolute -right-40 -top-48 -z-10 h-[36rem] w-[36rem] rounded-full bg-violet-300/30 blur-3xl" /><div className="absolute -bottom-48 -left-40 -z-10 h-[32rem] w-[32rem] rounded-full bg-orange-200/50 blur-3xl" />
+          <div className="mx-auto max-w-6xl px-5 pb-16 pt-16 text-center sm:px-6 sm:pb-20 sm:pt-20">
+            <Badge className="mb-6 rounded-full border border-violet-200 bg-violet-50 px-3.5 py-1.5 font-semibold text-violet-800"><Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />Free for your first 5 clients. No card required.</Badge>
+            <h1 className="mx-auto max-w-4xl text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-950 sm:text-6xl">The simple business hub for <span className="bg-gradient-to-r from-violet-600 to-orange-500 bg-clip-text text-transparent">independent fitness coaches.</span></h1>
+            <p className="mx-auto mt-6 max-w-3xl text-lg leading-relaxed text-slate-600 sm:text-xl">Manage clients, bookings, PARQ forms, invoices, and payments in one place—without stitching together spreadsheets and five different apps.</p>
+            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"><Button asChild size="lg" className="w-full rounded-full bg-violet-600 px-7 py-6 text-base font-bold shadow-lg shadow-violet-200 hover:bg-violet-700 sm:w-auto"><a href="/api/login" onClick={startSignup}>Start free with 5 clients <ArrowRight className="ml-2 h-5 w-5" aria-hidden="true" /></a></Button><a href="#dashboard-preview" className="inline-flex min-h-12 items-center rounded-full border border-slate-300 bg-white px-6 text-sm font-bold text-slate-700 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">See the dashboard <ChevronDown className="ml-1 h-4 w-4" aria-hidden="true" /></a></div>
+            <ul className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm font-medium text-slate-600"><li className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />Up to 5 clients free</li><li className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />No credit card required</li><li className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />Coach-sized plans</li></ul>
+            <div id="dashboard-preview"><ProductPreview /></div>
           </div>
-          <div className="flex items-center gap-4">
-            <a href="#pricing" className="text-sm text-gray-600 hover:text-gray-900 hidden sm:block transition-colors">Pricing</a>
-            <Button asChild size="sm" className="font-semibold rounded-full px-5" style={{ background: "linear-gradient(135deg, #7c3aed, #9333ea)" }}>
-              <a href="/api/login" data-testid="button-login-nav">Get started free</a>
-            </Button>
-          </div>
-        </div>
-      </nav>
+        </section>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full opacity-10 blur-3xl" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
-          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full opacity-10 blur-3xl" style={{ background: "radial-gradient(circle, #f97316 0%, transparent 70%)" }} />
-        </div>
+        <section id="how-it-works" className="border-y border-slate-200 bg-slate-50"><div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20"><div className="max-w-2xl"><p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-600">How it works</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">Start with the workflow you already know.</h2></div><ol className="mt-10 grid gap-5 md:grid-cols-3">{[["01", "Add your clients", "Create a clear client record with contact details, notes, and the coaching context you need."], ["02", "Run bookings and forms", "Schedule sessions, manage packages, and collect PARQ forms from the same client workflow."], ["03", "Get paid and track revenue", "Create invoices, follow outstanding amounts, and use payment workflows when you are ready."]].map(([number, title, description]) => <li key={number} className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200"><p className="text-sm font-extrabold text-violet-600">{number}</p><h3 className="mt-5 text-xl font-bold text-slate-950">{title}</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{description}</p></li>)}</ol></div></section>
 
-        <div className="max-w-6xl mx-auto px-6 pt-20 pb-24 text-center relative">
-          <Badge className="mb-6 text-sm px-4 py-1.5 rounded-full font-medium border-0" style={{ background: "linear-gradient(135deg, #ede9fe, #ffedd5)", color: "#7c3aed" }}>
-            🚀 Free for your first 5 clients - no credit card needed
-          </Badge>
+        <section id="features" className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20"><div className="mx-auto max-w-2xl text-center"><p className="text-sm font-bold uppercase tracking-[0.16em] text-violet-700">Designed for day-to-day coaching</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">Less tool switching. More time with clients.</h2><p className="mt-4 text-lg text-slate-600">FitTrack brings the tasks that make a solo coaching business feel fragmented into one calm, focused dashboard.</p></div><div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{features.map((feature) => <article key={feature.title} className="rounded-2xl border border-slate-200 bg-white p-6 transition hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-lg"><div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-violet-100 to-orange-100 text-violet-700"><feature.icon className="h-5 w-5" aria-hidden="true" /></div><h3 className="mt-5 text-lg font-bold text-slate-950">{feature.title}</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{feature.description}</p></article>)}</div></section>
 
-          <h1 className="text-5xl sm:text-6xl font-extrabold leading-tight tracking-tight mb-6 max-w-3xl mx-auto" data-testid="text-landing-title">
-            Run your coaching
-            <br />
-            <span style={{ background: "linear-gradient(135deg, #7c3aed, #f97316)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-              business like a pro
-            </span>
-          </h1>
+        <section className="bg-slate-950 text-white"><div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 sm:px-6 sm:py-20 lg:grid-cols-[.9fr_1.1fr] lg:items-center"><div><p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-300">Why coaches switch</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">A business hub built for the gap between spreadsheets and enterprise software.</h2><p className="mt-5 max-w-xl text-lg leading-relaxed text-slate-300">FitTrack is for coaches who need client, booking, form, invoice, and direct-debit workflows to work together—but do not need a huge platform with a huge learning curve.</p></div><ul className="grid gap-3 sm:grid-cols-2">{["One client record, not multiple versions", "A faster start with a five-client free plan", "PARQ collection beside coaching work", "GoCardless direct-debit setup when configured", "Invoices and revenue in the same place", "Clear limits that fit a solo practice"].map((item) => <li key={item} className="flex gap-3 rounded-xl border border-white/10 bg-white/5 p-4 text-sm font-medium text-slate-100"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-orange-300" aria-hidden="true" />{item}</li>)}</ul></div></section>
 
-          <p className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed">
-            The all-in-one dashboard for solo fitness coaches. Manage clients, schedule sessions, send invoices, and get paid without the admin headache.
-          </p>
+        <section className="border-b border-slate-200 bg-gradient-to-br from-violet-50 via-white to-orange-50"><div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20"><div className="mx-auto max-w-3xl text-center"><p className="text-sm font-bold uppercase tracking-[0.16em] text-violet-700">Built around coach workflows</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">A practical workspace for the work behind every session.</h2><p className="mt-4 text-lg text-slate-600">FitTrack keeps the coach workflow front and centre: client records, scheduling, PARQ forms, invoices, packages, and payment setup. No customer logos or performance claims—just the product capabilities you can review.</p></div></div></section>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button asChild size="lg" className="font-bold text-base rounded-full px-8 py-6 shadow-lg hover:shadow-xl transition-all hover:scale-105" style={{ background: "linear-gradient(135deg, #7c3aed, #9333ea)" }}>
-              <a href="/api/login" data-testid="button-login-hero">
-                Start free - 5 clients included
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </a>
-            </Button>
-            <a href="#features" className="text-gray-500 hover:text-gray-800 text-sm font-medium transition-colors flex items-center gap-1">
-              See what's included ↓
-            </a>
-          </div>
+        <section id="pricing" className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20"><div className="mx-auto max-w-3xl text-center"><p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-600">Simple limits, clear starting point</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">Choose the client limit that fits today.</h2><p className="mt-4 text-lg text-slate-600">Start with up to five clients for free. Plans are shown monthly; paid-plan checkout links are configured by the account owner.</p></div><div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{pricingTiers.map((tier) => <article key={tier.name} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><h3 className="text-lg font-bold text-slate-950">{tier.name}</h3><div className="mt-3 flex items-baseline gap-1"><span className="text-4xl font-extrabold tracking-tight">{tier.price}</span><span className="text-sm font-medium text-slate-500">{tier.period}</span></div><p className="mt-2 text-sm font-bold text-violet-700">{tier.clients}</p><p className="mt-3 min-h-12 text-sm leading-relaxed text-slate-600">{tier.description}</p><ul className="mt-5 flex-1 space-y-2.5">{tier.features.map((feature) => <li key={feature} className="flex gap-2 text-sm text-slate-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />{feature}</li>)}</ul><Button asChild variant={tier.name === "Free" ? "default" : "outline"} className={`mt-7 w-full rounded-full font-bold ${tier.name === "Free" ? "bg-violet-600 hover:bg-violet-700" : ""}`}><a href="/api/login" onClick={startSignup}>{tier.name === "Free" ? "Start free" : "Get started"}</a></Button></article>)}</div><div className="mx-auto mt-8 max-w-4xl rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm leading-relaxed text-orange-950"><p><strong>Before you subscribe:</strong> plans are monthly. VAT treatment is {siteConfig.vatTreatment}. Payment-provider transaction fees are {siteConfig.paymentProviderFees}. The app does not advertise a paid-plan free trial. Reaching a client limit prompts an upgrade; downgrades are blocked until your client count fits the target plan. Paid-plan billing changes and cancellation terms require owner review before launch.</p></div></section>
 
-          <div className="flex flex-wrap items-center justify-center gap-6 mt-10 text-sm text-gray-500">
-            {["No credit card", "Set up in 2 minutes", "UK-based & GDPR compliant", "Cancel anytime"].map((t) => (
-              <span key={t} className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                {t}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
+        <section aria-labelledby="security-heading" className="border-y border-slate-200 bg-slate-50"><div className="mx-auto max-w-6xl px-5 py-16 sm:px-6"><div className="grid gap-8 md:grid-cols-[.75fr_1.25fr]"><div><p className="text-sm font-bold uppercase tracking-[0.16em] text-emerald-700">Security and privacy</p><h2 id="security-heading" className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950">Specific product controls, not broad promises.</h2><p className="mt-4 text-slate-600">FitTrack does not claim a compliance certification. These are the concrete product capabilities currently available.</p></div><ul className="grid gap-3 sm:grid-cols-2">{[["Signed-in access", "Product API routes for client, session, invoice, form, and settings data require an authenticated coach."], ["Client records", "Client details, sessions, notes, forms, packages, and invoices are scoped to the coach account."], ["Export and deletion", "An individual client record can be exported from the client profile, and account deletion is available from Settings."], ["Payment handling", "GoCardless direct-debit setup is initiated through GoCardless when the account has been configured."]].map(([title, description]) => <li key={title} className="rounded-xl border border-slate-200 bg-white p-4"><ShieldCheck className="h-5 w-5 text-emerald-600" aria-hidden="true" /><h3 className="mt-3 font-bold text-slate-950">{title}</h3><p className="mt-1 text-sm leading-relaxed text-slate-600">{description}</p></li>)}</ul></div><p className="mt-8 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">Hosting, encryption at rest, backup schedules, audit logs, data location, retention, and the complete processor list are {OWNER_INPUT_REQUIRED} before launch. FitTrack provides software tools and does not provide legal, medical, or financial advice.</p></div></section>
 
-      {/* Stats bar */}
-      <section className="border-y border-gray-100 bg-gray-50/50">
-        <div className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
-          {[
-            { value: "2 min", label: "to set up your account" },
-            { value: "£0", label: "to manage 5 clients" },
-            { value: "100%", label: "client data stays yours" },
-            { value: "1 place", label: "for your whole business" },
-          ].map((s) => (
-            <div key={s.label}>
-              <p className="text-3xl font-extrabold" style={{ background: "linear-gradient(135deg, #7c3aed, #f97316)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{s.value}</p>
-              <p className="text-sm text-gray-500 mt-1">{s.label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+        <section id="faq" className="mx-auto max-w-4xl px-5 py-16 sm:px-6 sm:py-20"><div className="text-center"><p className="text-sm font-bold uppercase tracking-[0.16em] text-violet-700">FAQ</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">Questions coaches ask before they start.</h2></div><Accordion type="single" collapsible className="mt-10 rounded-2xl border border-slate-200 bg-white px-5 sm:px-6">{faqItems.map(([question, answer], index) => <AccordionItem key={question} value={`faq-${index}`}><AccordionTrigger className="text-left text-base font-bold text-slate-900 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">{question}</AccordionTrigger><AccordionContent className="pr-8 text-sm leading-relaxed text-slate-600">{answer}</AccordionContent></AccordionItem>)}</Accordion></section>
 
-      {/* Features */}
-      <section id="features" className="max-w-6xl mx-auto px-6 py-20">
-        <div className="text-center mb-14">
-          <Badge className="mb-4 text-sm px-4 py-1.5 rounded-full font-medium border-0" style={{ background: "#ede9fe", color: "#7c3aed" }}>
-            <Zap className="w-3.5 h-3.5 inline mr-1" />
-            Everything included from day one
-          </Badge>
-          <h2 className="text-3xl sm:text-4xl font-extrabold mb-4">One dashboard. Zero admin headaches.</h2>
-          <p className="text-gray-500 text-lg max-w-xl mx-auto">Built by coaches, for coaches. Every feature you actually need, none of the bloat.</p>
-        </div>
+        <section className="bg-gradient-to-r from-violet-700 via-violet-600 to-orange-500"><div className="mx-auto max-w-3xl px-5 py-16 text-center text-white sm:px-6 sm:py-20"><h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Start with the admin work you want to stop chasing.</h2><p className="mt-4 text-lg text-white/85">Set up FitTrack for up to five clients at no cost, then grow only when your client list does.</p><Button asChild size="lg" className="mt-8 rounded-full bg-white px-7 py-6 text-base font-bold text-violet-700 shadow-xl hover:bg-slate-50"><a href="/api/login" onClick={startSignup}>Create your free account <ArrowRight className="ml-2 h-5 w-5" aria-hidden="true" /></a></Button><p className="mt-4 text-sm text-white/75">No credit card required for the Free plan.</p></div></section>
+      </main>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((f) => (
-            <div key={f.title} className="rounded-2xl border border-gray-100 p-6 hover:border-violet-200 hover:shadow-md transition-all group">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform" style={{ background: "linear-gradient(135deg, #ede9fe, #ffedd5)" }}>
-                <f.icon className="w-5 h-5" style={{ color: "#7c3aed" }} />
-              </div>
-              <h3 className="font-bold text-lg mb-2">{f.title}</h3>
-              <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Social proof */}
-      <section className="border-y border-gray-100 py-16" style={{ background: "linear-gradient(135deg, #faf5ff 0%, #fff7ed 100%)" }}>
-        <div className="max-w-6xl mx-auto px-6">
-          <p className="text-center text-gray-500 text-sm font-medium mb-8">Loved by coaches across the UK</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {testimonials.map((t) => (
-              <div key={t.name} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div className="flex gap-0.5 mb-3">
-                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />)}
-                </div>
-                <p className="text-gray-700 text-sm leading-relaxed mb-4">"{t.text}"</p>
-                <div>
-                  <p className="font-semibold text-sm">{t.name}</p>
-                  <p className="text-gray-400 text-xs">{t.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section id="pricing" className="max-w-6xl mx-auto px-6 py-20">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl sm:text-4xl font-extrabold mb-4">Grow at your own pace</h2>
-          <p className="text-gray-500 text-lg max-w-xl mx-auto">Start completely free with 5 clients. Upgrade only when you're ready to grow.</p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
-          {tiers.map((tier) => (
-            <div
-              key={tier.name}
-              className={`rounded-2xl p-6 border transition-all ${tier.highlight
-                ? "border-violet-400 shadow-xl shadow-violet-100 scale-105 relative"
-                : "border-gray-100 hover:border-gray-200 hover:shadow-md"
-              }`}
-              style={tier.highlight ? { background: "linear-gradient(160deg, #faf5ff, #fff7ed)" } : {}}
-            >
-              {tier.badge && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="text-xs px-3 py-1 rounded-full font-semibold border-0 shadow-sm" style={{ background: "linear-gradient(135deg, #7c3aed, #f97316)", color: "white" }}>
-                    {tier.badge}
-                  </Badge>
-                </div>
-              )}
-              <h3 className="font-bold text-lg mb-1">{tier.name}</h3>
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-3xl font-extrabold">{tier.price}</span>
-                <span className="text-gray-400 text-sm">{tier.period}</span>
-              </div>
-              <p className="text-xs font-semibold text-violet-600 mb-2">{tier.clients}</p>
-              <p className="text-gray-500 text-sm mb-5">{tier.desc}</p>
-              <ul className="space-y-2 mb-6">
-                {tier.features.map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Button
-                asChild
-                className={`w-full rounded-full font-semibold text-sm ${tier.highlight ? "shadow-md hover:shadow-lg" : ""}`}
-                variant={tier.highlight ? "default" : "outline"}
-                style={tier.highlight ? { background: "linear-gradient(135deg, #7c3aed, #9333ea)" } : {}}
-              >
-                <a href="/api/login" data-testid={`button-cta-${tier.name.toLowerCase()}`}>
-                  {tier.price === "£0" ? "Start free" : "Get started"}
-                </a>
-              </Button>
-            </div>
-          ))}
-        </div>
-
-        <p className="text-center text-gray-400 text-sm mt-8">
-          All plans include a free trial period. Upgrade or downgrade anytime. No contracts.
-        </p>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-20" style={{ background: "linear-gradient(135deg, #7c3aed 0%, #9333ea 50%, #f97316 100%)" }}>
-        <div className="max-w-3xl mx-auto px-6 text-center text-white">
-          <h2 className="text-3xl sm:text-4xl font-extrabold mb-4">Ready to run your coaching business smarter?</h2>
-          <p className="text-white/80 text-lg mb-8 max-w-xl mx-auto">
-            Join coaches who've ditched the spreadsheets. Start free with 5 clients - no card, no commitment.
-          </p>
-          <Button asChild size="lg" className="font-bold text-base rounded-full px-8 py-6 bg-white hover:bg-gray-50 transition-all hover:scale-105 shadow-xl" style={{ color: "#7c3aed" }}>
-            <a href="/api/login" data-testid="button-login-cta">
-              Create your free account
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </a>
-          </Button>
-          <p className="text-white/60 text-sm mt-4">Free forever for up to 5 clients. No credit card required.</p>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-100 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: "linear-gradient(135deg, #7c3aed, #f97316)" }}>
-              <Dumbbell className="w-3 h-3 text-white" />
-            </div>
-            <span className="font-bold text-sm">FitTrack</span>
-          </div>
-          <p className="text-gray-400 text-xs">© 2026 FitTrack. Built for solo coaches in the UK. GDPR compliant.</p>
-          <div className="flex gap-4 text-xs text-gray-400">
-            <span>Privacy</span>
-            <span>Terms</span>
-            <span>Support</span>
-          </div>
-        </div>
-      </footer>
+      <footer className="bg-slate-950 text-slate-300"><div className="mx-auto flex max-w-6xl flex-col gap-5 px-5 py-8 sm:px-6 md:flex-row md:items-center md:justify-between"><div className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-violet-600 to-orange-500 text-white"><Dumbbell className="h-3.5 w-3.5" aria-hidden="true" /></span><span className="font-bold text-white">FitTrack</span></div><p className="text-sm text-slate-400">Built for independent coaches in the UK.</p><nav aria-label="Footer navigation" className="flex flex-wrap gap-5 text-sm font-medium"><Link href="/privacy" className="rounded hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400">Privacy</Link><Link href="/terms" className="rounded hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400">Terms</Link><Link href="/support" className="rounded hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400">Support</Link></nav></div></footer>
     </div>
   );
 }
