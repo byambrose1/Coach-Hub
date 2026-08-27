@@ -35,6 +35,17 @@ interface Tier {
 }
 
 const PLAN_ORDER = ["free", "starter", "professional", "business"];
+const TIMEZONE_OPTIONS = [
+  { value: "Europe/London", label: "London (GMT/BST)" },
+  { value: "Europe/Dublin", label: "Dublin (GMT/IST)" },
+  { value: "Europe/Paris", label: "Paris (CET/CEST)" },
+  { value: "America/New_York", label: "New York (ET)" },
+  { value: "America/Chicago", label: "Chicago (CT)" },
+  { value: "America/Los_Angeles", label: "Los Angeles (PT)" },
+  { value: "Asia/Kolkata", label: "India (IST)" },
+  { value: "Australia/Sydney", label: "Sydney (AEST/AEDT)" },
+  { value: "UTC", label: "UTC" },
+];
 
 function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
   const { toast } = useToast();
@@ -198,6 +209,7 @@ export default function SettingsPage() {
     dataRetentionDays: 365,
     termsAccepted: false,
     currency: "£",
+    timezone: "Europe/London",
     hasAcceptedTerms: false,
   });
 
@@ -222,6 +234,7 @@ export default function SettingsPage() {
         dataRetentionDays: settings.dataRetentionDays || 365,
         termsAccepted: settings.termsAccepted || false,
         currency: settings.currency || "£",
+        timezone: settings.timezone || "Europe/London",
         hasAcceptedTerms: settings.hasAcceptedTerms || false,
       });
     }
@@ -426,6 +439,20 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">Currency symbol used across the app.</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Business timezone</Label>
+            <Select value={formData.timezone} onValueChange={(v) => setFormData({ ...formData, timezone: v })}>
+              <SelectTrigger className="max-w-xs" data-testid="select-timezone">
+                <SelectValue placeholder="Select a timezone" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIMEZONE_OPTIONS.map((timezone) => (
+                  <SelectItem key={timezone.value} value={timezone.value}>{timezone.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Keep this aligned with the timezone where you run your coaching business.</p>
           </div>
           <div className="space-y-2">
             <Label className="flex items-center gap-1"><Receipt className="w-3 h-3" /> Invoice Number Prefix</Label>
