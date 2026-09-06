@@ -28,18 +28,22 @@ import { trackActivationEvent } from "@/lib/activation";
 
 function TermsModal() {
   const { isAuthenticated } = useAuth();
+  const [location] = useLocation();
   const { data: settings } = useQuery<Settings>({
     queryKey: ["/api/settings"],
     enabled: isAuthenticated,
   });
   const [open, setOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const isLegalPage = ["/terms", "/privacy", "/support"].includes(location);
 
   useEffect(() => {
-    if (isAuthenticated && settings && !settings.hasAcceptedTerms) {
+    if (isAuthenticated && settings && !settings.hasAcceptedTerms && !isLegalPage) {
       setOpen(true);
+    } else if (isLegalPage) {
+      setOpen(false);
     }
-  }, [isAuthenticated, settings]);
+  }, [isAuthenticated, settings, isLegalPage]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -62,7 +66,13 @@ function TermsModal() {
           <DialogDescription>Please review and accept the FitTrack terms to continue.</DialogDescription>
         </DialogHeader>
         <div className="p-4 border rounded-md text-sm space-y-3">
-          <p>Review the current <a href="/terms" className="text-primary underline">FitTrack Terms</a> and <a href="/privacy" className="text-primary underline">Privacy information</a> before continuing.</p>
+          <p>
+            Review the current{" "}
+            <a href="/terms" target="_blank" rel="noreferrer" className="text-primary underline">FitTrack Terms</a>
+            {" "}and{" "}
+            <a href="/privacy" target="_blank" rel="noreferrer" className="text-primary underline">Privacy information</a>
+            {" "}before continuing.
+          </p>
           <p className="text-muted-foreground">The legal operator details and final terms are clearly marked for owner review before public launch.</p>
         </div>
         <div className="flex items-center space-x-2 py-4">
@@ -175,7 +185,9 @@ function AuthenticatedApp() {
 
 function AppContent() {
   const { isLoading, isAuthenticated } = useAuth();
+  const [location] = useLocation();
   const trackedSignup = useRef(false);
+  const isPublicPage = ["/privacy", "/terms", "/support", "/pricing"].includes(location);
 
   useEffect(() => {
     if (isAuthenticated && !trackedSignup.current) {
@@ -190,6 +202,10 @@ function AppContent() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (isPublicPage) {
+    return <PublicRouter />;
   }
 
   if (!isAuthenticated) {

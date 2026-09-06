@@ -552,29 +552,23 @@ export default function SettingsPage() {
           <CardDescription>Review how you collect and manage client information in FitTrack.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
+          <div className="space-y-2 rounded-md border p-4">
             <div>
-              <Label>Health information review</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">Record that you have reviewed how you collect PARQ and other client health information.</p>
+              <Label>Handling PARQ and health information</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                PARQ responses are stored in the relevant client record. Only collect information you need for your coaching practice, limit access, and review your retention policy.
+              </p>
             </div>
-            <Switch
-              checked={formData.hipaaCompliant}
-              onCheckedChange={(v) => setFormData({ ...formData, hipaaCompliant: v })}
-              data-testid="switch-hipaa"
-            />
+            <div className="flex flex-wrap gap-3 text-sm font-medium">
+              <a href="/privacy" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                Read privacy information <ExternalLink className="h-3 w-3" />
+              </a>
+              <a href="/terms" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                Read service terms <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+            <p className="text-xs text-muted-foreground">This guidance is not a certification of legal or regulatory compliance.</p>
           </div>
-
-          {formData.hipaaCompliant && (
-            <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-3 space-y-2">
-              <p className="text-xs font-medium text-blue-800 dark:text-blue-200">Privacy review recorded</p>
-              <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-disc pl-4">
-                <li>PARQ responses are stored in the relevant client record.</li>
-                <li>Individual client records can be exported from the client profile.</li>
-                <li>Review your retention and access practices for your own coaching business.</li>
-                <li>This reminder is not a certification of legal or regulatory compliance.</li>
-              </ul>
-            </div>
-          )}
 
           <div className="space-y-2">
             <Label>Data Retention (days)</Label>
@@ -590,16 +584,18 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground">How long to retain client data after last activity. Default is 365 days.</p>
           </div>
 
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-4 rounded-md border p-4">
             <div>
-              <Label>Terms & Conditions Accepted</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">Confirm you've reviewed the service terms</p>
+              <Label>Terms & Conditions</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {settings?.hasAcceptedTerms
+                  ? "Accepted during the required first sign-in review."
+                  : "Not yet accepted. The required review appears on the dashboard."}
+              </p>
             </div>
-            <Switch
-              checked={formData.termsAccepted}
-              onCheckedChange={(v) => setFormData({ ...formData, termsAccepted: v })}
-              data-testid="switch-terms"
-            />
+            <Badge variant={settings?.hasAcceptedTerms ? "default" : "secondary"} data-testid="status-terms">
+              {settings?.hasAcceptedTerms ? <><Check className="mr-1 h-3 w-3" /> Accepted</> : "Pending"}
+            </Badge>
           </div>
         </CardContent>
       </Card>
