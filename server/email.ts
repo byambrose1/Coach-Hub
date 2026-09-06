@@ -1,4 +1,5 @@
 import { BrevoClient } from "@getbrevo/brevo";
+import { logError } from "./safe-logging";
 
 const brevo = new BrevoClient({
   apiKey: process.env.BREVO_API_KEY || "",
@@ -68,9 +69,9 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
     });
-    console.log(`Invoice email sent to ${clientEmail}`);
+    console.log("Invoice email sent");
   } catch (error: any) {
-    console.error(`Failed to send invoice email:`, error);
+    logError("Failed to send invoice email", error);
     throw error;
   }
 }
@@ -115,9 +116,9 @@ export async function sendBookingNotificationEmail(data: {
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
     });
-    console.log(`Booking notification sent to ${clientEmail}`);
+    console.log("Booking notification sent");
   } catch (error) {
-    console.error("Failed to send booking notification:", error);
+    logError("Failed to send booking notification", error);
   }
 }
 
@@ -161,9 +162,9 @@ export async function sendSessionCancellationEmail(data: {
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
     });
-    console.log(`Cancellation notification sent to ${clientEmail}`);
+    console.log("Cancellation notification sent");
   } catch (error) {
-    console.error("Failed to send cancellation email:", error);
+    logError("Failed to send cancellation email", error);
   }
 }
 
@@ -210,9 +211,9 @@ export async function sendSessionRescheduleEmail(data: {
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
     });
-    console.log(`Reschedule notification sent to ${clientEmail}`);
+    console.log("Reschedule notification sent");
   } catch (error) {
-    console.error("Failed to send reschedule email:", error);
+    logError("Failed to send reschedule email", error);
   }
 }
 
@@ -269,9 +270,9 @@ export async function sendLowSessionsEmail(data: {
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
     });
-    console.log(`Low sessions notification sent to ${clientEmail}`);
+    console.log("Low sessions notification sent");
   } catch (error: any) {
-    console.error("Failed to send low sessions email:", error);
+    logError("Failed to send low sessions email", error);
     throw error;
   }
 }
@@ -316,7 +317,7 @@ export async function sendBroadcastEmail(data: {
       });
       sent++;
     } catch (error) {
-      console.error(`Failed to send broadcast to ${recipient.email}:`, error);
+      logError("Failed to send broadcast email", error);
       failed++;
     }
   }
@@ -369,9 +370,9 @@ export async function sendParqEmail(data: {
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
     });
-    console.log(`PAR-Q email sent to ${clientEmail}`);
+    console.log("PAR-Q email sent");
   } catch (error: any) {
-    console.error("Failed to send PAR-Q email:", error);
+    logError("Failed to send PAR-Q email", error);
     throw error;
   }
 }

@@ -6,6 +6,7 @@ import { isAuthenticated as defaultIsAuthenticated } from "./replit_integrations
 import { sendInvoiceEmail, sendBookingNotificationEmail as defaultSendBookingNotificationEmail, sendSessionCancellationEmail, sendSessionRescheduleEmail, sendParqEmail, sendLowSessionsEmail, sendBroadcastEmail } from "./email";
 import { createMandateLink as defaultCreateMandateLink } from "./payments";
 import type { RequestHandler } from "express";
+import { logError } from "./safe-logging";
 
 declare module "express-session" {
   interface SessionData {
@@ -132,7 +133,8 @@ export async function registerRoutes(
   });
 
   app.post("/api/webhooks/gocardless", async (req, res) => {
-    console.log("GoCardless webhook received:", req.body);
+    const eventCount = Array.isArray(req.body?.events) ? req.body.events.length : 0;
+    console.log(`[gocardless-webhook] received events=${eventCount}`);
     res.status(204).send();
   });
 
@@ -441,7 +443,7 @@ export async function registerRoutes(
         });
       }
     } catch (err) {
-      console.error("Tier check error:", err);
+      logError("Tier check error", err);
     }
 
     const client = await storage.createClient(userId, parsed.data);
@@ -507,7 +509,7 @@ export async function registerRoutes(
         });
       }
     } catch (err) {
-      console.error("Package deduction error:", err);
+      logError("Package deduction error", err);
     }
 
     try {
@@ -525,7 +527,7 @@ export async function registerRoutes(
         });
       }
     } catch (err) {
-      console.error("Notification error:", err);
+      logError("Notification error", err);
     }
 
     res.status(201).json(session);
@@ -581,7 +583,7 @@ export async function registerRoutes(
         }
       }
     } catch (err) {
-      console.error("Notification error:", err);
+      logError("Notification error", err);
     }
 
     res.json(session);
@@ -642,7 +644,7 @@ export async function registerRoutes(
       });
       res.json({ success: true });
     } catch (err: any) {
-      console.error("Failed to send low sessions notification:", err);
+      logError("Failed to send low sessions notification", err);
       res.status(500).json({ message: err.message || "Failed to send notification" });
     }
   });
@@ -807,7 +809,7 @@ export async function registerRoutes(
 
       res.json(updated);
     } catch (err: any) {
-      console.error("Error sending invoice email:", err);
+      logError("Error sending invoice email", err);
       res.status(500).json({ message: err.message || "Failed to send invoice email" });
     }
   });

@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
+import { logError } from "../../safe-logging";
 
 // Register auth-specific routes
 export function registerAuthRoutes(app: Express): void {
@@ -17,7 +18,7 @@ export function registerAuthRoutes(app: Express): void {
       const account = await authStorage.getUser(user.claims.sub);
       return res.json(account);
     } catch (error) {
-      console.error("Error fetching auth status:", error);
+      logError("Error fetching auth status", error);
       return res.status(500).json({ message: "Failed to fetch auth status" });
     }
   });
@@ -43,7 +44,7 @@ export function registerAuthRoutes(app: Express): void {
         impersonatedUserName: impersonatedUserName || null,
       });
     } catch (error) {
-      console.error("Error fetching user:", error);
+      logError("Error fetching user", error);
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });

@@ -1,4 +1,5 @@
 import { createRequire } from "module";
+import { logError } from "./safe-logging";
 
 let requireFn: any;
 try {
@@ -20,7 +21,7 @@ function getClient() {
       const { constants } = requireFn("gocardless-nodejs");
       client = gocardless(process.env.GOCARDLESS_API_KEY, constants.Environments.Sandbox);
     } catch (err) {
-      console.warn("GoCardless not available:", err);
+      logError("GoCardless not available", err);
     }
   }
   return client;

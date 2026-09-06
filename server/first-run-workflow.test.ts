@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { after, before, test } from "node:test";
 import express, { type RequestHandler } from "express";
 import { registerRoutes } from "./routes";
+import { createApiRequestLogger } from "./safe-logging";
 import type { IStorage } from "./storage";
 import {
   parseOnboardingProgress,
@@ -13,6 +14,7 @@ import {
 const coachId = "test-coach";
 let baseUrl = "";
 let server: ReturnType<typeof createServer>;
+const requestLogs: string[] = [];
 
 const state = {
   settings: undefined as any,
@@ -93,6 +95,7 @@ async function request(path: string, init?: RequestInit) {
 before(async () => {
   const app = express();
   app.use(express.json());
+  app.use(createApiRequestLogger((message) => requestLogs.push(message)));
   server = createServer(app);
   await registerRoutes(server, app, {
     storage,
@@ -212,6 +215,17 @@ test("creates the first client, booking, PAR-Q form, and invoice", async () => {
   assert.equal((await request("/api/sessions")).body.length, 1);
   assert.equal((await request("/api/forms")).body.length, 1);
   assert.equal((await request("/api/invoices")).body.length, 1);
+
+  await new Promise((resolve) => setImmediate(resolve));
+  const dashboardLogs = requestLogs.join("\n");
+  assert.match(dashboardLogs, /GET \/api\/clients 200 in \d+ms/);
+  assert.match(dashboardLogs, /GET \/api\/sessions 200 in \d+ms/);
+  assert.match(dashboardLogs, /GET \/api\/forms 200 in \d+ms/);
+  assert.match(dashboardLogs, /GET \/api\/invoices 200 in \d+ms/);
+  assert.doesNotMatch(
+    dashboardLogs,
+    /Test Client|client@example|First coaching session|PAR-Q Health Screening|Ready\?|INV-TEST-001|50\.00/,
+  );
 });
 
 test("fails an unconfigured GoCardless attempt clearly and safely", async () => {
