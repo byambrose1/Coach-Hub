@@ -16,45 +16,45 @@ import {
 export interface IStorage {
   // User-scoped operations (all require userId)
   getClients(userId: string): Promise<Client[]>;
-  getClient(id: string): Promise<Client | undefined>;
+  getClient(userId: string, id: string): Promise<Client | undefined>;
   createClient(userId: string, data: InsertClient): Promise<Client>;
-  updateClient(id: string, data: Partial<InsertClient>): Promise<Client | undefined>;
-  deleteClient(id: string): Promise<void>;
+  updateClient(userId: string, id: string, data: Partial<InsertClient>): Promise<Client | undefined>;
+  deleteClient(userId: string, id: string): Promise<void>;
 
   getSessions(userId: string): Promise<Session[]>;
-  getSession(id: string): Promise<Session | undefined>;
+  getSession(userId: string, id: string): Promise<Session | undefined>;
   createSession(userId: string, data: InsertSession): Promise<Session>;
-  updateSession(id: string, data: Partial<InsertSession>): Promise<Session | undefined>;
-  deleteSession(id: string): Promise<void>;
+  updateSession(userId: string, id: string, data: Partial<InsertSession>): Promise<Session | undefined>;
+  deleteSession(userId: string, id: string): Promise<void>;
 
   getPackages(userId: string): Promise<Package[]>;
-  getPackage(id: string): Promise<Package | undefined>;
+  getPackage(userId: string, id: string): Promise<Package | undefined>;
   createPackage(userId: string, data: InsertPackage): Promise<Package>;
-  updatePackage(id: string, data: Partial<InsertPackage>): Promise<Package | undefined>;
+  updatePackage(userId: string, id: string, data: Partial<InsertPackage>): Promise<Package | undefined>;
 
   getNotes(userId: string): Promise<SessionNote[]>;
-  getNote(id: string): Promise<SessionNote | undefined>;
+  getNote(userId: string, id: string): Promise<SessionNote | undefined>;
   createNote(userId: string, data: InsertSessionNote): Promise<SessionNote>;
-  updateNote(id: string, data: Partial<InsertSessionNote>): Promise<SessionNote | undefined>;
-  deleteNote(id: string): Promise<void>;
+  updateNote(userId: string, id: string, data: Partial<InsertSessionNote>): Promise<SessionNote | undefined>;
+  deleteNote(userId: string, id: string): Promise<void>;
 
   getSettings(userId: string): Promise<Settings | undefined>;
   upsertSettings(userId: string, data: InsertSettings): Promise<Settings>;
 
   getClientForms(userId: string): Promise<ClientForm[]>;
-  getClientForm(id: string): Promise<ClientForm | undefined>;
+  getClientForm(userId: string, id: string): Promise<ClientForm | undefined>;
   createClientForm(userId: string, data: InsertClientForm): Promise<ClientForm>;
-  updateClientForm(id: string, data: Partial<InsertClientForm>): Promise<ClientForm | undefined>;
-  deleteClientForm(id: string): Promise<void>;
+  updateClientForm(userId: string, id: string, data: Partial<InsertClientForm>): Promise<ClientForm | undefined>;
+  deleteClientForm(userId: string, id: string): Promise<void>;
 
   getReferrals(userId: string): Promise<Referral[]>;
   createReferral(userId: string, data: InsertReferral): Promise<Referral>;
-  updateReferral(id: string, data: Partial<InsertReferral>): Promise<Referral | undefined>;
+  updateReferral(userId: string, id: string, data: Partial<InsertReferral>): Promise<Referral | undefined>;
 
   getInvoices(userId: string): Promise<Invoice[]>;
-  getInvoice(id: string): Promise<Invoice | undefined>;
+  getInvoice(userId: string, id: string): Promise<Invoice | undefined>;
   createInvoice(userId: string, data: InsertInvoice): Promise<Invoice>;
-  updateInvoice(id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined>;
+  updateInvoice(userId: string, id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined>;
 
   // Platform admin (owner only)
   getAllUsers(): Promise<User[]>;
@@ -86,13 +86,18 @@ export interface PlatformStats {
   activeUsersThisMonth: number;
 }
 
+function withoutOwnershipFields<T>(data: T): T {
+  const { id: _id, userId: _userId, ...safeData } = data as any;
+  return safeData as T;
+}
+
 export class DatabaseStorage implements IStorage {
   async getClients(userId: string): Promise<Client[]> {
     return db.select().from(clients).where(eq(clients.userId, userId));
   }
 
-  async getClient(id: string): Promise<Client | undefined> {
-    const rows = await db.select().from(clients).where(eq(clients.id, id));
+  async getClient(userId: string, id: string): Promise<Client | undefined> {
+    const rows = await db.select().from(clients).where(and(eq(clients.id, id), eq(clients.userId, userId)));
     return rows[0];
   }
 
@@ -101,12 +106,14 @@ export class DatabaseStorage implements IStorage {
     return rows[0];
   }
 
-  async updateClient(id: string, data: Partial<InsertClient>): Promise<Client | undefined> {
-    const rows = await db.update(clients).set(data).where(eq(clients.id, id)).returning();
+  async updateClient(userId: string, id: string, data: Partial<InsertClient>): Promise<Client | undefined> {
+    const rows = await db.update(clients).set(withoutOwnershipFields(data)).where(and(eq(clients.id, id), eq(clients.userId, userId))).returning();
     return rows[0];
   }
 
-  async deleteClient(id: string): Promise<void> {
+  async deleteClient(userId: string, id: string): Promise<void> {
+    const client = await this.getClient(userId, id);
+    if (!client) return;
     await db.delete(invoices).where(eq(invoices.clientId, id));
     await db.delete(sessionNotes).where(eq(sessionNotes.clientId, id));
     await db.delete(clientForms).where(eq(clientForms.clientId, id));
@@ -121,8 +128,8 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(trainingSessions).where(eq(trainingSessions.userId, userId));
   }
 
-  async getSession(id: string): Promise<Session | undefined> {
-    const rows = await db.select().from(trainingSessions).where(eq(trainingSessions.id, id));
+  async getSession(userId: string, id: string): Promise<Session | undefined> {
+    const rows = await db.select().from(trainingSessions).where(and(eq(trainingSessions.id, id), eq(trainingSessions.userId, userId)));
     return rows[0];
   }
 
@@ -131,21 +138,21 @@ export class DatabaseStorage implements IStorage {
     return rows[0];
   }
 
-  async updateSession(id: string, data: Partial<InsertSession>): Promise<Session | undefined> {
-    const rows = await db.update(trainingSessions).set(data).where(eq(trainingSessions.id, id)).returning();
+  async updateSession(userId: string, id: string, data: Partial<InsertSession>): Promise<Session | undefined> {
+    const rows = await db.update(trainingSessions).set(withoutOwnershipFields(data)).where(and(eq(trainingSessions.id, id), eq(trainingSessions.userId, userId))).returning();
     return rows[0];
   }
 
-  async deleteSession(id: string): Promise<void> {
-    await db.delete(trainingSessions).where(eq(trainingSessions.id, id));
+  async deleteSession(userId: string, id: string): Promise<void> {
+    await db.delete(trainingSessions).where(and(eq(trainingSessions.id, id), eq(trainingSessions.userId, userId)));
   }
 
   async getPackages(userId: string): Promise<Package[]> {
     return db.select().from(packages).where(eq(packages.userId, userId));
   }
 
-  async getPackage(id: string): Promise<Package | undefined> {
-    const rows = await db.select().from(packages).where(eq(packages.id, id));
+  async getPackage(userId: string, id: string): Promise<Package | undefined> {
+    const rows = await db.select().from(packages).where(and(eq(packages.id, id), eq(packages.userId, userId)));
     return rows[0];
   }
 
@@ -154,8 +161,8 @@ export class DatabaseStorage implements IStorage {
     return rows[0];
   }
 
-  async updatePackage(id: string, data: Partial<InsertPackage>): Promise<Package | undefined> {
-    const rows = await db.update(packages).set(data).where(eq(packages.id, id)).returning();
+  async updatePackage(userId: string, id: string, data: Partial<InsertPackage>): Promise<Package | undefined> {
+    const rows = await db.update(packages).set(withoutOwnershipFields(data)).where(and(eq(packages.id, id), eq(packages.userId, userId))).returning();
     return rows[0];
   }
 
@@ -163,8 +170,8 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(sessionNotes).where(eq(sessionNotes.userId, userId));
   }
 
-  async getNote(id: string): Promise<SessionNote | undefined> {
-    const rows = await db.select().from(sessionNotes).where(eq(sessionNotes.id, id));
+  async getNote(userId: string, id: string): Promise<SessionNote | undefined> {
+    const rows = await db.select().from(sessionNotes).where(and(eq(sessionNotes.id, id), eq(sessionNotes.userId, userId)));
     return rows[0];
   }
 
@@ -173,13 +180,13 @@ export class DatabaseStorage implements IStorage {
     return rows[0];
   }
 
-  async updateNote(id: string, data: Partial<InsertSessionNote>): Promise<SessionNote | undefined> {
-    const rows = await db.update(sessionNotes).set(data).where(eq(sessionNotes.id, id)).returning();
+  async updateNote(userId: string, id: string, data: Partial<InsertSessionNote>): Promise<SessionNote | undefined> {
+    const rows = await db.update(sessionNotes).set(withoutOwnershipFields(data)).where(and(eq(sessionNotes.id, id), eq(sessionNotes.userId, userId))).returning();
     return rows[0];
   }
 
-  async deleteNote(id: string): Promise<void> {
-    await db.delete(sessionNotes).where(eq(sessionNotes.id, id));
+  async deleteNote(userId: string, id: string): Promise<void> {
+    await db.delete(sessionNotes).where(and(eq(sessionNotes.id, id), eq(sessionNotes.userId, userId)));
   }
 
   async getSettings(userId: string): Promise<Settings | undefined> {
@@ -201,8 +208,8 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(clientForms).where(eq(clientForms.userId, userId));
   }
 
-  async getClientForm(id: string): Promise<ClientForm | undefined> {
-    const rows = await db.select().from(clientForms).where(eq(clientForms.id, id));
+  async getClientForm(userId: string, id: string): Promise<ClientForm | undefined> {
+    const rows = await db.select().from(clientForms).where(and(eq(clientForms.id, id), eq(clientForms.userId, userId)));
     return rows[0];
   }
 
@@ -211,13 +218,13 @@ export class DatabaseStorage implements IStorage {
     return rows[0];
   }
 
-  async updateClientForm(id: string, data: Partial<InsertClientForm>): Promise<ClientForm | undefined> {
-    const rows = await db.update(clientForms).set(data).where(eq(clientForms.id, id)).returning();
+  async updateClientForm(userId: string, id: string, data: Partial<InsertClientForm>): Promise<ClientForm | undefined> {
+    const rows = await db.update(clientForms).set(withoutOwnershipFields(data)).where(and(eq(clientForms.id, id), eq(clientForms.userId, userId))).returning();
     return rows[0];
   }
 
-  async deleteClientForm(id: string): Promise<void> {
-    await db.delete(clientForms).where(eq(clientForms.id, id));
+  async deleteClientForm(userId: string, id: string): Promise<void> {
+    await db.delete(clientForms).where(and(eq(clientForms.id, id), eq(clientForms.userId, userId)));
   }
 
   async getReferrals(userId: string): Promise<Referral[]> {
@@ -229,8 +236,8 @@ export class DatabaseStorage implements IStorage {
     return rows[0];
   }
 
-  async updateReferral(id: string, data: Partial<InsertReferral>): Promise<Referral | undefined> {
-    const rows = await db.update(referrals).set(data).where(eq(referrals.id, id)).returning();
+  async updateReferral(userId: string, id: string, data: Partial<InsertReferral>): Promise<Referral | undefined> {
+    const rows = await db.update(referrals).set(withoutOwnershipFields(data)).where(and(eq(referrals.id, id), eq(referrals.userId, userId))).returning();
     return rows[0];
   }
 
@@ -238,8 +245,8 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(invoices).where(eq(invoices.userId, userId));
   }
 
-  async getInvoice(id: string): Promise<Invoice | undefined> {
-    const rows = await db.select().from(invoices).where(eq(invoices.id, id));
+  async getInvoice(userId: string, id: string): Promise<Invoice | undefined> {
+    const rows = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.userId, userId)));
     return rows[0];
   }
 
@@ -248,8 +255,8 @@ export class DatabaseStorage implements IStorage {
     return rows[0];
   }
 
-  async updateInvoice(id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined> {
-    const rows = await db.update(invoices).set(data).where(eq(invoices.id, id)).returning();
+  async updateInvoice(userId: string, id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined> {
+    const rows = await db.update(invoices).set(withoutOwnershipFields(data)).where(and(eq(invoices.id, id), eq(invoices.userId, userId))).returning();
     return rows[0];
   }
 

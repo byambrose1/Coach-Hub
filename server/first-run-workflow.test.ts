@@ -20,7 +20,10 @@ const state = {
   settings: undefined as any,
   clients: [] as any[],
   sessions: [] as any[],
+  packages: [] as any[],
+  notes: [] as any[],
   forms: [] as any[],
+  referrals: [] as any[],
   invoices: [] as any[],
 };
 
@@ -34,20 +37,65 @@ const storage = {
   async getClients(userId: string) {
     return state.clients.filter((item) => item.userId === userId);
   },
-  async getClient(id: string) {
-    return state.clients.find((item) => item.id === id);
+  async getClient(userId: string, id: string) {
+    return state.clients.find((item) => item.id === id && item.userId === userId);
   },
   async createClient(userId: string, data: any) {
     return withId(state.clients, userId, data);
   },
+  async updateClient(userId: string, id: string, data: any) {
+    const item = state.clients.find((value) => value.id === id && value.userId === userId);
+    if (!item) return undefined;
+    Object.assign(item, data);
+    return item;
+  },
+  async deleteClient(userId: string, id: string) {
+    state.clients = state.clients.filter((item) => item.id !== id || item.userId !== userId);
+  },
   async getSessions(userId: string) {
     return state.sessions.filter((item) => item.userId === userId);
+  },
+  async getSession(userId: string, id: string) {
+    return state.sessions.find((item) => item.id === id && item.userId === userId);
   },
   async createSession(userId: string, data: any) {
     return withId(state.sessions, userId, data);
   },
-  async getPackages() {
-    return [];
+  async updateSession(userId: string, id: string, data: any) {
+    const item = state.sessions.find((value) => value.id === id && value.userId === userId);
+    if (!item) return undefined;
+    Object.assign(item, data);
+    return item;
+  },
+  async deleteSession(userId: string, id: string) {
+    state.sessions = state.sessions.filter((item) => item.id !== id || item.userId !== userId);
+  },
+  async getPackages(userId: string) {
+    return state.packages.filter((item) => item.userId === userId);
+  },
+  async getPackage(userId: string, id: string) {
+    return state.packages.find((item) => item.id === id && item.userId === userId);
+  },
+  async updatePackage(userId: string, id: string, data: any) {
+    const item = state.packages.find((value) => value.id === id && value.userId === userId);
+    if (!item) return undefined;
+    Object.assign(item, data);
+    return item;
+  },
+  async getNotes(userId: string) {
+    return state.notes.filter((item) => item.userId === userId);
+  },
+  async getNote(userId: string, id: string) {
+    return state.notes.find((item) => item.id === id && item.userId === userId);
+  },
+  async updateNote(userId: string, id: string, data: any) {
+    const item = state.notes.find((value) => value.id === id && value.userId === userId);
+    if (!item) return undefined;
+    Object.assign(item, data);
+    return item;
+  },
+  async deleteNote(userId: string, id: string) {
+    state.notes = state.notes.filter((item) => item.id !== id || item.userId !== userId);
   },
   async getSettings(userId: string) {
     return state.settings?.id === userId ? state.settings : undefined;
@@ -62,11 +110,38 @@ const storage = {
   async createClientForm(userId: string, data: any) {
     return withId(state.forms, userId, data);
   },
+  async getClientForm(userId: string, id: string) {
+    return state.forms.find((item) => item.id === id && item.userId === userId);
+  },
+  async updateClientForm(userId: string, id: string, data: any) {
+    const item = state.forms.find((value) => value.id === id && value.userId === userId);
+    if (!item) return undefined;
+    Object.assign(item, data);
+    return item;
+  },
+  async deleteClientForm(userId: string, id: string) {
+    state.forms = state.forms.filter((item) => item.id !== id || item.userId !== userId);
+  },
+  async updateReferral(userId: string, id: string, data: any) {
+    const item = state.referrals.find((value) => value.id === id && value.userId === userId);
+    if (!item) return undefined;
+    Object.assign(item, data);
+    return item;
+  },
   async getInvoices(userId: string) {
     return state.invoices.filter((item) => item.userId === userId);
   },
+  async getInvoice(userId: string, id: string) {
+    return state.invoices.find((item) => item.id === id && item.userId === userId);
+  },
   async createInvoice(userId: string, data: any) {
     return withId(state.invoices, userId, data);
+  },
+  async updateInvoice(userId: string, id: string, data: any) {
+    const item = state.invoices.find((value) => value.id === id && value.userId === userId);
+    if (!item) return undefined;
+    Object.assign(item, data);
+    return item;
   },
   async getPlatformConfig() {
     return { tier1MaxClients: 5 };
@@ -74,8 +149,9 @@ const storage = {
 } as unknown as IStorage;
 
 const authenticate: RequestHandler = (req, _res, next) => {
+  const authenticatedCoachId = req.get("x-test-coach-id") || coachId;
   req.user = {
-    claims: { sub: coachId },
+    claims: { sub: authenticatedCoachId },
     expires_at: Math.floor(Date.now() / 1000) + 3600,
   };
   req.isAuthenticated = () => true;
@@ -239,4 +315,96 @@ test("fails an unconfigured GoCardless attempt clearly and safely", async () => 
     message:
       "GoCardless is not configured. Please add the GOCARDLESS_API_KEY secret in Settings.",
   });
+});
+
+test("rejects record IDs owned by a different authenticated coach", async () => {
+  const otherCoachId = "other-test-coach";
+  const foreignClient = { id: "foreign-client", userId: otherCoachId, name: "Private Client", email: "private@example.test" };
+  const foreignSession = { id: "foreign-session", userId: otherCoachId, clientId: foreignClient.id, status: "scheduled" };
+  const foreignPackage = { id: "foreign-package", userId: otherCoachId, clientId: foreignClient.id, name: "Private Package", totalSessions: 5, usedSessions: 0 };
+  const foreignNote = { id: "foreign-note", userId: otherCoachId, clientId: foreignClient.id, content: "Private note" };
+  const foreignForm = { id: "foreign-form", userId: otherCoachId, clientId: foreignClient.id, title: "Private form" };
+  const foreignReferral = { id: "foreign-referral", userId: otherCoachId, status: "pending" };
+  const foreignInvoice = { id: "foreign-invoice", userId: otherCoachId, clientId: foreignClient.id, invoiceNumber: "PRIVATE", amount: "100", dueDate: "2026-10-01" };
+  state.clients.push(foreignClient);
+  state.sessions.push(foreignSession);
+  state.packages.push(foreignPackage);
+  state.notes.push(foreignNote);
+  state.forms.push(foreignForm);
+  state.referrals.push(foreignReferral);
+  state.invoices.push(foreignInvoice);
+
+  const attempts: Array<[string, RequestInit | undefined]> = [
+    [`/api/clients/${foreignClient.id}`, undefined],
+    [`/api/clients/${foreignClient.id}`, { method: "PATCH", body: JSON.stringify({ name: "Stolen" }) }],
+    [`/api/clients/${foreignClient.id}`, { method: "DELETE" }],
+    [`/api/clients/${foreignClient.id}/export`, undefined],
+    ["/api/parq/send-email", { method: "POST", body: JSON.stringify({ clientId: foreignClient.id }) }],
+    ["/api/payments/create-mandate-link", { method: "POST", body: JSON.stringify({ clientId: foreignClient.id }) }],
+    [`/api/sessions/${foreignSession.id}`, undefined],
+    [`/api/sessions/${foreignSession.id}`, { method: "PATCH", body: JSON.stringify({ status: "cancelled" }) }],
+    [`/api/sessions/${foreignSession.id}`, { method: "DELETE" }],
+    [`/api/packages/${foreignPackage.id}`, { method: "PATCH", body: JSON.stringify({ name: "Stolen" }) }],
+    [`/api/packages/${foreignPackage.id}/notify-low-sessions`, { method: "POST" }],
+    [`/api/notes/${foreignNote.id}`, undefined],
+    [`/api/notes/${foreignNote.id}`, { method: "PATCH", body: JSON.stringify({ content: "Stolen" }) }],
+    [`/api/notes/${foreignNote.id}`, { method: "DELETE" }],
+    [`/api/forms/${foreignForm.id}`, undefined],
+    [`/api/forms/${foreignForm.id}`, { method: "PATCH", body: JSON.stringify({ title: "Stolen" }) }],
+    [`/api/forms/${foreignForm.id}`, { method: "DELETE" }],
+    [`/api/referrals/${foreignReferral.id}`, { method: "PATCH", body: JSON.stringify({ status: "converted" }) }],
+    [`/api/invoices/${foreignInvoice.id}`, { method: "PATCH", body: JSON.stringify({ status: "paid" }) }],
+    [`/api/invoices/${foreignInvoice.id}/send`, { method: "POST" }],
+  ];
+
+  for (const [path, init] of attempts) {
+    const result = await request(path, {
+      ...init,
+      headers: { "x-test-coach-id": coachId, ...init?.headers },
+    });
+    assert.equal(result.response.status, 404, `${init?.method || "GET"} ${path}`);
+  }
+
+  assert.equal(foreignClient.name, "Private Client");
+  assert.equal(foreignSession.status, "scheduled");
+  assert.equal(foreignPackage.name, "Private Package");
+  assert.equal(foreignNote.content, "Private note");
+  assert.equal(foreignForm.title, "Private form");
+  assert.equal(foreignReferral.status, "pending");
+  assert.equal(foreignInvoice.status, undefined);
+
+  const ownerRead = await request(`/api/clients/${foreignClient.id}`, {
+    headers: { "x-test-coach-id": otherCoachId },
+  });
+  assert.equal(ownerRead.response.status, 200);
+  assert.equal(ownerRead.body.name, "Private Client");
+});
+
+test("does not allow update bodies to transfer records to another coach", async () => {
+  const targetCoachId = "ownership-target-coach";
+  const ownedPackage = { id: "owned-package", userId: coachId, clientId: state.clients[0].id, name: "Owned package" };
+  const ownedNote = { id: "owned-note", userId: coachId, clientId: state.clients[0].id, content: "Owned note" };
+  const ownedReferral = { id: "owned-referral", userId: coachId, status: "pending" };
+  state.packages.push(ownedPackage);
+  state.notes.push(ownedNote);
+  state.referrals.push(ownedReferral);
+
+  const ownedRecords = [
+    { path: `/api/clients/${state.clients[0].id}`, record: state.clients[0], update: { name: "Updated client" } },
+    { path: `/api/sessions/${state.sessions[0].id}`, record: state.sessions[0], update: { title: "Updated session" } },
+    { path: `/api/packages/${ownedPackage.id}`, record: ownedPackage, update: { name: "Updated package" } },
+    { path: `/api/notes/${ownedNote.id}`, record: ownedNote, update: { content: "Updated note" } },
+    { path: `/api/forms/${state.forms[0].id}`, record: state.forms[0], update: { title: "Updated form" } },
+    { path: `/api/referrals/${ownedReferral.id}`, record: ownedReferral, update: { status: "converted" } },
+    { path: `/api/invoices/${state.invoices[0].id}`, record: state.invoices[0], update: { notes: "Updated invoice" } },
+  ];
+
+  for (const { path, record, update } of ownedRecords) {
+    const result = await request(path, {
+      method: "PATCH",
+      body: JSON.stringify({ ...update, userId: targetCoachId }),
+    });
+    assert.equal(result.response.status, 200, `PATCH ${path}`);
+    assert.equal(record.userId, coachId, `ownership changed for ${path}`);
+  }
 });

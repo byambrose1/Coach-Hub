@@ -43,6 +43,11 @@ function getRouteParam(value: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function withoutOwnershipFields(body: any) {
+  const { id: _id, userId: _userId, ...data } = body || {};
+  return data;
+}
+
 function getRealUserId(req: any): string {
   return req.user?.claims?.sub || "";
 }
@@ -122,7 +127,7 @@ export async function registerRoutes(
   app.post("/api/payments/create-mandate-link", isAuthenticated, async (req, res) => {
     try {
       const { clientId } = req.body;
-      const client = await storage.getClient(clientId);
+      const client = await storage.getClient(getUserId(req), clientId);
       if (!client) return res.status(404).json({ message: "Client not found" });
       if (!client.email) return res.status(400).json({ message: "Client has no email" });
       const link = await createMandateLink(clientId, client.name, client.email);
@@ -143,7 +148,7 @@ export async function registerRoutes(
     try {
       const userId = getUserId(req);
       const { clientId } = req.body;
-      const client = await storage.getClient(clientId);
+      const client = await storage.getClient(userId, clientId);
       if (!client) return res.status(404).json({ message: "Client not found" });
       if (!client.email) return res.status(400).json({ message: "Client has no email address" });
       const s = await storage.getSettings(userId);
@@ -388,7 +393,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/clients/:id", async (req, res) => {
-    const client = await storage.getClient(req.params.id);
+    const client = await storage.getClient(getUserId(req), req.params.id);
     if (!client) return res.status(404).json({ message: "Client not found" });
     res.json(client);
   });
@@ -451,20 +456,23 @@ export async function registerRoutes(
   });
 
   app.patch("/api/clients/:id", async (req, res) => {
-    const client = await storage.updateClient(req.params.id, req.body);
+    const client = await storage.updateClient(getUserId(req), req.params.id, withoutOwnershipFields(req.body));
     if (!client) return res.status(404).json({ message: "Client not found" });
     res.json(client);
   });
 
   app.delete("/api/clients/:id", async (req, res) => {
-    await storage.deleteClient(req.params.id);
+    const userId = getUserId(req);
+    const client = await storage.getClient(userId, req.params.id);
+    if (!client) return res.status(404).json({ message: "Client not found" });
+    await storage.deleteClient(userId, req.params.id);
     res.status(204).send();
   });
 
   app.get("/api/clients/:id/export", async (req, res) => {
     const userId = getUserId(req);
-    const client = await storage.getClient(req.params.id);
-    if (!client || client.userId !== userId) return res.status(404).json({ message: "Client not found" });
+    const client = await storage.getClient(userId, req.params.id);
+    if (!client) return res.status(404).json({ message: "Client not found" });
     const sessions = await storage.getSessions(userId);
     const clientSessions = sessions.filter(s => s.clientId === client.id);
     const pkgs = await storage.getPackages(userId);
@@ -486,7 +494,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/sessions/:id", async (req, res) => {
-    const session = await storage.getSession(req.params.id);
+    const session = await storage.getSession(getUserId(req), req.params.id);
     if (!session) return res.status(404).json({ message: "Session not found" });
     res.json(session);
   });
@@ -504,7 +512,7 @@ export async function registerRoutes(
         (p) => p.clientId === session.clientId && p.status === "active" && p.billingType === "block" && (p.totalSessions - (p.usedSessions || 0)) > 0
       );
       if (activePackage) {
-        await storage.updatePackage(activePackage.id, {
+        await storage.updatePackage(userId, activePackage.id, {
           usedSessions: (activePackage.usedSessions || 0) + 1,
         });
       }
@@ -513,7 +521,7 @@ export async function registerRoutes(
     }
 
     try {
-      const client = await storage.getClient(session.clientId);
+      const client = await storage.getClient(userId, session.clientId);
       const s = await storage.getSettings(userId);
       if (client?.email) {
         await sendBookingNotificationEmail({
@@ -534,8 +542,10 @@ export async function registerRoutes(
   });
 
   app.patch("/api/sessions/:id", async (req, res) => {
-    const existing = await storage.getSession(req.params.id);
-    const session = await storage.updateSession(req.params.id, req.body);
+    const userId = getUserId(req);
+    const existing = await storage.getSession(userId, req.params.id);
+    if (!existing) return res.status(404).json({ message: "Session not found" });
+    const session = await storage.updateSession(userId, req.params.id, withoutOwnershipFields(req.body));
     if (!session) return res.status(404).json({ message: "Session not found" });
 
     // Handle session count on cancellation
@@ -548,15 +558,15 @@ export async function registerRoutes(
       // If deductSession is true, coach chose to keep deduction (late cancel penalty)
       // Otherwise restore the session back to the package
       if (!req.body.deductSession && activePackage && (activePackage.usedSessions || 0) > 0) {
-        await storage.updatePackage(activePackage.id, {
+        await storage.updatePackage(userId, activePackage.id, {
           usedSessions: (activePackage.usedSessions || 0) - 1,
         });
       }
     }
 
     try {
-      const client = await storage.getClient(session.clientId);
-      const s = await storage.getSettings(session.userId || "");
+      const client = await storage.getClient(userId, session.clientId);
+      const s = await storage.getSettings(userId);
       if (client?.email && existing) {
         const emailData = {
           clientName: client.name,
@@ -590,7 +600,10 @@ export async function registerRoutes(
   });
 
   app.delete("/api/sessions/:id", async (req, res) => {
-    await storage.deleteSession(req.params.id);
+    const userId = getUserId(req);
+    const session = await storage.getSession(userId, req.params.id);
+    if (!session) return res.status(404).json({ message: "Session not found" });
+    await storage.deleteSession(userId, req.params.id);
     res.status(204).send();
   });
 
@@ -610,12 +623,13 @@ export async function registerRoutes(
   });
 
   app.patch("/api/packages/:id", async (req, res) => {
-    const pkg = await storage.updatePackage(req.params.id, req.body);
+    const userId = getUserId(req);
+    const pkg = await storage.updatePackage(userId, req.params.id, withoutOwnershipFields(req.body));
     if (!pkg) return res.status(404).json({ message: "Package not found" });
     if (req.body.billingType === "monthly" && !req.body.nextBillingDate && !pkg.nextBillingDate) {
       const nextMonth = new Date();
       nextMonth.setMonth(nextMonth.getMonth() + 1);
-      await storage.updatePackage(req.params.id, {
+      await storage.updatePackage(userId, req.params.id, {
         nextBillingDate: nextMonth.toISOString().split("T")[0],
       });
     }
@@ -625,9 +639,9 @@ export async function registerRoutes(
   app.post("/api/packages/:id/notify-low-sessions", isAuthenticated, async (req, res) => {
     try {
       const userId = getUserId(req);
-      const pkg = await storage.getPackage(getRouteParam(req.params.id));
+      const pkg = await storage.getPackage(userId, getRouteParam(req.params.id));
       if (!pkg) return res.status(404).json({ message: "Package not found" });
-      const client = await storage.getClient(pkg.clientId);
+      const client = await storage.getClient(userId, pkg.clientId);
       if (!client) return res.status(404).json({ message: "Client not found" });
       if (!client.email) return res.status(400).json({ message: "Client has no email address" });
       const settings = await storage.getSettings(userId);
@@ -657,7 +671,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/notes/:id", async (req, res) => {
-    const note = await storage.getNote(req.params.id);
+    const note = await storage.getNote(getUserId(req), req.params.id);
     if (!note) return res.status(404).json({ message: "Note not found" });
     res.json(note);
   });
@@ -671,13 +685,16 @@ export async function registerRoutes(
   });
 
   app.patch("/api/notes/:id", async (req, res) => {
-    const note = await storage.updateNote(req.params.id, req.body);
+    const note = await storage.updateNote(getUserId(req), req.params.id, withoutOwnershipFields(req.body));
     if (!note) return res.status(404).json({ message: "Note not found" });
     res.json(note);
   });
 
   app.delete("/api/notes/:id", async (req, res) => {
-    await storage.deleteNote(req.params.id);
+    const userId = getUserId(req);
+    const note = await storage.getNote(userId, req.params.id);
+    if (!note) return res.status(404).json({ message: "Note not found" });
+    await storage.deleteNote(userId, req.params.id);
     res.status(204).send();
   });
 
@@ -711,7 +728,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/forms/:id", async (req, res) => {
-    const form = await storage.getClientForm(req.params.id);
+    const form = await storage.getClientForm(getUserId(req), req.params.id);
     if (!form) return res.status(404).json({ message: "Form not found" });
     res.json(form);
   });
@@ -725,13 +742,16 @@ export async function registerRoutes(
   });
 
   app.patch("/api/forms/:id", async (req, res) => {
-    const form = await storage.updateClientForm(req.params.id, req.body);
+    const form = await storage.updateClientForm(getUserId(req), req.params.id, withoutOwnershipFields(req.body));
     if (!form) return res.status(404).json({ message: "Form not found" });
     res.json(form);
   });
 
   app.delete("/api/forms/:id", async (req, res) => {
-    await storage.deleteClientForm(req.params.id);
+    const userId = getUserId(req);
+    const form = await storage.getClientForm(userId, req.params.id);
+    if (!form) return res.status(404).json({ message: "Form not found" });
+    await storage.deleteClientForm(userId, req.params.id);
     res.status(204).send();
   });
 
@@ -751,7 +771,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/referrals/:id", async (req, res) => {
-    const ref = await storage.updateReferral(req.params.id, req.body);
+    const ref = await storage.updateReferral(getUserId(req), req.params.id, withoutOwnershipFields(req.body));
     if (!ref) return res.status(404).json({ message: "Referral not found" });
     res.json(ref);
   });
@@ -772,19 +792,20 @@ export async function registerRoutes(
   });
 
   app.patch("/api/invoices/:id", async (req, res) => {
-    const inv = await storage.updateInvoice(req.params.id, req.body);
+    const inv = await storage.updateInvoice(getUserId(req), req.params.id, withoutOwnershipFields(req.body));
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
     res.json(inv);
   });
 
   app.post("/api/invoices/:id/send", async (req, res) => {
     try {
-      const inv = await storage.getInvoice(req.params.id);
+      const userId = getUserId(req);
+      const inv = await storage.getInvoice(userId, req.params.id);
       if (!inv) return res.status(404).json({ message: "Invoice not found" });
-      const client = await storage.getClient(inv.clientId);
+      const client = await storage.getClient(userId, inv.clientId);
       if (!client) return res.status(404).json({ message: "Client not found" });
       if (!client.email) return res.status(400).json({ message: "Client has no email address" });
-      const s = await storage.getSettings(inv.userId || "");
+      const s = await storage.getSettings(userId);
       const currency = s?.currency || "£";
 
       await sendInvoiceEmail({
@@ -802,7 +823,7 @@ export async function registerRoutes(
         paymentLink: s?.paymentLink || undefined,
       });
 
-      const updated = await storage.updateInvoice(req.params.id, {
+      const updated = await storage.updateInvoice(userId, req.params.id, {
         status: "sent",
         sentDate: new Date().toISOString().split("T")[0],
       });
