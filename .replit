@@ -53,3 +53,7 @@ integrations = ["javascript_log_in_with_replit:2.0.0"]
 
 [userenv.shared]
 OWNER_USER_ID = "43697825"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 300000
