@@ -1,8 +1,8 @@
-import Whop from "@whop/sdk";
+import { WhopClient } from "@whop/sdk";
 
-let clientPromise: Promise<Whop> | null = null;
+let clientPromise: Promise<WhopClient> | null = null;
 
-async function initWhopClient(): Promise<Whop> {
+async function initWhopClient(): Promise<WhopClient> {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? `repl ${process.env.REPL_IDENTITY}`
@@ -33,10 +33,10 @@ async function initWhopClient(): Promise<Whop> {
     throw new Error("Whop is connected but did not provide an API credential.");
   }
 
-  return new Whop({ apiKey });
+  return new WhopClient({ token: apiKey });
 }
 
-export function getWhopClient(): Promise<Whop> {
+export function getWhopClient(): Promise<WhopClient> {
   if (!clientPromise) {
     clientPromise = initWhopClient().catch((error) => {
       clientPromise = null;

@@ -1,0 +1,1 @@
+- [Whop SDK client API](whop-sdk-client-api.md) — current SDK uses the named WhopClient export with a token option; older default-export examples fail.
