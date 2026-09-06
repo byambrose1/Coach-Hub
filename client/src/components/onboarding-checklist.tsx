@@ -6,6 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackActivationEvent } from "@/lib/activation";
+import {
+  parseOnboardingProgress,
+  serializeOnboardingProgress,
+  toggleOnboardingStep,
+  type OnboardingProgress,
+} from "@/lib/onboarding-progress";
 import type { Settings } from "@shared/schema";
 
 const steps = [
@@ -17,27 +23,22 @@ const steps = [
   { id: "first-booking", label: "Create your first invoice or booking", href: "/schedule" },
 ];
 
-type ProgressState = Record<string, boolean>;
-
 export function OnboardingChecklist() {
   const [collapsed, setCollapsed] = useState(false);
   const { data: settings } = useQuery<Settings>({ queryKey: ["/api/settings"] });
-  const progress: ProgressState = useMemo(() => {
-    try {
-      return JSON.parse(settings?.onboardingProgress || "{}");
-    } catch {
-      return {};
-    }
-  }, [settings?.onboardingProgress]);
+  const progress = useMemo(
+    () => parseOnboardingProgress(settings?.onboardingProgress),
+    [settings?.onboardingProgress],
+  );
 
   const completed = steps.filter((step) => progress[step.id]).length;
   const dismissed = settings?.onboardingDismissed || completed === steps.length;
 
   const saveMutation = useMutation({
-    mutationFn: async (next: { progress?: ProgressState; dismissed?: boolean }) => {
+    mutationFn: async (next: { progress?: OnboardingProgress; dismissed?: boolean }) => {
       await apiRequest("PUT", "/api/settings", {
         ...settings,
-        ...(next.progress ? { onboardingProgress: JSON.stringify(next.progress) } : {}),
+        ...(next.progress ? { onboardingProgress: serializeOnboardingProgress(next.progress) } : {}),
         ...(typeof next.dismissed === "boolean" ? { onboardingDismissed: next.dismissed } : {}),
       });
     },
@@ -47,7 +48,7 @@ export function OnboardingChecklist() {
   if (!settings || dismissed) return null;
 
   const markStep = (id: string) => {
-    const next = { ...progress, [id]: !progress[id] };
+    const next = toggleOnboardingStep(progress, id);
     saveMutation.mutate({ progress: next });
   };
 

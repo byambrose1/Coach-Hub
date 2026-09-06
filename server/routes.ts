@@ -1,10 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage as defaultStorage, type IStorage } from "./storage";
 import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema } from "@shared/schema";
-import { isAuthenticated } from "./replit_integrations/auth";
-import { sendInvoiceEmail, sendBookingNotificationEmail, sendSessionCancellationEmail, sendSessionRescheduleEmail, sendParqEmail, sendLowSessionsEmail, sendBroadcastEmail } from "./email";
-import { createMandateLink } from "./payments";
+import { isAuthenticated as defaultIsAuthenticated } from "./replit_integrations/auth";
+import { sendInvoiceEmail, sendBookingNotificationEmail as defaultSendBookingNotificationEmail, sendSessionCancellationEmail, sendSessionRescheduleEmail, sendParqEmail, sendLowSessionsEmail, sendBroadcastEmail } from "./email";
+import { createMandateLink as defaultCreateMandateLink } from "./payments";
+import type { RequestHandler } from "express";
 
 declare module "express-session" {
   interface SessionData {
@@ -57,8 +58,19 @@ function isOwner(req: any): boolean {
 
 export async function registerRoutes(
   httpServer: Server,
-  app: Express
+  app: Express,
+  dependencies: {
+    storage?: IStorage;
+    isAuthenticated?: RequestHandler;
+    createMandateLink?: typeof defaultCreateMandateLink;
+    sendBookingNotificationEmail?: typeof defaultSendBookingNotificationEmail;
+  } = {},
 ): Promise<Server> {
+  const storage = dependencies.storage ?? defaultStorage;
+  const isAuthenticated = dependencies.isAuthenticated ?? defaultIsAuthenticated;
+  const createMandateLink = dependencies.createMandateLink ?? defaultCreateMandateLink;
+  const sendBookingNotificationEmail =
+    dependencies.sendBookingNotificationEmail ?? defaultSendBookingNotificationEmail;
   app.get("/robots.txt", (req, res) => {
     const siteUrl = getPublicSiteUrl(req);
     res.type("text/plain").send([
