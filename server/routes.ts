@@ -3,10 +3,28 @@ import { createServer, type Server } from "http";
 import { storage as defaultStorage, type IStorage } from "./storage";
 import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema } from "@shared/schema";
 import { isAuthenticated as defaultIsAuthenticated } from "./replit_integrations/auth";
-import { sendInvoiceEmail, sendBookingNotificationEmail as defaultSendBookingNotificationEmail, sendSessionCancellationEmail, sendSessionRescheduleEmail, sendParqEmail, sendLowSessionsEmail, sendBroadcastEmail } from "./email";
+import {
+  sendInvoiceEmail as defaultSendInvoiceEmail,
+  sendBookingNotificationEmail as defaultSendBookingNotificationEmail,
+  sendSessionCancellationEmail,
+  sendSessionRescheduleEmail,
+  sendParqEmail as defaultSendParqEmail,
+  sendLowSessionsEmail as defaultSendLowSessionsEmail,
+  sendBroadcastEmail as defaultSendBroadcastEmail,
+} from "./email";
 import { createMandateLink as defaultCreateMandateLink } from "./payments";
 import type { RequestHandler } from "express";
 import { logError } from "./safe-logging";
+
+const PAYMENT_PROVIDER_ERROR = {
+  code: "PAYMENT_PROVIDER_ERROR",
+  message: "Unable to create the payment link. Please try again.",
+} as const;
+
+const EMAIL_PROVIDER_ERROR = {
+  code: "EMAIL_PROVIDER_ERROR",
+  message: "Unable to send the email. Please try again.",
+} as const;
 
 declare module "express-session" {
   interface SessionData {
@@ -70,6 +88,10 @@ export async function registerRoutes(
     isAuthenticated?: RequestHandler;
     createMandateLink?: typeof defaultCreateMandateLink;
     sendBookingNotificationEmail?: typeof defaultSendBookingNotificationEmail;
+    sendInvoiceEmail?: typeof defaultSendInvoiceEmail;
+    sendParqEmail?: typeof defaultSendParqEmail;
+    sendLowSessionsEmail?: typeof defaultSendLowSessionsEmail;
+    sendBroadcastEmail?: typeof defaultSendBroadcastEmail;
   } = {},
 ): Promise<Server> {
   const storage = dependencies.storage ?? defaultStorage;
@@ -77,6 +99,12 @@ export async function registerRoutes(
   const createMandateLink = dependencies.createMandateLink ?? defaultCreateMandateLink;
   const sendBookingNotificationEmail =
     dependencies.sendBookingNotificationEmail ?? defaultSendBookingNotificationEmail;
+  const sendInvoiceEmail = dependencies.sendInvoiceEmail ?? defaultSendInvoiceEmail;
+  const sendParqEmail = dependencies.sendParqEmail ?? defaultSendParqEmail;
+  const sendLowSessionsEmail =
+    dependencies.sendLowSessionsEmail ?? defaultSendLowSessionsEmail;
+  const sendBroadcastEmail =
+    dependencies.sendBroadcastEmail ?? defaultSendBroadcastEmail;
   app.get("/robots.txt", (req, res) => {
     const siteUrl = getPublicSiteUrl(req);
     res.type("text/plain").send([
@@ -132,8 +160,9 @@ export async function registerRoutes(
       if (!client.email) return res.status(400).json({ message: "Client has no email" });
       const link = await createMandateLink(clientId, client.name, client.email);
       res.json({ link });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err) {
+      logError("Failed to create payment mandate link", err);
+      res.status(502).json(PAYMENT_PROVIDER_ERROR);
     }
   });
 
@@ -160,8 +189,9 @@ export async function registerRoutes(
         trainerEmail: s?.trainerEmail || undefined,
       });
       res.json({ message: "PAR-Q email sent successfully" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err) {
+      logError("Failed to send PAR-Q email", err);
+      res.status(502).json(EMAIL_PROVIDER_ERROR);
     }
   });
 
@@ -197,8 +227,9 @@ export async function registerRoutes(
       });
 
       res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err) {
+      logError("Failed to send broadcast email", err);
+      res.status(502).json(EMAIL_PROVIDER_ERROR);
     }
   });
 
@@ -657,9 +688,9 @@ export async function registerRoutes(
         paymentLink: settings?.paymentLink || undefined,
       });
       res.json({ success: true });
-    } catch (err: any) {
+    } catch (err) {
       logError("Failed to send low sessions notification", err);
-      res.status(500).json({ message: err.message || "Failed to send notification" });
+      res.status(502).json(EMAIL_PROVIDER_ERROR);
     }
   });
 
@@ -829,9 +860,9 @@ export async function registerRoutes(
       });
 
       res.json(updated);
-    } catch (err: any) {
+    } catch (err) {
       logError("Error sending invoice email", err);
-      res.status(500).json({ message: err.message || "Failed to send invoice email" });
+      res.status(502).json(EMAIL_PROVIDER_ERROR);
     }
   });
 

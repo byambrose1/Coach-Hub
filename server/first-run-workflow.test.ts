@@ -179,8 +179,22 @@ before(async () => {
     sendBookingNotificationEmail: async () => {},
     createMandateLink: async () => {
       throw new Error(
-        "GoCardless is not configured. Please add the GOCARDLESS_API_KEY secret in Settings.",
+        "private-provider-detail: GoCardless credential gc_secret_123 was rejected",
       );
+    },
+    sendParqEmail: async () => {
+      throw new Error(
+        "private-provider-detail: Brevo request for client@example.test was rejected",
+      );
+    },
+    sendBroadcastEmail: async () => {
+      throw new Error("private-provider-detail: Brevo broadcast request was rejected");
+    },
+    sendLowSessionsEmail: async () => {
+      throw new Error("private-provider-detail: Brevo low-session request was rejected");
+    },
+    sendInvoiceEmail: async () => {
+      throw new Error("private-provider-detail: Brevo invoice request was rejected");
     },
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -304,17 +318,57 @@ test("creates the first client, booking, PAR-Q form, and invoice", async () => {
   );
 });
 
-test("fails an unconfigured GoCardless attempt clearly and safely", async () => {
+test("payment provider failures return a stable response without provider details", async () => {
   const client = state.clients[0];
   const result = await request("/api/payments/create-mandate-link", {
     method: "POST",
     body: JSON.stringify({ clientId: client.id }),
   });
-  assert.equal(result.response.status, 500);
+  assert.equal(result.response.status, 502);
   assert.deepEqual(result.body, {
-    message:
-      "GoCardless is not configured. Please add the GOCARDLESS_API_KEY secret in Settings.",
+    code: "PAYMENT_PROVIDER_ERROR",
+    message: "Unable to create the payment link. Please try again.",
   });
+  assert.doesNotMatch(JSON.stringify(result.body), /GoCardless|gc_secret|private-provider-detail/i);
+});
+
+test("email provider failures return stable responses without provider details", async () => {
+  const client = state.clients[0];
+  const pkg = withId(state.packages, coachId, {
+    clientId: client.id,
+    name: "Test Package",
+    totalSessions: 10,
+    usedSessions: 9,
+  });
+  const invoice = state.invoices[0];
+  const attempts: Array<[string, RequestInit]> = [
+    [
+      "/api/parq/send-email",
+      { method: "POST", body: JSON.stringify({ clientId: client.id }) },
+    ],
+    [
+      "/api/emails/broadcast",
+      {
+        method: "POST",
+        body: JSON.stringify({ subject: "Update", message: "Hello" }),
+      },
+    ],
+    [`/api/packages/${pkg.id}/notify-low-sessions`, { method: "POST" }],
+    [`/api/invoices/${invoice.id}/send`, { method: "POST" }],
+  ];
+
+  for (const [path, init] of attempts) {
+    const result = await request(path, init);
+    assert.equal(result.response.status, 502, path);
+    assert.deepEqual(result.body, {
+      code: "EMAIL_PROVIDER_ERROR",
+      message: "Unable to send the email. Please try again.",
+    });
+    assert.doesNotMatch(
+      JSON.stringify(result.body),
+      /Brevo|client@example|private-provider-detail/i,
+    );
+  }
 });
 
 test("rejects record IDs owned by a different authenticated coach", async () => {
