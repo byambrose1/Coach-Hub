@@ -1,1 +1,2 @@
 - [Whop SDK client API](whop-sdk-client-api.md) — current SDK uses the named WhopClient export with a token option; older default-export examples fail.
+- [Logging guard approvals](logging-guard-approvals.md) — server logging safety is default-deny; approve exact safe expressions, never whole functions.

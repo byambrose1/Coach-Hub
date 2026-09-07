@@ -3,6 +3,7 @@ import test from "node:test";
 import express from "express";
 import { createServer } from "node:http";
 import { createApiRequestLogger, logError } from "./safe-logging";
+import { findUnsafeServerLogs } from "../script/check-safe-logging";
 
 test("API request logs contain diagnostics without response data", async () => {
   const messages: string[] = [];
@@ -61,4 +62,111 @@ test("error logs omit messages and arbitrary private fields", () => {
   } finally {
     console.error = originalConsoleError;
   }
+});
+
+test("logging guard rejects request and response bodies", () => {
+  const source = `
+    console.log(req.body);
+    console.info(response.body);
+  `;
+
+  const findings = findUnsafeServerLogs(source);
+  assert.equal(findings.length, 2);
+  assert(findings.every(({ reason }) => reason.includes("body")));
+});
+
+test("logging guard rejects recipient addresses and raw errors", () => {
+  const source = `
+    console.log("Sending to", recipient);
+    console.error("Provider failed", error);
+  `;
+
+  const findings = findUnsafeServerLogs(source);
+  assert.deepEqual(
+    findings.map(({ reason }) => reason),
+    ['private field "recipient"', "raw error object"],
+  );
+});
+
+test("logging guard rejects known customer and health fields in nested forms", () => {
+  const source = `
+    console.log(client.phone);
+    console.info({ notes: client.notes, responses: form.responses });
+    console.warn(\`Session detail: \${sessionNote.content}\`);
+    console.debug({ paymentLink: checkout.paymentLink, token });
+    console.log(client.name);
+  `;
+
+  const findings = findUnsafeServerLogs(source);
+  assert.equal(findings.length, 5);
+  assert.deepEqual(
+    findings.map(({ reason }) => reason),
+    [
+      'private field "phone"',
+      'private field "notes"',
+      'private field "content"',
+      'private field "paymentLink"',
+      'private field "name"',
+    ],
+  );
+});
+
+test("logging guard rejects arbitrary dynamic values by default", () => {
+  const source = `
+    console.log(customer);
+    console.info(\`Created record: \${createdRecord}\`);
+  `;
+
+  const findings = findUnsafeServerLogs(source);
+  assert.equal(findings.length, 2);
+  assert(findings.every(({ reason }) => reason.includes("unapproved dynamic value")));
+});
+
+test("logging guard allows metadata-only logs and the shared safe logger", () => {
+  const metadata = `
+    console.log(\`POST /api/bookings \${res.statusCode} in \${duration}ms\`);
+    console.info(\`received events=\${eventCount}\`);
+    logError("Provider failed", error);
+  `;
+  const safeLogger = `
+    export function logError(context: string, error: unknown): void {
+      console.error(\`\${context}:\`, getSafeErrorSummary(error));
+    }
+  `;
+
+  assert.deepEqual(findUnsafeServerLogs(metadata, "server/routes.ts"), []);
+  assert.deepEqual(
+    findUnsafeServerLogs(safeLogger, "server/safe-logging.ts"),
+    [],
+  );
+});
+
+test("logging guard rejects unsafe additions inside shared logging functions", () => {
+  const unsafeErrorLogger = `
+    export function logError(context: string, error: unknown): void {
+      console.error(\`\${context}:\`, getSafeErrorSummary(error));
+      console.error(error);
+      console.log(req.body);
+    }
+  `;
+  const unsafeRequestLogger = `
+    export function log(message: string, source = "express") {
+      console.log(\`\${formattedTime} [\${source}] \${message}\`);
+      console.log(client.email);
+      console.log(client.phone);
+    }
+  `;
+
+  assert.deepEqual(
+    findUnsafeServerLogs(unsafeErrorLogger, "server/safe-logging.ts").map(
+      ({ reason }) => reason,
+    ),
+    ["raw error object", 'private field "body"'],
+  );
+  assert.deepEqual(
+    findUnsafeServerLogs(unsafeRequestLogger, "server/index.ts").map(
+      ({ reason }) => reason,
+    ),
+    ['private field "email"', 'private field "phone"'],
+  );
 });
