@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Crown, ArrowRight, Users, Lock } from "lucide-react";
+import { useState } from "react";
 
 interface UpgradeInfo {
   currentCount: number;
@@ -28,17 +29,31 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 export function UpgradePopup({ open, onClose, upgradeInfo }: UpgradePopupProps) {
+  const [isStartingCheckout, setIsStartingCheckout] = useState(false);
   if (!upgradeInfo) return null;
 
   const nextPlanLabel = PLAN_LABELS[upgradeInfo.nextTierPlan] || upgradeInfo.nextTierPlan;
   const currentPlanLabel = PLAN_LABELS[upgradeInfo.currentPlan] || upgradeInfo.currentPlan;
   const isFree = upgradeInfo.currentPlan === "free";
 
-  const handleUpgrade = () => {
-    if (upgradeInfo.paymentLink) {
-      window.open(upgradeInfo.paymentLink, "_blank");
+  const handleUpgrade = async () => {
+    setIsStartingCheckout(true);
+    try {
+      const response = await fetch("/api/subscription/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ plan: upgradeInfo.nextTierPlan }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.url) {
+        throw new Error(data.message || "Unable to start checkout");
+      }
+      window.location.assign(data.url);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Unable to start checkout");
+      setIsStartingCheckout(false);
     }
-    onClose();
   };
 
   return (
@@ -99,12 +114,10 @@ export function UpgradePopup({ open, onClose, upgradeInfo }: UpgradePopupProps) 
             </div>
           </div>
 
-          {!upgradeInfo.paymentLink && (
-            <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg text-sm text-blue-700 dark:text-blue-400">
-              <Lock className="h-4 w-4 flex-shrink-0" />
-              <span>Payment link not yet configured. Contact your administrator to upgrade.</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg text-sm text-blue-700 dark:text-blue-400">
+            <Lock className="h-4 w-4 flex-shrink-0" />
+            <span>Checkout is hosted securely by Stripe. Your plan updates after payment is verified.</span>
+          </div>
         </div>
 
         <div className="flex gap-3">
@@ -113,11 +126,11 @@ export function UpgradePopup({ open, onClose, upgradeInfo }: UpgradePopupProps) 
           </Button>
           <Button
             onClick={handleUpgrade}
-            disabled={!upgradeInfo.paymentLink}
+            disabled={isStartingCheckout}
             className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
             data-testid="button-upgrade-plan"
           >
-            Upgrade to {nextPlanLabel}
+            {isStartingCheckout ? "Opening checkout..." : `Upgrade to ${nextPlanLabel}`}
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </div>

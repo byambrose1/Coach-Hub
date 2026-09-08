@@ -80,6 +80,32 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
     },
   });
 
+  const checkoutMutation = useMutation({
+    mutationFn: async (plan: string) => {
+      const res = await apiRequest("POST", "/api/subscription/checkout", { plan });
+      return res.json() as Promise<{ url: string }>;
+    },
+    onSuccess: ({ url }) => {
+      window.location.assign(url);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Unable to start checkout", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const portalMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/subscription/portal", {});
+      return res.json() as Promise<{ url: string }>;
+    },
+    onSuccess: ({ url }) => {
+      window.location.assign(url);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Unable to open billing", description: err.message, variant: "destructive" });
+    },
+  });
+
   if (tiersLoading) {
     return <Card><CardContent className="pt-6 h-32 animate-pulse bg-muted rounded" /></Card>;
   }
@@ -139,21 +165,32 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
 
               <div className="flex-shrink-0">
                 {isCurrent ? (
-                  <span className="text-xs text-muted-foreground">Active</span>
-                ) : isUpgrade ? (
-                  tier.paymentLink ? (
-                    <a href={tier.paymentLink} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="default" className="gap-1.5 text-xs" data-testid={`button-upgrade-${tier.name}`}>
-                        <ArrowUp className="h-3 w-3" />
-                        Upgrade
-                        <ExternalLink className="h-3 w-3" />
-                      </Button>
-                    </a>
-                  ) : (
-                    <Button size="sm" variant="outline" disabled className="text-xs opacity-50">
-                      No link set
+                  currentPlan !== "free" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 text-xs"
+                      onClick={() => portalMutation.mutate()}
+                      disabled={portalMutation.isPending}
+                    >
+                      <CreditCard className="h-3 w-3" />
+                      {portalMutation.isPending ? "Opening..." : "Manage billing"}
                     </Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Active</span>
                   )
+                ) : isUpgrade ? (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="gap-1.5 text-xs"
+                    onClick={() => checkoutMutation.mutate(tier.name)}
+                    disabled={checkoutMutation.isPending}
+                    data-testid={`button-upgrade-${tier.name}`}
+                  >
+                    <ArrowUp className="h-3 w-3" />
+                    {checkoutMutation.isPending ? "Opening..." : "Upgrade"}
+                  </Button>
                 ) : canDowngrade ? (
                   <Button
                     size="sm"
@@ -176,7 +213,7 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
           );
         })}
         <p className="text-xs text-muted-foreground pt-1">
-          Upgrades are processed via external payment. After payment, your plan will be updated automatically or by your administrator.
+          Paid-plan changes open secure Stripe Checkout. Your plan changes only after Stripe confirms payment through a verified webhook.
         </p>
       </CardContent>
     </Card>

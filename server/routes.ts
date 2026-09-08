@@ -543,6 +543,12 @@ export async function registerRoutes(
       if (!["free", "starter", "professional", "business"].includes(plan)) {
         return res.status(400).json({ message: "Invalid plan" });
       }
+      if (plan !== "free") {
+        return res.status(402).json({
+          code: "CHECKOUT_REQUIRED",
+          message: "Paid plan changes must be completed through Stripe Checkout.",
+        });
+      }
       const [config, existingClients, currentSettings] = await Promise.all([
         storage.getPlatformConfig(),
         storage.getClients(userId),
@@ -557,6 +563,12 @@ export async function registerRoutes(
       const targetMax = tierMaxMap[plan];
       const currentPlan = currentSettings?.subscriptionPlan || "free";
       const isDowngrade = PLAN_TIER[plan] < PLAN_TIER[currentPlan];
+      if (currentPlan !== "free" && currentSettings?.stripeSubscriptionId) {
+        return res.status(409).json({
+          code: "BILLING_PORTAL_REQUIRED",
+          message: "Manage your paid subscription through Stripe Billing.",
+        });
+      }
       if (isDowngrade && existingClients.length > targetMax) {
         return res.status(400).json({
           message: `You have ${existingClients.length} clients. The ${plan} plan only allows ${targetMax}. Remove ${existingClients.length - targetMax} client(s) first.`,
