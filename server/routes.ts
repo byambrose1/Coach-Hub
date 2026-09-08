@@ -206,12 +206,12 @@ export async function registerRoutes(
         const object = event.data.object as import("stripe").default.Checkout.Session | import("stripe").default.Subscription;
         const metadata = object.metadata || {};
         const customerId = typeof object.customer === "string" ? object.customer : object.customer?.id;
-        const subscriptionId =
+        const rawSubscriptionId =
           event.type === "checkout.session.completed"
-            ? typeof (object as import("stripe").default.Checkout.Session).subscription === "string"
-              ? (object as import("stripe").default.Checkout.Session).subscription
-              : undefined
+            ? (object as import("stripe").default.Checkout.Session).subscription
             : (object as import("stripe").default.Subscription).id;
+        const subscriptionId =
+          typeof rawSubscriptionId === "string" ? rawSubscriptionId : rawSubscriptionId?.id;
         const userId = metadata.userId;
         const plan =
           metadata.plan ||
@@ -239,11 +239,13 @@ export async function registerRoutes(
       }
 
       if (event.type === "invoice.payment_failed") {
-        const invoice = event.data.object as import("stripe").default.Invoice;
+        const invoice = event.data.object as import("stripe").default.Invoice & {
+          subscription?: string | import("stripe").default.Subscription | null;
+        };
         const subscriptionId =
           typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
         if (subscriptionId) {
-          const settings = await storage.findSettingsByStripeSubscriptionId?.(subscriptionId);
+          const settings = await storage.getSettingsByStripeSubscriptionId(subscriptionId);
           if (settings) {
             await storage.upsertSettings(settings.id, {
               ...settings,
@@ -274,7 +276,7 @@ export async function registerRoutes(
       }
 
       const current = await storage.getSettings(userId);
-      const claims = req.user?.claims || {};
+      const claims = (req as any).user?.claims || {};
       const customer = current?.stripeCustomerId
         ? current.stripeCustomerId
         : await getStripeClient().customers.create({

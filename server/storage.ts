@@ -39,6 +39,7 @@ export interface IStorage {
   deleteNote(userId: string, id: string): Promise<void>;
 
   getSettings(userId: string): Promise<Settings | undefined>;
+  getSettingsByStripeSubscriptionId(subscriptionId: string): Promise<Settings | undefined>;
   upsertSettings(userId: string, data: InsertSettings): Promise<Settings>;
 
   getClientForms(userId: string): Promise<ClientForm[]>;
@@ -191,6 +192,11 @@ export class DatabaseStorage implements IStorage {
 
   async getSettings(userId: string): Promise<Settings | undefined> {
     const rows = await db.select().from(settings).where(eq(settings.id, userId));
+    return rows[0];
+  }
+
+  async getSettingsByStripeSubscriptionId(subscriptionId: string): Promise<Settings | undefined> {
+    const rows = await db.select().from(settings).where(eq(settings.stripeSubscriptionId, subscriptionId));
     return rows[0];
   }
 
