@@ -90,6 +90,8 @@ export const settings = pgTable("settings", {
   reminderHoursBefore: integer("reminder_hours_before").default(24),
   subscriptionStatus: text("subscription_status").default("trial"),
   subscriptionPlan: text("subscription_plan").default("free"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
   hipaaCompliant: boolean("hipaa_compliant").default(false),
   dataRetentionDays: integer("data_retention_days").default(365),
   termsAccepted: boolean("terms_accepted").default(false),
