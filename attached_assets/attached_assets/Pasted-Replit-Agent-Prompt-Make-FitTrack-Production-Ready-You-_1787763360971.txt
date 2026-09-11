@@ -1,0 +1,165 @@
+Replit Agent Prompt: Make FitTrack Production-Ready
+
+You are working on my existing FitTrack application, a SaaS dashboard for solo fitness coaches in the UK. Do not rebuild the product from scratch and do not remove existing working functionality. First inspect the current codebase, routes, database schema, authentication flow, styling system, and deployment configuration. Then implement the improvements below directly in the existing app.
+
+The goal is to make FitTrack feel like a trustworthy, production-ready SaaS rather than a prototype, while preserving the current brand direction: clean, modern, energetic, purple/orange gradients, and a simple coach-focused experience.
+
+Non-negotiable implementation rules
+
+Before changing code, identify the framework, entry points, route structure, auth provider, public/static asset directory, and current deployment setup. Reuse existing components and design tokens wherever possible. Do not introduce a second UI framework, duplicate routing system, or unnecessary dependencies.
+
+Do not invent customer claims, compliance certifications, security controls, company details, pricing terms, or legal language. Where the codebase does not contain verified facts, create clear placeholders marked TODO: OWNER INPUT REQUIRED and use conservative wording in the user-facing copy. Do not claim HIPAA compliance unless the existing architecture and policies genuinely support it. For the UK market, describe concrete privacy features rather than presenting GDPR as a certification.
+
+After implementation, run the project’s existing type checks, lint checks, tests, and production build. Fix errors rather than merely reporting them. Test all modified routes at desktop and mobile widths, test keyboard navigation, and verify that every visible CTA and footer link works.
+
+1. Upgrade the public landing page
+
+Keep the existing FitTrack landing page structure, but improve it so visitors can understand the product and trust it before signup.
+
+Change the hero copy to be more specific and outcome-oriented. Use this direction unless the existing brand voice requires a small refinement:
+
+
+The simple business hub for independent fitness coaches.Manage clients, bookings, PARQ forms, invoices, and payments in one place—without stitching together spreadsheets and five different apps.
+
+Keep the free offer prominent: free for the first five clients, no credit card required, and cancel anytime only if that is factually true in the current billing implementation. Keep one primary CTA, such as Start free with 5 clients, and one secondary CTA, such as See the dashboard.
+
+Add a real product-proof section directly in or immediately below the hero. Use existing screenshots if they exist. If they do not exist, create a polished CSS-based dashboard preview using the actual product vocabulary and realistic but clearly illustrative sample data. It should show a weekly calendar, client list, upcoming session, outstanding invoice, and a PARQ/onboarding status. Do not use fake customer logos or fabricated performance statistics.
+
+Add a concise “How it works” section with three steps: add your clients, run bookings and forms, get paid and track revenue. Add a “Why coaches switch” section that explains the specific alternative to spreadsheets and multiple disconnected tools. Focus on fewer tools, faster onboarding, direct debit, PARQ collection, invoicing, and a coach-sized client limit.
+
+Keep the existing feature grid, but rewrite each feature around a user outcome. Include client management, scheduling, invoices and payments, PARQ forms, automated emails, and revenue tracking. Every feature card should have a readable heading, a concise explanation, and a meaningful icon with accessible labeling if the icon is not decorative.
+
+Strengthen the testimonials section without inventing evidence. Keep current testimonials only if they are genuine and approved for publication. Otherwise label them as pilot feedback or replace them with an honest “Built around coach workflows” section. If genuine customer evidence is available, support each testimonial with the person’s approved name, role, location, optional photo, and a specific result. Do not imply independent verification unless it exists.
+
+Add an FAQ section covering the following questions: who FitTrack is for; what is included in the free plan; how client limits work; whether clients need their own login; how payments and GoCardless work; how PARQ and health information are handled; how data can be exported or deleted; what happens when a user cancels or downgrades; whether VAT or payment-provider fees apply; and how support is contacted. Use accessible accordion components with keyboard support and correct ARIA state attributes.
+
+2. Make pricing precise and trustworthy
+
+Keep the existing pricing structure only if it matches the actual billing implementation: Free up to 5 clients, Starter up to 10, Professional up to 20, and Business up to 50. Make the following terms explicit on the page:
+
+•
+Whether prices are monthly, annual, or both.
+
+•
+Whether VAT is included or added.
+
+•
+Whether payment-provider transaction fees are separate.
+
+•
+The exact length of any free trial.
+
+•
+What happens when a user reaches a client limit.
+
+•
+What happens to existing data after downgrade or cancellation.
+
+•
+Whether plans can be changed immediately and how billing adjustments work.
+
+•
+What “priority support” means, including an honest expected response time.
+
+Do not say “all plans include a free trial” unless the application really provides that trial. If the trial length is not known, replace it with a TODO: OWNER INPUT REQUIRED placeholder in an internal configuration constant and use neutral public copy until confirmed.
+
+Keep the Professional plan visually highlighted only if it is genuinely the recommended plan. Add a clear comparison of which features are included in each tier. Ensure the pricing cards remain readable and usable on narrow screens: stack them vertically, preserve the plan CTA, and avoid horizontal overflow.
+
+3. Fix legal, support, and company trust signals
+
+The footer must contain real, keyboard-accessible links for Privacy, Terms, and Support. These must not be plain text. Create routes or pages for /privacy, /terms, and /support if they do not already exist. Use the application’s existing routing approach.
+
+The Privacy page should include clearly marked owner-review placeholders where facts are unknown. It should cover the categories of data collected, client health/PARQ information, billing and payment data, purposes of processing, processors/subprocessors, retention, deletion/export, user rights, cookies/analytics, contact details, and effective date. Do not make legal conclusions or promise a specific hosting location unless verified.
+
+The Terms page should include placeholders for the legal operator name, contact address, governing law, account responsibilities, acceptable use, subscriptions, billing, cancellation, intellectual property, limitation of liability, and contact route. Do not fabricate a company registration number.
+
+The Support page should provide a real support mechanism if one exists in the codebase. Otherwise create a clear support email placeholder marked TODO: OWNER INPUT REQUIRED instead of displaying a broken link. Include expected response time only if the owner has supplied it.
+
+Add the legal operator or responsible business identity in the footer once the owner’s verified details are available. Until then, do not invent one. Preserve a concise footer statement such as “Built for independent coaches in the UK,” but do not present that statement as proof of compliance.
+
+Replace ambiguous copy such as 100% client data stays yours with precise capability language. Use wording such as Export or delete your data anytime only if that functionality exists. Otherwise use Your data is kept separate from other customers only if that is verified, or add an owner-review placeholder.
+
+4. Correct compliance and security wording
+
+Remove or revise any broad HIPAA/GDPR tools claim. Use precise language such as Privacy controls for managing client records or Tools to help you manage consent, forms, and data requests, but only where those features actually exist.
+
+Add a compact security and privacy section explaining only verified controls. Possible topics include encrypted transport, access control, backups, audit logs, export/deletion, payment-provider handling, and subprocessors. Each item must be derived from the actual code and deployment configuration. If a control cannot be verified, label it TODO: OWNER INPUT REQUIRED rather than claiming it.
+
+Add a visible disclaimer that FitTrack provides software tools and does not itself provide legal, medical, or financial advice. Do not make medical claims about PARQ forms.
+
+5. Improve signup and onboarding
+
+Keep the existing Replit authentication integration if replacing it is not possible in the current project, but make the transition feel intentional and branded. Ensure the OAuth application name, callback, logo, and product name consistently say FitTrack rather than Coach Hub if the product is branded FitTrack. If the auth provider cannot be renamed from within the codebase, add a short pre-auth message explaining that account creation is securely handled by the authentication provider.
+
+After successful signup, route the user to a guided first-run checklist rather than an unexplained empty dashboard. The checklist should guide the user through: setting business details and timezone; adding the first client; creating a service or package; setting availability; sending a PARQ form; and creating the first invoice or booking. Show progress, allow users to skip steps, and persist completion state using the existing data layer.
+
+Define and instrument activation events using the project’s existing analytics approach, if present. Track signup started, signup completed, first client created, first booking created, first PARQ form sent, first invoice created, and first payment initiated. Do not add invasive tracking or send health information to analytics providers.
+
+6. Accessibility and responsive behavior
+
+Use semantic HTML throughout the public page. Maintain exactly one meaningful H1. Use H2 headings for major sections and H3 headings for cards or subsections. Ensure all interactive elements are actual links or buttons with visible focus states.
+
+Verify that keyboard users can reach and operate the navigation, CTAs, FAQ accordions, pricing controls, auth links, and footer links. Do not rely on color alone to communicate the recommended plan or status. Check contrast for text, buttons, gradients, muted copy, and badges. Add accessible names to icon-only controls and mark decorative SVGs as hidden from assistive technology.
+
+At mobile widths, prevent horizontal scrolling. Ensure the navigation collapses or wraps cleanly, hero copy remains readable, pricing cards stack, FAQ content is usable, and CTA buttons have adequate tap targets. Respect prefers-reduced-motion for animated gradients or transitions.
+
+7. SEO and public deployment hygiene
+
+Improve the document metadata for the public landing page. Use a title similar to FitTrack | Coaching Business Software for Independent Fitness Coaches and a meta description similar to FitTrack helps UK fitness coaches manage clients, bookings, PARQ forms, invoices, and payments in one simple dashboard. Keep the wording truthful and within normal search-snippet length.
+
+Add a canonical URL for the preferred production domain, but make it configurable through an environment variable or central site configuration. Do not hard-code a temporary Replit URL if a production domain is available.
+
+Create a real /robots.txt response with appropriate directives and a sitemap URL. Create a valid /sitemap.xml containing the public landing page and the public privacy, terms, support, and pricing routes if those routes are indexable. Do not include authenticated dashboard routes, callback routes, or private client data paths. If the framework uses a catch-all client route, configure these endpoints before the catch-all so they return the correct content type and body rather than the app HTML shell.
+
+Add Open Graph and Twitter metadata for the landing page. If no approved social preview image exists, create a simple branded preview using the existing logo/colors and ensure it contains no unverifiable claims.
+
+Review the public response headers and configure, where supported by the current deployment, X-Content-Type-Options: nosniff, a suitable Content Security Policy, Referrer-Policy, and Permissions-Policy. Do not break OAuth, payment-provider, font, analytics, or WebSocket functionality. Document any header that must be configured at the Replit/deployment layer rather than in application code.
+
+8. Production QA checklist
+
+Before declaring the work complete, verify all of the following:
+
+1.
+The public landing page loads without a blank state or console errors.
+
+2.
+Every CTA goes to the intended signup route.
+
+3.
+The authentication callback returns the user to the app correctly.
+
+4.
+The dashboard still supports existing client, scheduling, invoice, PARQ, email, and revenue workflows.
+
+5.
+Privacy, Terms, and Support are real working links.
+
+6.
+/robots.txt is plain text and /sitemap.xml is valid XML.
+
+7.
+Authenticated and private routes are absent from the sitemap.
+
+8.
+Pricing language matches the actual billing implementation.
+
+9.
+No unsupported GDPR, HIPAA, security, customer, or data-ownership claims remain.
+
+10.
+The page works at desktop, tablet, and mobile widths without horizontal overflow.
+
+11.
+Keyboard navigation and visible focus states work across all public interactions.
+
+12.
+Type checking, linting, tests, and production build pass.
+
+13.
+The browser console has no new errors or failed critical network requests.
+
+14.
+All owner-input placeholders are collected in one clearly named file or configuration section so they can be completed before launch.
+
+At the end, provide a concise implementation summary listing changed files, routes added or modified, environment variables required, owner-input placeholders still outstanding, tests run, and any deployment-level steps that must be completed in Replit.
+

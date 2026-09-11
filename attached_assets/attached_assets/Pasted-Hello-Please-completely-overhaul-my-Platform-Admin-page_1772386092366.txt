@@ -1,0 +1,38 @@
+Hello! Please completely overhaul my "Platform Admin" page to turn it into a functional, interactive admin panel for me, the platform owner. The goal is to allow me to manage users and troubleshoot support issues.
+
+Please implement the following features:
+
+**1. Make the Coaches List Interactive**
+
+*   In the "Registered Coaches" table, make each coach's row clickable.
+*   Clicking a row should navigate to a new page: `/admin/coaches/[coachId]`.
+
+**2. Create a Detailed Coach View Page (`/admin/coaches/[coachId]`)**
+
+This page should display all information related to a single coach. It should have the following sections:
+
+*   **Coach Details:**
+    *   Display the coach's Name, Email, and Join Date.
+    *   Add an "Edit" button that allows me to update the coach's name and email address.
+*   **Client List:**
+    *   Show a table of all clients belonging to this coach.
+    *   Make each client row clickable, leading to a detailed client view (`/admin/coaches/[coachId]/clients/[clientId]`).
+*   **Account Stats:**
+    *   Show key stats for this coach: Total Clients, Total Sessions Booked, and Total Revenue Processed.
+
+**3. Implement a User Impersonation Feature**
+
+This is the most important feature. I need to be able to view the app as if I were one of my coaches.
+
+*   On the detailed coach view page (`/admin/coaches/[coachId]`), add a button that says "Impersonate Coach".
+*   When I click this button, my admin session should be temporarily switched to that coach's session. I should be redirected to the normal coach dashboard, seeing everything exactly as they would see it.
+*   When in impersonation mode, display a persistent banner at the top of the screen that says "You are impersonating [Coach Name]. Click here to exit." Clicking this banner should end the impersonation session and return me to my admin panel.
+
+**4. Enhance the Main Admin Dashboard**
+
+On the main `/admin` dashboard, please add the following:
+
+*   **User Search:** Add a search bar above the "Registered Coaches" table that allows me to filter the list by coach name or email.
+*   **System Status Links:** Make the items in the "System" section (Auth Provider, Email Provider, Payment Provider) links to their respective service dashboards (e.g., GoCardless dashboard, Brevo dashboard). This allows me to quickly check their status if there's an issue.
+
+Please ensure all new pages are protected by the existing admin-only access rule.
