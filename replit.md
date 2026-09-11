@@ -1,4 +1,4 @@
-# FitTrack - Solo Coach Dashboard
+# Practably - Solo Coach Dashboard
 
 ## Overview
 A fitness trainer app designed for solo coaches managing in-person and online clients. Features authentication via Replit Auth, client management with health forms (PARQs), editable notes within client profiles, flexible payment options (block sessions and monthly billing), full invoice management (view/edit/download/send), configurable currency (£/$/€), UK date formats, HIPAA compliance options, notification settings, mass client email announcements, and calendar availability blocking.
