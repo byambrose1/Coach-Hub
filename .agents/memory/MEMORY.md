@@ -1,1 +1,2 @@
 - [Logging guard approvals](logging-guard-approvals.md) — server logging safety is default-deny; approve exact safe expressions, never whole functions.
+- [GitHub upload layout](github-upload-layout.md) — verify the workflow root before syncing; uploads can create inactive nested client/server copies.

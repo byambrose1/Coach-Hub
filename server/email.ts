@@ -22,8 +22,8 @@ interface InvoiceEmailData {
 
 export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
   const { clientName, clientEmail, invoiceNumber, amount, currency, dueDate, notes, trainerName, businessName, businessAddress, trainerEmail, paymentLink } = data;
-  const senderName = businessName || trainerName || "FitTrack";
-  const senderEmail = trainerEmail || "noreply@fittrack.app";
+  const senderName = businessName || trainerName || "Practably";
+  const senderEmail = trainerEmail || "noreply@practably.app";
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
@@ -58,7 +58,7 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
       <p style="color:#555;font-size:14px;">If you have any questions, please don't hesitate to get in touch.</p>
       <p style="color:#333;font-size:14px;">Thank you,<br><strong>${trainerName}</strong></p>
     </div>
-    <div class="footer">${businessAddress ? `<p>${businessAddress}</p>` : ""}<p>Sent via FitTrack</p></div>
+    <div class="footer">${businessAddress ? `<p>${businessAddress}</p>` : ""}<p>Sent via Practably</p></div>
   </div>
   </body></html>`;
 
@@ -86,8 +86,8 @@ export async function sendBookingNotificationEmail(data: {
   trainerEmail?: string;
 }): Promise<void> {
   const { clientName, clientEmail, sessionDate, sessionTime, trainerName, businessName, trainerEmail } = data;
-  const senderName = businessName || trainerName || "FitTrack";
-  const senderEmail = trainerEmail || "noreply@fittrack.app";
+  const senderName = businessName || trainerName || "Practably";
+  const senderEmail = trainerEmail || "noreply@practably.app";
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
@@ -105,7 +105,7 @@ export async function sendBookingNotificationEmail(data: {
       <p><strong>Time:</strong> ${sessionTime}</p>
     </div>
     <p>We look forward to seeing you then!</p>
-    <div class="footer"><p>Sent via FitTrack by ${senderName}</p></div>
+    <div class="footer"><p>Sent via Practably by ${senderName}</p></div>
   </div>
   </body></html>`;
 
@@ -132,8 +132,8 @@ export async function sendSessionCancellationEmail(data: {
   trainerEmail?: string;
 }): Promise<void> {
   const { clientName, clientEmail, sessionDate, sessionTime, trainerName, businessName, trainerEmail } = data;
-  const senderName = businessName || trainerName || "FitTrack";
-  const senderEmail = trainerEmail || "noreply@fittrack.app";
+  const senderName = businessName || trainerName || "Practably";
+  const senderEmail = trainerEmail || "noreply@practably.app";
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
@@ -151,7 +151,7 @@ export async function sendSessionCancellationEmail(data: {
       <p><strong>Time:</strong> ${sessionTime}</p>
     </div>
     <p>Please contact <strong>${trainerName}</strong> to reschedule if needed.</p>
-    <div class="footer"><p>Sent via FitTrack by ${senderName}</p></div>
+    <div class="footer"><p>Sent via Practably by ${senderName}</p></div>
   </div>
   </body></html>`;
 
@@ -180,8 +180,8 @@ export async function sendSessionRescheduleEmail(data: {
   trainerEmail?: string;
 }): Promise<void> {
   const { clientName, clientEmail, newDate, newTime, oldDate, oldTime, trainerName, businessName, trainerEmail } = data;
-  const senderName = businessName || trainerName || "FitTrack";
-  const senderEmail = trainerEmail || "noreply@fittrack.app";
+  const senderName = businessName || trainerName || "Practably";
+  const senderEmail = trainerEmail || "noreply@practably.app";
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
@@ -200,7 +200,7 @@ export async function sendSessionRescheduleEmail(data: {
       <p><strong>New Time:</strong> ${newTime}</p>
     </div>
     <p>Please let us know if this new time doesn't work for you.</p>
-    <div class="footer"><p>Sent via FitTrack by ${senderName}</p></div>
+    <div class="footer"><p>Sent via Practably by ${senderName}</p></div>
   </div>
   </body></html>`;
 
@@ -228,8 +228,8 @@ export async function sendLowSessionsEmail(data: {
   paymentLink?: string;
 }): Promise<void> {
   const { clientName, clientEmail, packageName, remainingSessions, trainerName, businessName, trainerEmail, paymentLink } = data;
-  const senderName = businessName || trainerName || "FitTrack";
-  const senderEmail = trainerEmail || "noreply@fittrack.app";
+  const senderName = businessName || trainerName || "Practably";
+  const senderEmail = trainerEmail || "noreply@practably.app";
   const sessionWord = remainingSessions === 1 ? "session" : "sessions";
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -259,7 +259,7 @@ export async function sendLowSessionsEmail(data: {
       ${paymentLink ? `<p style="text-align:center;"><a href="${paymentLink}" class="renew-button">Renew Sessions</a></p>` : ""}
       <p style="color:#333;font-size:14px;">Thank you,<br><strong>${trainerName}</strong></p>
     </div>
-    <div class="footer"><p>Sent via FitTrack by ${senderName}</p></div>
+    <div class="footer"><p>Sent via Practably by ${senderName}</p></div>
   </div>
   </body></html>`;
 
@@ -286,8 +286,8 @@ export async function sendBroadcastEmail(data: {
   trainerEmail?: string;
 }): Promise<{ sent: number; failed: number }> {
   const { subject, message, recipients, trainerName, businessName, trainerEmail } = data;
-  const senderName = businessName || trainerName || "FitTrack";
-  const senderEmail = trainerEmail || "noreply@fittrack.app";
+  const senderName = businessName || trainerName || "Practably";
+  const senderEmail = trainerEmail || "noreply@practably.app";
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
@@ -300,7 +300,7 @@ export async function sendBroadcastEmail(data: {
   <div class="container">
     <div class="header"><h1>${senderName}</h1></div>
     <div class="body">${message.replace(/\n/g, "<br/>")}</div>
-    <div class="footer"><p>Message from ${trainerName} via FitTrack</p></div>
+    <div class="footer"><p>Message from ${trainerName} via Practably</p></div>
   </div>
   </body></html>`;
 
@@ -333,8 +333,8 @@ export async function sendParqEmail(data: {
   trainerEmail?: string;
 }): Promise<void> {
   const { clientName, clientEmail, trainerName, businessName, trainerEmail } = data;
-  const senderName = businessName || trainerName || "FitTrack";
-  const senderEmail = trainerEmail || "noreply@fittrack.app";
+  const senderName = businessName || trainerName || "Practably";
+  const senderEmail = trainerEmail || "noreply@practably.app";
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
@@ -359,7 +359,7 @@ export async function sendParqEmail(data: {
       <div class="q">7. Do you know of any other reason why you should not do physical activity?</div>
     </div>
     <p style="font-size:13px;color:#666;">Please reply to this email or contact ${trainerName} with your responses before your first session.</p>
-    <div class="footer"><p>Sent via FitTrack by ${senderName}</p></div>
+    <div class="footer"><p>Sent via Practably by ${senderName}</p></div>
   </div>
   </body></html>`;
 

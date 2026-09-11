@@ -36,7 +36,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">CH</span>
+            <span className="text-primary-foreground font-bold text-sm">Pr</span>
           </div>
           <div>
             <h2 className="font-semibold text-sm leading-tight" data-testid="text-app-name">{siteConfig.name}</h2>
