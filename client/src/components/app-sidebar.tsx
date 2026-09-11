@@ -1,6 +1,7 @@
 import { Calendar, Users, CreditCard, Settings, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { siteConfig } from "@/config/site";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sidebar,
@@ -35,10 +36,10 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">FT</span>
+            <span className="text-primary-foreground font-bold text-sm">CH</span>
           </div>
           <div>
-            <h2 className="font-semibold text-sm leading-tight" data-testid="text-app-name">FitTrack</h2>
+            <h2 className="font-semibold text-sm leading-tight" data-testid="text-app-name">{siteConfig.name}</h2>
             <p className="text-xs text-muted-foreground">Coach Dashboard</p>
           </div>
         </div>

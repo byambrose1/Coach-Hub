@@ -1,10 +1,10 @@
 export const OWNER_INPUT_REQUIRED = "TODO: OWNER INPUT REQUIRED";
 
 export const siteConfig = {
-  name: "FitTrack",
+  name: "Coach Hub",
   tagline: "The simple business hub for independent fitness coaches.",
   description:
-    "FitTrack helps UK fitness coaches manage clients, bookings, PARQ forms, invoices, and payments in one simple dashboard.",
+    "Coach Hub helps UK fitness coaches manage clients, bookings, PARQ forms, invoices, and payments in one simple dashboard.",
   siteUrl: import.meta.env.VITE_SITE_URL || "",
   supportEmail: OWNER_INPUT_REQUIRED,
   legalOperator: OWNER_INPUT_REQUIRED,

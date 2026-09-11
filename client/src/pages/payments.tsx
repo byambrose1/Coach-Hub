@@ -17,6 +17,7 @@ import { Plus, Package, CreditCard, AlertTriangle, FileText, Clock, CheckCircle,
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import type { Client, Package as PackageType, Settings, Invoice, Session } from "@shared/schema";
 import { trackActivationEvent } from "@/lib/activation";
+import { siteConfig } from "@/config/site";
 
 function formatDateUK(dateStr: string): string {
   try {
@@ -448,7 +449,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
             <p style="font-size:14px;color:#666;">Invoice No: <strong>${invoice.invoiceNumber}</strong></p>
           </div>
           <div class="business-info">
-            <h2>${settings?.businessName || "FitTrack"}</h2>
+            <h2>${settings?.businessName || siteConfig.name}</h2>
             <p>${settings?.trainerName || "Coach"}</p>
             ${settings?.trainerEmail ? `<p>${settings.trainerEmail}</p>` : ""}
             ${settings?.trainerPhone ? `<p>${settings.trainerPhone}</p>` : ""}
@@ -489,7 +490,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
         ${settings?.paymentLink ? `<p style="font-size:13px;color:#666;">Pay online: <a href="${settings.paymentLink}" style="color:#2563eb;">${settings.paymentLink}</a></p>` : ""}
         <div class="footer">
           <p>Thank you for your business</p>
-          <p>${settings?.businessName || "FitTrack"} · Generated on ${formatDateUK(new Date().toISOString().split("T")[0])}</p>
+          <p>${settings?.businessName || siteConfig.name} · Generated on ${formatDateUK(new Date().toISOString().split("T")[0])}</p>
         </div>
         <div class="no-print" style="margin-top:30px;text-align:center;">
           <button onclick="window.print()" style="padding:10px 30px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Print / Save as PDF</button>

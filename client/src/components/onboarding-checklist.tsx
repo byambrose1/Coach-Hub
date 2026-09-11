@@ -13,6 +13,7 @@ import {
   type OnboardingProgress,
 } from "@/lib/onboarding-progress";
 import type { Settings } from "@shared/schema";
+import { siteConfig } from "@/config/site";
 
 const steps = [
   { id: "business", label: "Set your business details and timezone", href: "/settings" },
@@ -59,7 +60,7 @@ export function OnboardingChecklist() {
           <div className="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-violet-700">
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> First steps
           </div>
-          <CardTitle className="text-lg">Make FitTrack work for your coaching business</CardTitle>
+          <CardTitle className="text-lg">Make {siteConfig.name} work for your coaching business</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">Complete the essentials at your own pace. You can skip this checklist anytime.</p>
         </div>
         <Button variant="ghost" size="icon" aria-label={collapsed ? "Expand setup checklist" : "Collapse setup checklist"} onClick={() => setCollapsed(!collapsed)}>

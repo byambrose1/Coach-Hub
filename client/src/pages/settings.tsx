@@ -25,6 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Save, User, FileText, CreditCard, Bell, Shield, Trash2, Mail, Phone, MapPin, Receipt, Crown, ArrowUp, ArrowDown, ExternalLink, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Settings } from "@shared/schema";
+import { siteConfig } from "@/config/site";
 
 interface Tier {
   name: string;
@@ -586,7 +587,7 @@ export default function SettingsPage() {
             <Shield className="w-4 h-4" />
             Privacy controls
           </CardTitle>
-          <CardDescription>Review how you collect and manage client information in FitTrack.</CardDescription>
+          <CardDescription>Review how you collect and manage client information in {siteConfig.name}.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2 rounded-md border p-4">
