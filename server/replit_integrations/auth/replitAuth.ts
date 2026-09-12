@@ -7,16 +7,35 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { authStorage } from "./storage";
+import { logError } from "../../safe-logging";
 
-const getOidcConfig = memoize(
-  async () => {
-    return await client.discovery(
-      new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
-      process.env.REPL_ID!
-    );
-  },
-  { maxAge: 3600 * 1000 }
-);
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// OIDC discovery hits Replit's own identity service over the network at startup.
+// A transient blip there should not take the whole app down - retry a few times
+// with backoff before giving up. Once it succeeds, memoize() below caches the
+// result for an hour so we are not re-discovering on every request.
+async function discoverWithRetry(attempts = 3, baseDelayMs = 1000) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await client.discovery(
+        new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
+        process.env.REPL_ID!
+      );
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        await sleep(baseDelayMs * attempt);
+      }
+    }
+  }
+  throw lastError;
+}
+
+const getOidcConfig = memoize(discoverWithRetry, { maxAge: 3600 * 1000 });
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -66,7 +85,26 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  const config = await getOidcConfig();
+  let config: Awaited<ReturnType<typeof getOidcConfig>>;
+  try {
+    config = await getOidcConfig();
+  } catch (error) {
+    // Sign-in depends on Replit's identity service being reachable. If it is
+    // down or unreachable after retries, keep the rest of the app (marketing
+    // pages, already-authenticated sessions using a cached token) working
+    // instead of crashing the whole process, and fail sign-in explicitly.
+    console.error("Auth setup failed: could not reach the sign-in provider.");
+    logError("OIDC discovery failed at startup", error);
+    const unavailable: RequestHandler = (_req, res) => {
+      res.status(503).json({
+        message: "Sign-in is temporarily unavailable. Please try again shortly.",
+      });
+    };
+    app.get("/api/login", unavailable);
+    app.get("/api/callback", unavailable);
+    app.get("/api/logout", unavailable);
+    return;
+  }
 
   const verify: VerifyFunction = async (
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
