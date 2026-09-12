@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage as defaultStorage, type IStorage } from "./storage";
-import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema } from "@shared/schema";
+import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema, type Session } from "@shared/schema";
 import { isAuthenticated as defaultIsAuthenticated } from "./replit_integrations/auth";
 import {
   sendInvoiceEmail as defaultSendInvoiceEmail,
@@ -72,6 +72,45 @@ function withoutOwnershipFields(body: any) {
   return data;
 }
 
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + (minutes || 0);
+}
+
+// Finds a scheduling conflict for a candidate session against the coach's
+// existing sessions: an overlapping time on the same day. Cancelled sessions
+// never conflict. Group sessions are exempt in both directions, since a coach
+// running a group class legitimately has several bookings at the same time -
+// this only guards against accidentally double-booking 1:1/online/outdoor slots,
+// and against booking a real client into time the coach has blocked off.
+function findSchedulingConflict(
+  existingSessions: Session[],
+  candidate: { date: string; startTime: string; endTime: string; sessionType?: string | null },
+  excludeSessionId?: string,
+): Session | null {
+  // Blocking time off is a bulk, coach-only action with no specific client -
+  // it should always succeed even on a day that already has sessions, exactly
+  // like it does today. Only real client bookings get conflict-checked below.
+  if (candidate.sessionType === "blocked") return null;
+
+  const candidateStart = timeToMinutes(candidate.startTime);
+  const candidateEnd = timeToMinutes(candidate.endTime);
+
+  for (const existing of existingSessions) {
+    if (excludeSessionId && existing.id === excludeSessionId) continue;
+    if (existing.date !== candidate.date) continue;
+    if (existing.status === "cancelled") continue;
+    if (existing.sessionType === "group" || candidate.sessionType === "group") continue;
+
+    const existingStart = timeToMinutes(existing.startTime);
+    const existingEnd = timeToMinutes(existing.endTime);
+    if (candidateStart < existingEnd && existingStart < candidateEnd) {
+      return existing;
+    }
+  }
+  return null;
+}
+
 function getRealUserId(req: any): string {
   return req.user?.claims?.sub || "";
 }
@@ -84,6 +123,23 @@ function isOwner(req: any): boolean {
   const userId = getRealUserId(req);
   const ownerId = process.env.OWNER_USER_ID;
   return !!ownerId && userId === ownerId;
+}
+
+// Support staff: comma-separated Replit user IDs in SUPPORT_USER_IDS. They can
+// view coach accounts and use impersonation to help troubleshoot, but cannot
+// see or change platform pricing/tier configuration or a coach's billing plan.
+// Configure this env var with the admin person's Replit user ID once you have it.
+function isSupportStaff(req: any): boolean {
+  const userId = getRealUserId(req);
+  const supportIds = (process.env.SUPPORT_USER_IDS || "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  return supportIds.includes(userId);
+}
+
+function isOwnerOrSupport(req: any): boolean {
+  return isOwner(req) || isSupportStaff(req);
 }
 
 export async function registerRoutes(
@@ -433,8 +489,13 @@ export async function registerRoutes(
   });
 
   // --- Platform Owner Admin ---
+  app.get("/api/platform-admin/role", isAuthenticated, async (req, res) => {
+    if (!isOwnerOrSupport(req)) return res.status(403).json({ message: "Forbidden" });
+    res.json({ role: isOwner(req) ? "owner" : "support" });
+  });
+
   app.get("/api/platform-admin/stats", isAuthenticated, async (req, res) => {
-    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    if (!isOwnerOrSupport(req)) return res.status(403).json({ message: "Forbidden" });
     try {
       const stats = await storage.getPlatformStats();
       res.json(stats);
@@ -444,7 +505,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/platform-admin/users", isAuthenticated, async (req, res) => {
-    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    if (!isOwnerOrSupport(req)) return res.status(403).json({ message: "Forbidden" });
     try {
       const allUsers = await storage.getAllUsers();
       res.json(allUsers);
@@ -454,7 +515,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/platform-admin/config", isAuthenticated, async (req, res) => {
-    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    if (!isOwnerOrSupport(req)) return res.status(403).json({ message: "Forbidden" });
     try {
       const config = await storage.getPlatformConfig();
       res.json(config);
@@ -474,7 +535,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/platform-admin/coaches/:coachId", isAuthenticated, async (req, res) => {
-    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    if (!isOwnerOrSupport(req)) return res.status(403).json({ message: "Forbidden" });
     try {
       const detail = await storage.getCoachDetail(getRouteParam(req.params.coachId));
       if (!detail) return res.status(404).json({ message: "Coach not found" });
@@ -499,7 +560,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/platform-admin/impersonate/:userId", isAuthenticated, async (req, res) => {
-    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    if (!isOwnerOrSupport(req)) return res.status(403).json({ message: "Forbidden" });
     try {
       const targetUserId = getRouteParam(req.params.userId);
       if (targetUserId === getRealUserId(req)) {
@@ -705,6 +766,19 @@ export async function registerRoutes(
     const userId = getUserId(req);
     const parsed = insertSessionSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+
+    const existingSessions = await storage.getSessions(userId);
+    const conflict = findSchedulingConflict(existingSessions, parsed.data);
+    if (conflict) {
+      const isBlocked = conflict.clientId === "__blocked__";
+      return res.status(409).json({
+        message: isBlocked
+          ? `That time overlaps with time you've blocked off (${conflict.startTime}-${conflict.endTime}).`
+          : `That time overlaps with another session (${conflict.startTime}-${conflict.endTime}). Pick a different time or reschedule the existing one first.`,
+        conflictingSessionId: conflict.id,
+      });
+    }
+
     const session = await storage.createSession(userId, parsed.data);
 
     // Deduct 1 session from the client's active block package when booked
@@ -747,6 +821,28 @@ export async function registerRoutes(
     const userId = getUserId(req);
     const existing = await storage.getSession(userId, req.params.id);
     if (!existing) return res.status(404).json({ message: "Session not found" });
+
+    const isReschedule = req.body.date !== undefined || req.body.startTime !== undefined || req.body.endTime !== undefined;
+    if (isReschedule) {
+      const candidate = {
+        date: req.body.date ?? existing.date,
+        startTime: req.body.startTime ?? existing.startTime,
+        endTime: req.body.endTime ?? existing.endTime,
+        sessionType: req.body.sessionType ?? existing.sessionType,
+      };
+      const existingSessions = await storage.getSessions(userId);
+      const conflict = findSchedulingConflict(existingSessions, candidate, existing.id);
+      if (conflict) {
+        const isBlocked = conflict.clientId === "__blocked__";
+        return res.status(409).json({
+          message: isBlocked
+            ? `That time overlaps with time you've blocked off (${conflict.startTime}-${conflict.endTime}).`
+            : `That time overlaps with another session (${conflict.startTime}-${conflict.endTime}). Pick a different time or reschedule the existing one first.`,
+          conflictingSessionId: conflict.id,
+        });
+      }
+    }
+
     const session = await storage.updateSession(userId, req.params.id, withoutOwnershipFields(req.body));
     if (!session) return res.status(404).json({ message: "Session not found" });
 

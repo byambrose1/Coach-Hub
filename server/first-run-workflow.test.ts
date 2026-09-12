@@ -318,6 +318,150 @@ test("creates the first client, booking, PAR-Q form, and invoice", async () => {
   );
 });
 
+test("prevents double-booking overlapping sessions but allows group and non-overlapping bookings", async () => {
+  const clientA = await request("/api/clients", {
+    method: "POST",
+    body: JSON.stringify({ name: "Client A" }),
+  });
+  const clientB = await request("/api/clients", {
+    method: "POST",
+    body: JSON.stringify({ name: "Client B" }),
+  });
+
+  const first = await request("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      clientId: clientA.body.id,
+      title: "Session A",
+      date: "2026-09-21",
+      startTime: "10:00",
+      endTime: "11:00",
+    }),
+  });
+  assert.equal(first.response.status, 201);
+
+  // Overlapping 1:1 session for a different client on the same day: rejected.
+  const overlapping = await request("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      clientId: clientB.body.id,
+      title: "Session B",
+      date: "2026-09-21",
+      startTime: "10:30",
+      endTime: "11:30",
+    }),
+  });
+  assert.equal(overlapping.response.status, 409);
+  assert.equal(overlapping.body.conflictingSessionId, first.body.id);
+
+  // Back-to-back, non-overlapping session on the same day: allowed.
+  const backToBack = await request("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      clientId: clientB.body.id,
+      title: "Session B",
+      date: "2026-09-21",
+      startTime: "11:00",
+      endTime: "12:00",
+    }),
+  });
+  assert.equal(backToBack.response.status, 201);
+
+  // Group sessions are exempt from the overlap check by design.
+  const group = await request("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      clientId: clientB.body.id,
+      title: "Group class",
+      date: "2026-09-21",
+      startTime: "10:00",
+      endTime: "11:00",
+      sessionType: "group",
+    }),
+  });
+  assert.equal(group.response.status, 201);
+
+  // Rescheduling into a conflicting slot is rejected too.
+  const reschedule = await request(`/api/sessions/${backToBack.body.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ startTime: "10:15", endTime: "10:45" }),
+  });
+  assert.equal(reschedule.response.status, 409);
+  assert.equal(reschedule.body.conflictingSessionId, first.body.id);
+
+  // Blocking time off always succeeds, even on a day with existing sessions -
+  // this must not regress.
+  const blocked = await request("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      clientId: "__blocked__",
+      title: "Holiday",
+      date: "2026-09-21",
+      startTime: "00:00",
+      endTime: "23:59",
+      sessionType: "blocked",
+    }),
+  });
+  assert.equal(blocked.response.status, 201);
+
+  // But booking a real client into already-blocked time is rejected.
+  const intoBlockedTime = await request("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      clientId: clientA.body.id,
+      title: "Session on blocked day",
+      date: "2026-09-21",
+      startTime: "14:00",
+      endTime: "15:00",
+    }),
+  });
+  assert.equal(intoBlockedTime.response.status, 409);
+  assert.equal(intoBlockedTime.body.conflictingSessionId, blocked.body.id);
+});
+
+test("marking a session as no-show keeps it deducted from the client's package", async () => {
+  const client = await request("/api/clients", {
+    method: "POST",
+    body: JSON.stringify({ name: "No-show Client" }),
+  });
+
+  const pkg = {
+    id: "no-show-pkg",
+    userId: coachId,
+    clientId: client.body.id,
+    name: "Block of 5",
+    totalSessions: 5,
+    usedSessions: 2,
+    status: "active",
+    billingType: "block",
+  };
+  state.packages.push(pkg);
+
+  const session = await request("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      clientId: client.body.id,
+      title: "Session likely to be missed",
+      date: "2026-09-22",
+      startTime: "09:00",
+      endTime: "10:00",
+    }),
+  });
+  assert.equal(session.response.status, 201);
+  // Booking deducts one session from the active block package.
+  assert.equal(pkg.usedSessions, 3);
+
+  const noShow = await request(`/api/sessions/${session.body.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "no_show" }),
+  });
+  assert.equal(noShow.response.status, 200);
+  assert.equal(noShow.body.status, "no_show");
+  // Unlike a cancellation (which restores the session by default), a
+  // no-show keeps the slot counted as used - the coach held the time.
+  assert.equal(pkg.usedSessions, 3);
+});
+
 test("payment provider failures return a stable response without provider details", async () => {
   const client = state.clients[0];
   const result = await request("/api/payments/create-mandate-link", {

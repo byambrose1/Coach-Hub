@@ -64,7 +64,15 @@ app.use(createApiRequestLogger(log));
 
 (async () => {
   const { setupAuth, registerAuthRoutes } = await import("./replit_integrations/auth");
-  await setupAuth(app);
+  try {
+    await setupAuth(app);
+  } catch (error) {
+    // setupAuth already handles the expected "sign-in provider unreachable"
+    // case internally and returns instead of throwing. This catch is a last
+    // line of defense against anything else unexpected during auth startup -
+    // the rest of the app (routes, static assets) should still come up.
+    logError("Unexpected error during auth setup", error);
+  }
   registerAuthRoutes(app);
 
   const { seedDatabase } = await import("./seed");
