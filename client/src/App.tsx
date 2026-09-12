@@ -25,7 +25,6 @@ import type { Settings } from "@shared/schema";
 import { apiRequest } from "./lib/queryClient";
 import { PrivacyPage, TermsPage, SupportPage } from "@/pages/public";
 import { trackActivationEvent } from "@/lib/activation";
-import { siteConfig } from "@/config/site";
 
 function TermsModal() {
   const { isAuthenticated } = useAuth();
@@ -64,12 +63,12 @@ function TermsModal() {
             <ShieldCheck className="w-5 h-5 text-primary" />
             Terms and Conditions
           </DialogTitle>
-          <DialogDescription>Please review and accept the {siteConfig.name} terms to continue.</DialogDescription>
+          <DialogDescription>Please review and accept the Practably terms to continue.</DialogDescription>
         </DialogHeader>
         <div className="p-4 border rounded-md text-sm space-y-3">
           <p>
             Review the current{" "}
-            <a href="/terms" target="_blank" rel="noreferrer" className="text-primary underline">{siteConfig.name} Terms</a>
+            <a href="/terms" target="_blank" rel="noreferrer" className="text-primary underline">Practably Terms</a>
             {" "}and{" "}
             <a href="/privacy" target="_blank" rel="noreferrer" className="text-primary underline">Privacy information</a>
             {" "}before continuing.
@@ -79,7 +78,7 @@ function TermsModal() {
         <div className="flex items-center space-x-2 py-4">
           <Checkbox id="terms" checked={agreed} onCheckedChange={(v) => setAgreed(!!v)} />
           <label htmlFor="terms" className="text-sm font-medium leading-none cursor-pointer">
-            I have read and agree to the {siteConfig.name} Terms
+            I have read and agree to the Practably Terms
           </label>
         </div>
         <DialogFooter>
