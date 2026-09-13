@@ -5,7 +5,7 @@ import { QueryClientProvider, useQuery, useMutation } from "@tanstack/react-quer
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppSidebar } from "@/app-sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2, ShieldCheck, AlertTriangle, X } from "lucide-react";
 import NotFound from "@/pages/not-found";
@@ -14,7 +14,7 @@ import Schedule from "@/pages/schedule";
 import Clients from "@/pages/clients";
 import Payments from "@/pages/payments";
 import SettingsPage from "@/pages/settings";
-import Landing from "@/pages/landing";
+import Landing from "@/landing";
 import Admin from "@/pages/admin";
 import PlatformAdmin from "@/pages/platform-admin";
 import PlatformAdminCoach from "@/pages/platform-admin-coach";
