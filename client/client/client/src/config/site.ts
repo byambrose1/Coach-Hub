@@ -6,15 +6,15 @@ export const siteConfig = {
   description:
     "Practably helps UK coaches manage clients, bookings, PARQ forms, invoices, and payments in one simple dashboard.",
   siteUrl: import.meta.env.VITE_SITE_URL || "",
-  supportEmail: OWNER_INPUT_REQUIRED,
-  legalOperator: OWNER_INPUT_REQUIRED,
-  contactAddress: OWNER_INPUT_REQUIRED,
-  governingLaw: OWNER_INPUT_REQUIRED,
-  effectiveDate: OWNER_INPUT_REQUIRED,
-  vatTreatment: OWNER_INPUT_REQUIRED,
-  paymentProviderFees: OWNER_INPUT_REQUIRED,
-  paidPlanSupportResponse: OWNER_INPUT_REQUIRED,
-  retentionPolicy: OWNER_INPUT_REQUIRED,
+  supportEmail: "contact@practably.co.uk",
+  legalOperator: "ElectriSoul Limited",
+  contactAddress: "Unit 29 Highcroft Industrial Estate, Enterprise Road, Waterlooville, England, PO8 0BT",
+  governingLaw: "England and Wales",
+  effectiveDate: "13 September 2026",
+  vatTreatment: "Practably is not VAT-registered, so no VAT is added to these prices.",
+  paymentProviderFees: "Coach subscriptions are billed via Stripe. Direct debit payments from your clients are processed via GoCardless. Both providers charge their own standard transaction fees, which are separate from your Practably subscription price.",
+  paidPlanSupportResponse: "We aim to reply within 4 hours. Messages sent after 8pm GMT are answered the next morning.",
+  retentionPolicy: "30 days after account closure, after which client data is deleted",
   subprocessors: "Replit Auth, PostgreSQL, Brevo, and GoCardless are used where enabled.",
 };
 
@@ -49,7 +49,7 @@ export const pricingTiers = [
     period: "/ month",
     clients: "Up to 50 clients",
     description: "For larger rosters that still want a coach-sized tool.",
-    features: ["50 client records", "Everything in Professional", "Advanced revenue views", "Custom business details", `${OWNER_INPUT_REQUIRED}: priority support terms`],
+    features: ["50 client records", "Everything in Professional", "Advanced revenue views", "Custom business details", "Priority support: response within 4 hours"],
   },
 ];
 
