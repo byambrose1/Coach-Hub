@@ -167,13 +167,13 @@ export const platformConfig = pgTable("platform_config", {
   tier1Price: text("tier1_price").default("0"),
   tier1PaymentLink: text("tier1_payment_link").default(""),
   tier2MaxClients: integer("tier2_max_clients").default(10),
-  tier2Price: text("tier2_price").default("1.99"),
+  tier2Price: text("tier2_price").default("3.99"),
   tier2PaymentLink: text("tier2_payment_link").default(""),
   tier3MaxClients: integer("tier3_max_clients").default(20),
-  tier3Price: text("tier3_price").default("4.99"),
+  tier3Price: text("tier3_price").default("7.99"),
   tier3PaymentLink: text("tier3_payment_link").default(""),
   tier4MaxClients: integer("tier4_max_clients").default(50),
-  tier4Price: text("tier4_price").default("7.99"),
+  tier4Price: text("tier4_price").default("12.99"),
   tier4PaymentLink: text("tier4_payment_link").default(""),
 });
 
