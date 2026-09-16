@@ -40,6 +40,7 @@ export interface IStorage {
 
   getSettings(userId: string): Promise<Settings | undefined>;
   getSettingsByStripeSubscriptionId(subscriptionId: string): Promise<Settings | undefined>;
+  getSettingsByPublicSlug(slug: string): Promise<Settings | undefined>;
   upsertSettings(userId: string, data: InsertSettings): Promise<Settings>;
 
   getClientForms(userId: string): Promise<ClientForm[]>;
@@ -197,6 +198,11 @@ export class DatabaseStorage implements IStorage {
 
   async getSettingsByStripeSubscriptionId(subscriptionId: string): Promise<Settings | undefined> {
     const rows = await db.select().from(settings).where(eq(settings.stripeSubscriptionId, subscriptionId));
+    return rows[0];
+  }
+
+  async getSettingsByPublicSlug(slug: string): Promise<Settings | undefined> {
+    const rows = await db.select().from(settings).where(eq(settings.publicSlug, slug));
     return rows[0];
   }
 

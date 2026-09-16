@@ -319,6 +319,47 @@ export async function registerRoutes(
     }
   });
 
+  // --- Public lead capture (no auth - this is a public application form a
+  // coach can link to from their own website) ---
+  app.get("/api/public/coach/:slug", async (req, res) => {
+    const coachSettings = await storage.getSettingsByPublicSlug(getRouteParam(req.params.slug));
+    if (!coachSettings) return res.status(404).json({ message: "Not found" });
+    res.json({
+      businessName: coachSettings.businessName || coachSettings.trainerName || "this coach",
+    });
+  });
+
+  app.post("/api/public/apply/:slug", async (req, res) => {
+    const coachSettings = await storage.getSettingsByPublicSlug(getRouteParam(req.params.slug));
+    if (!coachSettings) return res.status(404).json({ message: "Not found" });
+
+    // Honeypot: a hidden field real users never fill in. If it has a value,
+    // silently pretend success rather than telling a bot its submission failed.
+    if (req.body.website) {
+      return res.status(201).json({ ok: true });
+    }
+
+    const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
+    if (!name) return res.status(400).json({ message: "Name is required." });
+    const email = typeof req.body.email === "string" ? req.body.email.trim() : undefined;
+    const phone = typeof req.body.phone === "string" ? req.body.phone.trim() : undefined;
+    const applicationMessage = typeof req.body.message === "string" ? req.body.message.trim().slice(0, 2000) : undefined;
+
+    // Leads intentionally bypass the tier client-limit check below - they
+    // aren't a roster client yet, only converting one to "active" should be
+    // blocked by plan capacity.
+    await storage.createClient(coachSettings.id, {
+      name,
+      email,
+      phone,
+      status: "lead",
+      source: "website_application",
+      applicationMessage,
+    } as any);
+
+    res.status(201).json({ ok: true });
+  });
+
   app.post("/api/subscription/checkout", isAuthenticated, async (req, res) => {
     try {
       const userId = getUserId(req);
@@ -588,9 +629,9 @@ export async function registerRoutes(
       const config = await storage.getPlatformConfig();
       res.json([
         { name: "free", label: "Free", max: config.tier1MaxClients ?? 5, price: config.tier1Price ?? "0", paymentLink: config.tier1PaymentLink ?? "" },
-        { name: "starter", label: "Starter", max: config.tier2MaxClients ?? 10, price: config.tier2Price ?? "1.99", paymentLink: config.tier2PaymentLink ?? "" },
-        { name: "professional", label: "Professional", max: config.tier3MaxClients ?? 20, price: config.tier3Price ?? "4.99", paymentLink: config.tier3PaymentLink ?? "" },
-        { name: "business", label: "Business", max: config.tier4MaxClients ?? 50, price: config.tier4Price ?? "7.99", paymentLink: config.tier4PaymentLink ?? "" },
+        { name: "starter", label: "Starter", max: config.tier2MaxClients ?? 10, price: config.tier2Price ?? "3.99", paymentLink: config.tier2PaymentLink ?? "" },
+        { name: "professional", label: "Professional", max: config.tier3MaxClients ?? 20, price: config.tier3Price ?? "7.99", paymentLink: config.tier3PaymentLink ?? "" },
+        { name: "business", label: "Business", max: config.tier4MaxClients ?? 50, price: config.tier4Price ?? "12.99", paymentLink: config.tier4PaymentLink ?? "" },
       ]);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -661,6 +702,56 @@ export async function registerRoutes(
     res.json(client);
   });
 
+// Shared by both new-client creation and lead-to-client conversion. Returns
+// null when there's room on the coach's current plan, or the upgrade-prompt
+// payload (same shape the frontend's upgrade popup expects) when there isn't.
+// Leads don't count against the limit - only active roster clients do.
+async function getTierLimitBlock(userId: string) {
+  const [existingClients, coachSettings, config] = await Promise.all([
+    storage.getClients(userId),
+    storage.getSettings(userId),
+    storage.getPlatformConfig(),
+  ]);
+  const plan = coachSettings?.subscriptionPlan || "free";
+  const tier = PLAN_TIER[plan] || 1;
+  const tierMaxMap: Record<number, number> = {
+    1: config.tier1MaxClients ?? 5,
+    2: config.tier2MaxClients ?? 10,
+    3: config.tier3MaxClients ?? 20,
+    4: config.tier4MaxClients ?? 50,
+  };
+  const currentMax = tierMaxMap[tier];
+  const activeClientCount = existingClients.filter((c) => c.status !== "lead").length;
+  if (activeClientCount < currentMax) return null;
+
+  const nextTier = Math.min(tier + 1, 4);
+  const nextTierMax = tierMaxMap[nextTier];
+  const tierPriceMap: Record<number, string> = {
+    1: config.tier1Price ?? "0",
+    2: config.tier2Price ?? "3.99",
+    3: config.tier3Price ?? "7.99",
+    4: config.tier4Price ?? "12.99",
+  };
+  const tierLinkMap: Record<number, string> = {
+    1: config.tier1PaymentLink ?? "",
+    2: config.tier2PaymentLink ?? "",
+    3: config.tier3PaymentLink ?? "",
+    4: config.tier4PaymentLink ?? "",
+  };
+  const planNames: Record<number, string> = { 1: "free", 2: "starter", 3: "professional", 4: "business" };
+  return {
+    code: "CLIENT_LIMIT_EXCEEDED",
+    currentCount: activeClientCount,
+    currentPlan: plan,
+    currentMax,
+    nextTier,
+    nextTierMax,
+    nextTierPrice: tierPriceMap[nextTier],
+    nextTierPlan: planNames[nextTier],
+    paymentLink: tierLinkMap[nextTier],
+  };
+}
+
   app.post("/api/clients", async (req, res) => {
     const userId = getUserId(req);
     const parsed = insertClientSchema.safeParse(req.body);
@@ -668,48 +759,8 @@ export async function registerRoutes(
 
     // Enforce tier limits
     try {
-      const [existingClients, coachSettings, config] = await Promise.all([
-        storage.getClients(userId),
-        storage.getSettings(userId),
-        storage.getPlatformConfig(),
-      ]);
-      const plan = coachSettings?.subscriptionPlan || "free";
-      const tier = PLAN_TIER[plan] || 1;
-      const tierMaxMap: Record<number, number> = {
-        1: config.tier1MaxClients ?? 5,
-        2: config.tier2MaxClients ?? 10,
-        3: config.tier3MaxClients ?? 20,
-        4: config.tier4MaxClients ?? 50,
-      };
-      const currentMax = tierMaxMap[tier];
-      if (existingClients.length >= currentMax) {
-        const nextTier = Math.min(tier + 1, 4);
-        const nextTierMax = tierMaxMap[nextTier];
-        const tierPriceMap: Record<number, string> = {
-          1: config.tier1Price ?? "0",
-          2: config.tier2Price ?? "1.99",
-          3: config.tier3Price ?? "4.99",
-          4: config.tier4Price ?? "7.99",
-        };
-        const tierLinkMap: Record<number, string> = {
-          1: config.tier1PaymentLink ?? "",
-          2: config.tier2PaymentLink ?? "",
-          3: config.tier3PaymentLink ?? "",
-          4: config.tier4PaymentLink ?? "",
-        };
-        const planNames: Record<number, string> = { 1: "free", 2: "starter", 3: "professional", 4: "business" };
-        return res.status(402).json({
-          code: "CLIENT_LIMIT_EXCEEDED",
-          currentCount: existingClients.length,
-          currentPlan: plan,
-          currentMax,
-          nextTier,
-          nextTierMax,
-          nextTierPrice: tierPriceMap[nextTier],
-          nextTierPlan: planNames[nextTier],
-          paymentLink: tierLinkMap[nextTier],
-        });
-      }
+      const block = await getTierLimitBlock(userId);
+      if (block) return res.status(402).json(block);
     } catch (err) {
       logError("Tier check error", err);
     }
@@ -719,7 +770,23 @@ export async function registerRoutes(
   });
 
   app.patch("/api/clients/:id", async (req, res) => {
-    const client = await storage.updateClient(getUserId(req), req.params.id, withoutOwnershipFields(req.body));
+    const userId = getUserId(req);
+    const existing = await storage.getClient(userId, req.params.id);
+    if (!existing) return res.status(404).json({ message: "Client not found" });
+
+    // Converting a lead into a real roster client should respect the same
+    // plan capacity a brand-new client would - leads themselves don't count,
+    // but accepting one into your active roster does.
+    if (existing.status === "lead" && req.body.status && req.body.status !== "lead") {
+      try {
+        const block = await getTierLimitBlock(userId);
+        if (block) return res.status(402).json(block);
+      } catch (err) {
+        logError("Tier check error", err);
+      }
+    }
+
+    const client = await storage.updateClient(userId, req.params.id, withoutOwnershipFields(req.body));
     if (!client) return res.status(404).json({ message: "Client not found" });
     res.json(client);
   });
@@ -1014,6 +1081,12 @@ export async function registerRoutes(
 
   app.put("/api/settings", async (req, res) => {
     const userId = getUserId(req);
+    if (typeof req.body.publicSlug === "string" && req.body.publicSlug.length > 0) {
+      const holder = await storage.getSettingsByPublicSlug(req.body.publicSlug);
+      if (holder && holder.id !== userId) {
+        return res.status(409).json({ message: "That link name is already taken. Try a different one." });
+      }
+    }
     const s = await storage.upsertSettings(userId, req.body);
     res.json(s);
   });

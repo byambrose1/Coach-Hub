@@ -104,6 +104,9 @@ const storage = {
     state.settings = { ...(state.settings ?? {}), ...data, id: userId };
     return state.settings;
   },
+  async getSettingsByPublicSlug(slug: string) {
+    return state.settings?.publicSlug === slug ? state.settings : undefined;
+  },
   async getClientForms(userId: string) {
     return state.forms.filter((item) => item.userId === userId);
   },
@@ -605,4 +608,88 @@ test("does not allow update bodies to transfer records to another coach", async 
     assert.equal(result.response.status, 200, `PATCH ${path}`);
     assert.equal(record.userId, coachId, `ownership changed for ${path}`);
   }
+});
+
+test("captures website leads without affecting client limits, and enforces the limit on conversion", async () => {
+  const leadCoachId = "lead-test-coach";
+  const authHeaders = { "x-test-coach-id": leadCoachId };
+
+  const settingsUpdate = await request("/api/settings", {
+    method: "PUT",
+    headers: authHeaders,
+    body: JSON.stringify({ businessName: "Jane's Coaching", publicSlug: "jane-coaching" }),
+  });
+  assert.equal(settingsUpdate.response.status, 200);
+
+  // A public visitor (no auth) can look up the coach by their link.
+  const coachLookup = await request("/api/public/coach/jane-coaching");
+  assert.equal(coachLookup.response.status, 200);
+  assert.equal(coachLookup.body.businessName, "Jane's Coaching");
+
+  // A public visitor submits an application.
+  const applied = await request("/api/public/apply/jane-coaching", {
+    method: "POST",
+    body: JSON.stringify({ name: "Prospective Client", email: "prospect@example.test", message: "Looking to get back into training" }),
+  });
+  assert.equal(applied.response.status, 201);
+
+  const clientsAfterApply = await request("/api/clients", { headers: authHeaders });
+  const lead = clientsAfterApply.body.find((c: any) => c.name === "Prospective Client");
+  assert.ok(lead, "lead should appear in the coach's client list");
+  assert.equal(lead.status, "lead");
+  assert.equal(lead.source, "website_application");
+  assert.equal(lead.applicationMessage, "Looking to get back into training");
+
+  // Fill this coach's plan to capacity (free tier max = 5) with real clients.
+  for (let i = 0; i < 5; i++) {
+    const res = await request("/api/clients", {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ name: `Active Client ${i}` }),
+    });
+    assert.equal(res.response.status, 201);
+  }
+
+  // A new lead is still accepted even at capacity - leads don't count against the limit.
+  const secondApplication = await request("/api/public/apply/jane-coaching", {
+    method: "POST",
+    body: JSON.stringify({ name: "Another Prospect" }),
+  });
+  assert.equal(secondApplication.response.status, 201);
+
+  // But converting the earlier lead into an active client is blocked - the
+  // coach is now at their plan's client limit.
+  const conversionBlocked = await request(`/api/clients/${lead.id}`, {
+    method: "PATCH",
+    headers: authHeaders,
+    body: JSON.stringify({ status: "active" }),
+  });
+  assert.equal(conversionBlocked.response.status, 402);
+  assert.equal(conversionBlocked.body.code, "CLIENT_LIMIT_EXCEEDED");
+
+  // Honeypot: a bot filling in the hidden field gets a fake success, but no
+  // client record is actually created.
+  const beforeHoneypot = (await request("/api/clients", { headers: authHeaders })).body.length;
+  const honeypotAttempt = await request("/api/public/apply/jane-coaching", {
+    method: "POST",
+    body: JSON.stringify({ name: "Spam Bot", website: "http://spam.example" }),
+  });
+  assert.equal(honeypotAttempt.response.status, 201);
+  const afterHoneypot = (await request("/api/clients", { headers: authHeaders })).body.length;
+  assert.equal(afterHoneypot, beforeHoneypot, "honeypot submission must not create a client");
+
+  // Applying to a link that doesn't exist returns 404.
+  const badSlug = await request("/api/public/apply/does-not-exist", {
+    method: "POST",
+    body: JSON.stringify({ name: "Nobody" }),
+  });
+  assert.equal(badSlug.response.status, 404);
+
+  // A second coach cannot claim the same link name.
+  const duplicateSlug = await request("/api/settings", {
+    method: "PUT",
+    headers: { "x-test-coach-id": "another-lead-test-coach" },
+    body: JSON.stringify({ publicSlug: "jane-coaching" }),
+  });
+  assert.equal(duplicateSlug.response.status, 409);
 });
