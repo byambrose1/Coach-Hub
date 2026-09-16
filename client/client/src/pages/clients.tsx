@@ -161,7 +161,7 @@ const PARQ_QUESTIONS = [
   "Do you know of any other reason why you should not do physical activity?",
 ];
 
-function ClientDetail({ client, onClose }: { client: Client; onClose: () => void }) {
+function ClientDetail({ client, onClose, onUpgradeRequired }: { client: Client; onClose: () => void; onUpgradeRequired: (info: any) => void }) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -260,6 +260,41 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
     },
     onError: (err: Error) => {
       toast({ title: "Error updating client", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const convertMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/clients/${client.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "active" }),
+        credentials: "include",
+      });
+      if (res.status === 402) {
+        const info = await res.json();
+        const err: any = new Error("limit");
+        err.isLimitError = true;
+        err.info = info;
+        throw err;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || "Unable to convert lead.");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      toast({ title: "Lead converted to client" });
+      onClose();
+    },
+    onError: (err: any) => {
+      if (err.isLimitError) {
+        onUpgradeRequired(err.info);
+        return;
+      }
+      toast({ title: "Error converting lead", description: err.message, variant: "destructive" });
     },
   });
 
@@ -535,6 +570,27 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
             </DialogTitle>
             <DialogDescription className="sr-only">Details for client {currentClient.name}</DialogDescription>
           </DialogHeader>
+
+          {currentClient.status === "lead" && (
+            <div className="rounded-md border border-violet-200 bg-violet-50 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-sm font-medium text-violet-900">
+                  New lead{currentClient.source === "website_application" ? ", applied via your website" : ""}
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => convertMutation.mutate()}
+                  disabled={convertMutation.isPending}
+                  data-testid="button-convert-lead"
+                >
+                  {convertMutation.isPending ? "Converting..." : "Convert to client"}
+                </Button>
+              </div>
+              {currentClient.applicationMessage && (
+                <p className="text-sm text-violet-800">"{currentClient.applicationMessage}"</p>
+              )}
+            </div>
+          )}
 
           {showDeleteConfirm && (
             <div className="rounded-md border border-destructive p-4 space-y-3">
@@ -1237,6 +1293,7 @@ export default function Clients() {
   const [search, setSearch] = useState("");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [upgradeInfo, setUpgradeInfo] = useState<any>(null);
+  const [view, setView] = useState<"clients" | "leads">("clients");
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -1251,7 +1308,9 @@ export default function Clients() {
     }
   }, [clients]);
 
-  const filtered = clients.filter((c) =>
+  const leads = clients.filter((c) => c.status === "lead");
+  const activeClients = clients.filter((c) => c.status !== "lead");
+  const filtered = (view === "leads" ? leads : activeClients).filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     (c.email && c.email.toLowerCase().includes(search.toLowerCase()))
   );
@@ -1274,7 +1333,7 @@ export default function Clients() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-clients-title">Clients</h1>
-          <p className="text-sm text-muted-foreground">{clients.length} total clients</p>
+          <p className="text-sm text-muted-foreground">{activeClients.length} client{activeClients.length !== 1 ? "s" : ""}{leads.length > 0 ? `, ${leads.length} new lead${leads.length !== 1 ? "s" : ""}` : ""}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setBroadcastOpen(true)} data-testid="button-send-announcement">
@@ -1288,10 +1347,19 @@ export default function Clients() {
         </div>
       </div>
 
+      <Tabs value={view} onValueChange={(v) => setView(v as "clients" | "leads")}>
+        <TabsList>
+          <TabsTrigger value="clients" data-testid="tab-view-clients">Clients</TabsTrigger>
+          <TabsTrigger value="leads" data-testid="tab-view-leads">
+            Leads{leads.length > 0 ? ` (${leads.length})` : ""}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search clients..."
+          placeholder={view === "leads" ? "Search leads..." : "Search clients..."}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
@@ -1303,7 +1371,11 @@ export default function Clients() {
         <div className="text-center py-12">
           <User className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
           <p className="text-muted-foreground">
-            {search ? "No clients match your search" : "No clients yet. Add your first client to get started."}
+            {search
+              ? `No ${view} match your search`
+              : view === "leads"
+              ? "No leads yet. Share your application link from Settings to start receiving them."
+              : "No clients yet. Add your first client to get started."}
           </p>
           {!search && (
             <Button variant="secondary" className="mt-4" onClick={() => setNewClientOpen(true)}>
@@ -1358,7 +1430,7 @@ export default function Clients() {
       )}
 
       <NewClientDialog open={newClientOpen} onOpenChange={setNewClientOpen} onUpgradeRequired={setUpgradeInfo} />
-      {selectedClient && <ClientDetail client={selectedClient} onClose={() => setSelectedClient(null)} />}
+      {selectedClient && <ClientDetail client={selectedClient} onClose={() => setSelectedClient(null)} onUpgradeRequired={setUpgradeInfo} />}
       <UpgradePopup open={!!upgradeInfo} onClose={() => setUpgradeInfo(null)} upgradeInfo={upgradeInfo} />
       <BroadcastEmailDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} clients={clients} />
     </div>

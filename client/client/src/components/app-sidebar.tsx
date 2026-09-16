@@ -2,6 +2,7 @@ import { Calendar, Users, CreditCard, Settings, LayoutDashboard, LogOut, ShieldC
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { BrandMark } from "@/components/brand-mark";
 import {
   Sidebar,
   SidebarContent,
@@ -34,9 +35,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">Pr</span>
-          </div>
+          <BrandMark className="h-8 w-8 flex-shrink-0" />
           <div>
             <h2 className="font-semibold text-sm leading-tight" data-testid="text-app-name">Practably</h2>
             <p className="text-xs text-muted-foreground">Coach Dashboard</p>

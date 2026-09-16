@@ -11,9 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 
 const PLAN_LABELS: Record<string, string> = {
   free: "Free (up to 5 clients)",
-  starter: "Starter (up to 10 clients) - £1.99/mo",
-  professional: "Professional (up to 20 clients) - £4.99/mo",
-  business: "Business (up to 50 clients) - £7.99/mo",
+  starter: "Starter (up to 10 clients) - £3.99/mo",
+  professional: "Professional (up to 20 clients) - £7.99/mo",
+  business: "Business (up to 50 clients) - £12.99/mo",
 };
 
 const PLAN_BADGE_COLORS: Record<string, string> = {
@@ -191,9 +191,9 @@ export default function PlatformAdminCoach() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="free">Free (up to 5 clients)</SelectItem>
-                <SelectItem value="starter">Starter - up to 10 clients (£1.99/mo)</SelectItem>
-                <SelectItem value="professional">Professional - up to 20 clients (£4.99/mo)</SelectItem>
-                <SelectItem value="business">Business - up to 50 clients (£7.99/mo)</SelectItem>
+                <SelectItem value="starter">Starter - up to 10 clients (£3.99/mo)</SelectItem>
+                <SelectItem value="professional">Professional - up to 20 clients (£7.99/mo)</SelectItem>
+                <SelectItem value="business">Business - up to 50 clients (£12.99/mo)</SelectItem>
               </SelectContent>
             </Select>
             {planMutation.isPending && (

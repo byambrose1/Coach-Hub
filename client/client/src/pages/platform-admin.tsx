@@ -150,7 +150,7 @@ export default function PlatformAdmin() {
         <div>
           <h1 className="text-2xl font-bold">Platform Admin</h1>
           <p className="text-sm text-muted-foreground">
-            {isSupportOnly ? "Support access — view only for pricing and billing" : "Owner dashboard"}
+            {isSupportOnly ? "Support access: view only for pricing and billing" : "Owner dashboard"}
           </p>
         </div>
       </div>

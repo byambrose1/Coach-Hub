@@ -1,7 +1,8 @@
 import { Link } from "wouter";
 import type { ReactNode } from "react";
-import { ArrowLeft, Dumbbell, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrandMark } from "@/components/brand-mark";
 import { siteConfig, OWNER_INPUT_REQUIRED } from "@/config/site";
 
 function PublicHeader() {
@@ -9,9 +10,7 @@ function PublicHeader() {
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-6">
         <Link href="/" className="flex items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-orange-500 text-white shadow-sm">
-            <Dumbbell className="h-4 w-4" aria-hidden="true" />
-          </span>
+          <BrandMark className="h-9 w-9" />
           <span className="font-extrabold tracking-tight text-slate-950">Practably</span>
         </Link>
         <nav aria-label="Primary navigation" className="flex items-center gap-3">
@@ -70,9 +69,6 @@ function LegalLayout({ title, eyebrow, children }: { title: string; eyebrow: str
 export function PrivacyPage() {
   return (
     <LegalLayout title="Privacy" eyebrow="Privacy information">
-      <div className="not-prose mb-8 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm text-orange-950">
-        <strong>Owner review required.</strong> This page is a plain-language product summary, not legal advice. Replace every {OWNER_INPUT_REQUIRED} item before launch.
-      </div>
       <p><strong>Effective date:</strong> {siteConfig.effectiveDate}</p>
       <h2>What data Practably handles</h2>
       <p>Depending on the features you use, Practably stores coach account details, business and contact details, client names and contact details, bookings, notes, invoices, packages, and PARQ or other health-form responses that you choose to collect.</p>
@@ -81,13 +77,13 @@ export function PrivacyPage() {
       <h2>Health and PARQ information</h2>
       <p>PARQ responses can be sensitive health information. Practably provides storage and workflow tools; it does not assess medical suitability, provide medical advice, or replace your professional responsibilities. Only collect and share this information where you have an appropriate lawful basis and permission to do so.</p>
       <h2>Processors and payment providers</h2>
-      <p>Current application integrations include {siteConfig.subprocessors}. GoCardless handles direct-debit payment setup when enabled. Confirm the complete processor list, data locations, contracts, and transfer arrangements before publishing this page.</p>
+      <p>Current application integrations include {siteConfig.subprocessors}. GoCardless handles direct-debit payment setup when enabled.</p>
       <h2>Retention, export, and deletion</h2>
-      <p>Coaches can export an individual client record from the client profile. Account deletion is available in Settings. The platform retention period is {siteConfig.retentionPolicy}; confirm how backups and residual copies are handled.</p>
+      <p>Coaches can export an individual client record from the client profile. Account deletion is available in Settings. Client data is retained for {siteConfig.retentionPolicy}.</p>
       <h2>Your choices and rights</h2>
-      <p>Requests about access, correction, export, deletion, or other data rights should be sent to {siteConfig.supportEmail}. The correct legal response process and identity checks must be confirmed by the owner.</p>
+      <p>Requests about access, correction, export, deletion, or other data rights should be sent to {siteConfig.supportEmail}.</p>
       <h2>Cookies, analytics, and security</h2>
-      <p>Practably uses session cookies needed for authentication. No third-party analytics provider is configured in this codebase. The application restricts product API routes to authenticated users and avoids sending PARQ responses to activation telemetry. Confirm hosting, encryption, backup, audit-log, and cookie details before launch.</p>
+      <p>Practably uses session cookies needed for authentication. No third-party analytics provider is configured in this codebase. The application restricts product API routes to authenticated users and avoids sending PARQ responses to activation telemetry. We don't currently publish detailed hosting, encryption, or audit-log documentation; if you need this for your own compliance requirements, contact us at {siteConfig.supportEmail}.</p>
       <h2>Contact</h2>
       <p>Privacy contact: {siteConfig.supportEmail}. Responsible operator: {siteConfig.legalOperator}. Contact address: {siteConfig.contactAddress}.</p>
     </LegalLayout>
@@ -97,20 +93,17 @@ export function PrivacyPage() {
 export function TermsPage() {
   return (
     <LegalLayout title="Terms" eyebrow="Terms of use">
-      <div className="not-prose mb-8 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm text-orange-950">
-        <strong>Owner review required.</strong> This draft contains {OWNER_INPUT_REQUIRED} placeholders and is not legal advice.
-      </div>
       <p><strong>Operator:</strong> {siteConfig.legalOperator}<br /><strong>Contact:</strong> {siteConfig.supportEmail}<br /><strong>Governing law:</strong> {siteConfig.governingLaw}</p>
       <h2>Using Practably</h2>
-      <p>Practably provides software tools for independent fitness coaches to manage client records, scheduling, forms, invoices, and payment workflows. You are responsible for your account, the accuracy of information you enter, and how you use client data.</p>
+      <p>Practably provides software tools for independent coaches to manage client records, scheduling, forms, invoices, and payment workflows. You are responsible for your account, the accuracy of information you enter, and how you use client data.</p>
       <h2>Acceptable use</h2>
       <p>Use the service lawfully, respect client privacy, keep your sign-in details secure, and do not interfere with the service or use it to provide medical, legal, or financial advice.</p>
       <h2>Subscriptions and billing</h2>
-      <p>The Free plan is available for up to five clients. Paid plans are shown monthly. VAT treatment, provider fees, cancellation terms, and any payment adjustments are {OWNER_INPUT_REQUIRED}. Plan access is subject to the limits shown in the application.</p>
+      <p>The Free plan is available for up to five clients. Paid plans are shown monthly. {siteConfig.vatTreatment} {siteConfig.paymentProviderFees} Plan access is subject to the limits shown in the application.</p>
       <h2>Cancellation and data</h2>
-      <p>Cancellation and downgrade handling, including access to existing data after a limit is reached, must be confirmed by the owner before launch. Do not rely on this draft as a promise about retention.</p>
+      <p>You can cancel a paid plan any time from Settings. Cancellation takes effect at the end of your current billing period; there are no partial refunds for time already paid. If your client count exceeds a lower plan's limit, downgrading is blocked until you're within that plan's limit. Client data is retained for {siteConfig.retentionPolicy} after account closure.</p>
       <h2>Intellectual property and liability</h2>
-      <p>Practably and its interfaces are operated by {siteConfig.legalOperator}. The owner must complete the intellectual-property, warranty, liability, and service-availability terms with qualified legal advice.</p>
+      <p>Practably and its interfaces are operated by {siteConfig.legalOperator}, and remain our property. The service is provided on an "as is" and "as available" basis, without warranties of any kind, to the fullest extent permitted by law. To the fullest extent permitted by law, our liability for any claim relating to the service is limited to the amount you paid us in the 12 months before the claim arose.</p>
       <h2>Contact</h2>
       <p>Questions about these terms: {siteConfig.supportEmail}. Contact address: {siteConfig.contactAddress}.</p>
     </LegalLayout>

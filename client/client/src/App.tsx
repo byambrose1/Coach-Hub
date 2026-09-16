@@ -24,6 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { Settings } from "@shared/schema";
 import { apiRequest } from "./lib/queryClient";
 import { PrivacyPage, TermsPage, SupportPage } from "@/pages/public";
+import Apply from "@/pages/apply";
 import { trackActivationEvent } from "@/lib/activation";
 
 function TermsModal() {
@@ -154,6 +155,7 @@ function PublicRouter() {
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/support" component={SupportPage} />
+      <Route path="/apply/:slug" component={Apply} />
       <Route path="/pricing" component={Landing} />
       <Route component={Landing} />
     </Switch>
@@ -187,7 +189,7 @@ function AppContent() {
   const { isLoading, isAuthenticated } = useAuth();
   const [location] = useLocation();
   const trackedSignup = useRef(false);
-  const isPublicPage = ["/privacy", "/terms", "/support", "/pricing"].includes(location);
+  const isPublicPage = ["/privacy", "/terms", "/support", "/pricing"].includes(location) || location.startsWith("/apply/");
 
   useEffect(() => {
     if (isAuthenticated && !trackedSignup.current) {

@@ -22,9 +22,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, User, FileText, CreditCard, Bell, Shield, Trash2, Mail, Phone, MapPin, Receipt, Crown, ArrowUp, ArrowDown, ExternalLink, Check } from "lucide-react";
+import { Save, User, FileText, CreditCard, Bell, Shield, Trash2, Mail, Phone, MapPin, Receipt, Crown, ArrowUp, ArrowDown, ExternalLink, Check, Copy, UserPlus } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Settings } from "@shared/schema";
+import { getPublicSiteUrl } from "@/config/site";
 
 interface Tier {
   name: string;
@@ -230,6 +231,7 @@ export default function SettingsPage() {
   const [formData, setFormData] = useState({
     trainerName: "",
     businessName: "",
+    publicSlug: "",
     trainerEmail: "",
     trainerPhone: "",
     businessAddress: "",
@@ -255,6 +257,7 @@ export default function SettingsPage() {
       setFormData({
         trainerName: settings.trainerName || "",
         businessName: settings.businessName || "",
+        publicSlug: settings.publicSlug || "",
         trainerEmail: settings.trainerEmail || "",
         trainerPhone: settings.trainerPhone || "",
         businessAddress: settings.businessAddress || "",
@@ -364,12 +367,54 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <Label className="flex items-center gap-1"><MapPin className="w-3 h-3" /> Business Address</Label>
             <Input
-              placeholder="123 Fitness St, City, State"
+              placeholder="123 High Street, Town, Postcode"
               value={formData.businessAddress}
               onChange={(e) => setFormData({ ...formData, businessAddress: e.target.value })}
               data-testid="input-business-address"
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><UserPlus className="w-4 h-4" /> Client applications</CardTitle>
+          <CardDescription>Get a link you can share on your own website so new leads land straight in your dashboard, not your inbox.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <Label>Your link name</Label>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">{getPublicSiteUrl()}/apply/</span>
+              <Input
+                placeholder="your-name"
+                value={formData.publicSlug}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  publicSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, ""),
+                })}
+                data-testid="input-public-slug"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">Letters, numbers, and hyphens only. Save your settings, then copy the link below to add as a button on your own website.</p>
+          </div>
+          {settings?.publicSlug && (
+            <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-2">
+              <code className="flex-1 text-xs truncate">{getPublicSiteUrl()}/apply/{settings.publicSlug}</code>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${getPublicSiteUrl()}/apply/${settings.publicSlug}`);
+                  toast({ title: "Link copied" });
+                }}
+                data-testid="button-copy-apply-link"
+              >
+                <Copy className="w-3 h-3 mr-1" /> Copy
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
