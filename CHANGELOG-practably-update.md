@@ -147,6 +147,48 @@ codebase for other common AI-generated writing tells (words like "seamless," "un
 "elevate," "revolutionize," exclamation-heavy copy, "whether you're X or Y" framing).
 None were found; the existing copy was already fairly plain and specific.
 
+## 11. Pricing updated
+
+Tiers changed from £1.99/£4.99/£7.99 to **£3.99/£7.99/£12.99**, updated consistently
+across the marketing page, database schema defaults, server-side fallbacks, and the
+admin panel's coach plan-editor (which had the old prices hardcoded separately, a real
+bug caught while making this change).
+
+## 12. PWA support added
+
+The app can now be installed to a phone's home screen (Add to Home Screen on iOS/
+Android) and opens full-screen like a native app, no app store needed. Includes a new
+icon set built from the logo and a minimal service worker that deliberately never
+caches anything under `/api/`, so a coach's phone never shows stale booking or client
+data.
+
+## 13. Website lead capture
+
+Coaches can now get a personal application-page link (set in Settings) to put on
+their own website. Submissions land in the app as a "Lead," a distinct tab on the
+Clients page, separate from the real client roster, and don't count against the
+coach's plan client limit. A "Convert to client" button moves them into the real
+roster and does check the plan limit at that point. Covered by an automated
+end-to-end test.
+
+## 14. Flexible payment options for coaches' clients
+
+The old single "Payment Link" field (one link only) is now a free-text list, a coach
+can enter as many ways to pay as they want, one per line (PayPal, bank transfer
+details, "cash accepted," anything), shown on invoices and renewal emails. Plain URLs
+become clickable automatically. Added proper HTML-escaping since this is now free
+text that renders inside emails sent to real clients.
+
+## 15. Brevo email sending
+
+If transactional emails (booking confirmations, cancellations, invoices) stop
+sending, check two things first: the `BREVO_API_KEY` secret must be an actual **API
+Key** from Brevo's SMTP & API → API Keys tab, not SMTP credentials from the SMTP tab,
+those are different credential types and produce a 401 error if mixed up. Second, the
+sender email address must be verified in Brevo's dashboard, an unverified sender will
+also fail silently server-side (the error is logged, but the booking/action itself
+still succeeds, so this can go unnoticed).
+
 ## How to apply this
 
 This zip contains the full project with all changes already made. The simplest path:
