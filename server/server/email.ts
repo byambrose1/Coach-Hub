@@ -5,6 +5,35 @@ const brevo = new BrevoClient({
   apiKey: process.env.BREVO_API_KEY || "",
 });
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// A coach can list as many ways to pay as they want, one per line, free text
+// (a PayPal link, bank details, "cash accepted", anything). Lines that are a
+// plain URL become a clickable link; everything else renders as plain text.
+function renderPaymentOptions(paymentOptions?: string): string {
+  if (!paymentOptions) return "";
+  const lines = paymentOptions
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return "";
+  const items = lines
+    .map((line) => {
+      const escaped = escapeHtml(line);
+      const isUrl = /^https?:\/\//i.test(line);
+      return `<li>${isUrl ? `<a href="${escaped}">${escaped}</a>` : escaped}</li>`;
+    })
+    .join("");
+  return `<div style="margin:16px 0;"><strong style="font-size:13px;color:#555;">Ways to pay</strong><ul style="margin:6px 0 0;padding-left:18px;font-size:14px;color:#333;">${items}</ul></div>`;
+}
+
 interface InvoiceEmailData {
   clientName: string;
   clientEmail: string;
@@ -54,7 +83,7 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
         <tr class="amount-row"><td>Amount Due</td><td>${currency}${amount}</td></tr>
       </table>
       ${notes ? `<div class="notes"><strong>Notes:</strong> ${notes}</div>` : ""}
-      ${paymentLink ? `<p style="text-align:center;"><a href="${paymentLink}" class="pay-button">Pay Now</a></p>` : ""}
+      ${renderPaymentOptions(paymentLink)}
       <p style="color:#555;font-size:14px;">If you have any questions, please don't hesitate to get in touch.</p>
       <p style="color:#333;font-size:14px;">Thank you,<br><strong>${trainerName}</strong></p>
     </div>
@@ -256,7 +285,7 @@ export async function sendLowSessionsEmail(data: {
       </div>
       <p style="text-align:center;"><span class="package-name">${packageName}</span></p>
       <p style="color:#555;font-size:14px;">To keep your training on track, please get in touch with <strong>${trainerName}</strong> to renew or top up your sessions.</p>
-      ${paymentLink ? `<p style="text-align:center;"><a href="${paymentLink}" class="renew-button">Renew Sessions</a></p>` : ""}
+      ${renderPaymentOptions(paymentLink)}
       <p style="color:#333;font-size:14px;">Thank you,<br><strong>${trainerName}</strong></p>
     </div>
     <div class="footer"><p>Sent via Practably by ${senderName}</p></div>
