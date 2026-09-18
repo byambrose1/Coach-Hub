@@ -18,6 +18,31 @@ import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } fr
 import type { Client, Package as PackageType, Settings, Invoice, Session } from "@shared/schema";
 import { trackActivationEvent } from "@/lib/activation";
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Same idea as the email templates: a coach can list several ways to pay,
+// one per line, free text. Plain URL lines become clickable links.
+function renderPaymentOptions(paymentOptions?: string | null): string {
+  if (!paymentOptions) return "";
+  const lines = paymentOptions.split("\n").map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 0) return "";
+  const items = lines
+    .map((line) => {
+      const escaped = escapeHtml(line);
+      const isUrl = /^https?:\/\//i.test(line);
+      return `<li>${isUrl ? `<a href="${escaped}">${escaped}</a>` : escaped}</li>`;
+    })
+    .join("");
+  return `<div style="margin:10px 0;"><strong style="font-size:13px;color:#555;">Ways to pay</strong><ul style="margin:4px 0 0;padding-left:18px;font-size:13px;color:#666;">${items}</ul></div>`;
+}
+
 function formatDateUK(dateStr: string): string {
   try {
     return format(parseISO(dateStr), "dd/MM/yyyy");
@@ -486,7 +511,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
             </tr>
           </tbody>
         </table>
-        ${settings?.paymentLink ? `<p style="font-size:13px;color:#666;">Pay online: <a href="${settings.paymentLink}" style="color:#2563eb;">${settings.paymentLink}</a></p>` : ""}
+        ${renderPaymentOptions(settings?.paymentLink)}
         <div class="footer">
           <p>Thank you for your business</p>
           <p>${settings?.businessName || "Practably"} · Generated on ${formatDateUK(new Date().toISOString().split("T")[0])}</p>

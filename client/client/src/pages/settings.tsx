@@ -479,14 +479,15 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Payment Link</Label>
-            <Input
-              placeholder="e.g. https://paypal.me/yourname or Stripe link"
+            <Label>Payment Options</Label>
+            <Textarea
+              placeholder={"e.g.\nhttps://paypal.me/yourname\nBank transfer: sort code 12-34-56, account 12345678\nCash accepted"}
+              rows={4}
               value={formData.paymentLink}
               onChange={(e) => setFormData({ ...formData, paymentLink: e.target.value })}
               data-testid="input-payment-link"
             />
-            <p className="text-xs text-muted-foreground">Add your PayPal, Stripe, or other payment link.</p>
+            <p className="text-xs text-muted-foreground">List however many ways you accept payment, one per line, PayPal, a card link, bank details, "cash accepted", anything. These show on invoices you send.</p>
           </div>
           <div className="space-y-2">
             <Label>Accepted Payment Methods</Label>
