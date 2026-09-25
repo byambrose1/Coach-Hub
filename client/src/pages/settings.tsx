@@ -308,6 +308,25 @@ export default function SettingsPage() {
     },
   });
 
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/account");
+      return res.json();
+    },
+    onSuccess: (data: { stripeCancelFailed?: boolean }) => {
+      if (data.stripeCancelFailed) {
+        toast({
+          title: "Account deleted",
+          description: "Your data was deleted, but we couldn't confirm your Stripe subscription was cancelled — please check your Stripe billing or contact support.",
+        });
+      }
+      window.location.href = "/api/logout";
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error deleting account", description: err.message, variant: "destructive" });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-6 max-w-2xl">
@@ -800,15 +819,11 @@ export default function SettingsPage() {
                   <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={() => {
-                      toast({
-                        title: "Account deletion requested",
-                        description: "Please contact support to complete your account deletion.",
-                      });
-                    }}
+                    disabled={deleteAccountMutation.isPending}
+                    onClick={() => deleteAccountMutation.mutate()}
                     data-testid="button-confirm-delete"
                   >
-                    Yes, delete my account
+                    {deleteAccountMutation.isPending ? "Deleting..." : "Yes, delete my account"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

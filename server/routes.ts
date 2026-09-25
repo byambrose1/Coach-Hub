@@ -3,7 +3,7 @@ import rateLimit from "express-rate-limit";
 import { createServer, type Server } from "http";
 import { storage as defaultStorage, type IStorage } from "./storage";
 import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema, type Session } from "@shared/schema";
-import { isAuthenticated as defaultIsAuthenticated } from "./replit_integrations/auth";
+import { isAuthenticated as defaultIsAuthenticated, authStorage } from "./replit_integrations/auth";
 import {
   sendInvoiceEmail as defaultSendInvoiceEmail,
   sendBookingNotificationEmail as defaultSendBookingNotificationEmail,
@@ -155,11 +155,13 @@ export async function registerRoutes(
     sendParqEmail?: typeof defaultSendParqEmail;
     sendLowSessionsEmail?: typeof defaultSendLowSessionsEmail;
     sendBroadcastEmail?: typeof defaultSendBroadcastEmail;
+    deleteAuthUser?: typeof authStorage.deleteUser;
   } = {},
 ): Promise<Server> {
   const storage = dependencies.storage ?? defaultStorage;
   const isAuthenticated = dependencies.isAuthenticated ?? defaultIsAuthenticated;
   const createMandateLink = dependencies.createMandateLink ?? defaultCreateMandateLink;
+  const deleteAuthUser = dependencies.deleteAuthUser ?? authStorage.deleteUser.bind(authStorage);
   const sendBookingNotificationEmail =
     dependencies.sendBookingNotificationEmail ?? defaultSendBookingNotificationEmail;
   const sendInvoiceEmail = dependencies.sendInvoiceEmail ?? defaultSendInvoiceEmail;
@@ -1143,6 +1145,43 @@ export async function registerRoutes(
       logError("Error sending invoice email", err);
       res.status(502).json(EMAIL_PROVIDER_ERROR);
     }
+  });
+
+  // --- Account deletion (self-service) ---
+  app.delete("/api/account", isAuthenticated, async (req, res) => {
+    if ((req.session as any)?.impersonatedUserId) {
+      return res.status(400).json({ message: "Stop impersonating before deleting an account." });
+    }
+    if (isOwner(req)) {
+      return res.status(403).json({ message: "The platform owner account can't be deleted from here. Contact support." });
+    }
+
+    const userId = getRealUserId(req);
+    let stripeCancelFailed = false;
+
+    try {
+      const currentSettings = await storage.getSettings(userId);
+      if (currentSettings?.stripeSubscriptionId) {
+        try {
+          await getStripeClient().subscriptions.cancel(currentSettings.stripeSubscriptionId);
+        } catch (err) {
+          stripeCancelFailed = true;
+          logError("Failed to cancel Stripe subscription during account deletion", err);
+        }
+      }
+
+      await storage.deleteAccountData(userId);
+      await deleteAuthUser(userId);
+    } catch (err) {
+      logError("Failed to delete account", err);
+      return res.status(500).json({ message: "Unable to delete your account. Please try again or contact support." });
+    }
+
+    req.logout(() => {
+      req.session.destroy(() => {
+        res.status(200).json({ success: true, stripeCancelFailed });
+      });
+    });
   });
 
   return httpServer;

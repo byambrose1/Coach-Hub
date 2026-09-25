@@ -8,7 +8,7 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsx script/check-safe-logging.ts && tsc",
-    "test": "tsx --test server/*.test.ts",
+    "test": "DATABASE_URL=\"${DATABASE_URL:-postgres://test:test@localhost:5432/test}\" tsx --test server/*.test.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

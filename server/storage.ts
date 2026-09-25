@@ -57,6 +57,11 @@ export interface IStorage {
   createInvoice(userId: string, data: InsertInvoice): Promise<Invoice>;
   updateInvoice(userId: string, id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined>;
 
+  // Permanently removes every row this coach owns (clients and everything
+  // under them, settings). Does not touch the auth user record - that's a
+  // separate concern owned by IAuthStorage.
+  deleteAccountData(userId: string): Promise<void>;
+
   // Platform admin (owner only)
   getAllUsers(): Promise<User[]>;
   getPlatformStats(): Promise<PlatformStats>;
@@ -264,6 +269,17 @@ export class DatabaseStorage implements IStorage {
   async updateInvoice(userId: string, id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined> {
     const rows = await db.update(invoices).set(withoutOwnershipFields(data)).where(and(eq(invoices.id, id), eq(invoices.userId, userId))).returning();
     return rows[0];
+  }
+
+  async deleteAccountData(userId: string): Promise<void> {
+    await db.delete(invoices).where(eq(invoices.userId, userId));
+    await db.delete(sessionNotes).where(eq(sessionNotes.userId, userId));
+    await db.delete(clientForms).where(eq(clientForms.userId, userId));
+    await db.delete(packages).where(eq(packages.userId, userId));
+    await db.delete(trainingSessions).where(eq(trainingSessions.userId, userId));
+    await db.delete(referrals).where(eq(referrals.userId, userId));
+    await db.delete(clients).where(eq(clients.userId, userId));
+    await db.delete(settings).where(eq(settings.id, userId));
   }
 
   // Platform admin
