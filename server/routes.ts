@@ -2,7 +2,7 @@ import type { Express } from "express";
 import rateLimit from "express-rate-limit";
 import { createServer, type Server } from "http";
 import { storage as defaultStorage, type IStorage } from "./storage";
-import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema, type Session } from "@shared/schema";
+import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema, insertSettingsSchema, type Session } from "@shared/schema";
 import { isAuthenticated as defaultIsAuthenticated, authStorage } from "./replit_integrations/auth";
 import {
   sendInvoiceEmail as defaultSendInvoiceEmail,
@@ -1028,7 +1028,9 @@ export async function registerRoutes(
 
   app.put("/api/settings", async (req, res) => {
     const userId = getUserId(req);
-    const s = await storage.upsertSettings(userId, req.body);
+    const parsed = insertSettingsSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    const s = await storage.upsertSettings(userId, parsed.data);
     res.json(s);
   });
 

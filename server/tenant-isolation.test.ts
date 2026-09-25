@@ -362,6 +362,16 @@ test("the platform owner cannot self-delete via the account endpoint", async () 
   assert.equal(deletedAuthUserIds.includes(OWNER_ID), false);
 });
 
+test("PUT /api/settings rejects a malformed body instead of writing it through", async () => {
+  const { response, body } = await request("/api/settings", {
+    method: "PUT",
+    as: COACH_A,
+    body: JSON.stringify({ lowSessionThreshold: "not-a-number" }),
+  });
+  assert.equal(response.status, 400);
+  assert.ok(body.message);
+});
+
 test("account deletion is blocked while impersonating, to avoid deleting the wrong account", async () => {
   const { response, body } = await request("/api/account", {
     method: "DELETE",
