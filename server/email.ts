@@ -1,5 +1,7 @@
 import { BrevoClient } from "@getbrevo/brevo";
 import { logError } from "./safe-logging";
+import { paymentMethodsHtml } from "@shared/payment-methods";
+import type { Settings } from "@shared/schema";
 
 const brevo = new BrevoClient({
   apiKey: process.env.BREVO_API_KEY || "",
@@ -17,11 +19,11 @@ interface InvoiceEmailData {
   businessName: string;
   businessAddress?: string;
   trainerEmail?: string;
-  paymentLink?: string;
+  paymentMethods?: Settings;
 }
 
 export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
-  const { clientName, clientEmail, invoiceNumber, amount, currency, dueDate, notes, trainerName, businessName, businessAddress, trainerEmail, paymentLink } = data;
+  const { clientName, clientEmail, invoiceNumber, amount, currency, dueDate, notes, trainerName, businessName, businessAddress, trainerEmail, paymentMethods } = data;
   const senderName = businessName || trainerName || "Practably";
   const senderEmail = trainerEmail || "noreply@practably.app";
 
@@ -54,7 +56,7 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
         <tr class="amount-row"><td>Amount Due</td><td>${currency}${amount}</td></tr>
       </table>
       ${notes ? `<div class="notes"><strong>Notes:</strong> ${notes}</div>` : ""}
-      ${paymentLink ? `<p style="text-align:center;"><a href="${paymentLink}" class="pay-button">Pay Now</a></p>` : ""}
+      ${paymentMethodsHtml(paymentMethods)}
       <p style="color:#555;font-size:14px;">If you have any questions, please don't hesitate to get in touch.</p>
       <p style="color:#333;font-size:14px;">Thank you,<br><strong>${trainerName}</strong></p>
     </div>
@@ -225,9 +227,9 @@ export async function sendLowSessionsEmail(data: {
   trainerName: string;
   businessName?: string;
   trainerEmail?: string;
-  paymentLink?: string;
+  paymentMethods?: Settings;
 }): Promise<void> {
-  const { clientName, clientEmail, packageName, remainingSessions, trainerName, businessName, trainerEmail, paymentLink } = data;
+  const { clientName, clientEmail, packageName, remainingSessions, trainerName, businessName, trainerEmail, paymentMethods } = data;
   const senderName = businessName || trainerName || "Practably";
   const senderEmail = trainerEmail || "noreply@practably.app";
   const sessionWord = remainingSessions === 1 ? "session" : "sessions";
@@ -256,7 +258,7 @@ export async function sendLowSessionsEmail(data: {
       </div>
       <p style="text-align:center;"><span class="package-name">${packageName}</span></p>
       <p style="color:#555;font-size:14px;">To keep your training on track, please get in touch with <strong>${trainerName}</strong> to renew or top up your sessions.</p>
-      ${paymentLink ? `<p style="text-align:center;"><a href="${paymentLink}" class="renew-button">Renew Sessions</a></p>` : ""}
+      ${paymentMethodsHtml(paymentMethods)}
       <p style="color:#333;font-size:14px;">Thank you,<br><strong>${trainerName}</strong></p>
     </div>
     <div class="footer"><p>Sent via Practably by ${senderName}</p></div>

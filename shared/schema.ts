@@ -84,6 +84,21 @@ export const settings = pgTable("settings", {
   trainerPhone: text("trainer_phone"),
   businessAddress: text("business_address"),
   acceptedPaymentMethods: text("accepted_payment_methods"),
+  // Payment methods a coach offers their own clients. Each is a simple
+  // record-keeping / link-sharing option - none of it moves money through
+  // Practably. Stripe/PayPal here are the coach's OWN payment links (e.g. a
+  // Stripe Payment Link or paypal.me URL they set up themselves), not a
+  // Practably-run checkout.
+  acceptsCash: boolean("accepts_cash").default(false),
+  acceptsCardMachine: boolean("accepts_card_machine").default(false),
+  acceptsBankTransfer: boolean("accepts_bank_transfer").default(false),
+  bankTransferDetails: text("bank_transfer_details"),
+  acceptsPaypal: boolean("accepts_paypal").default(false),
+  paypalLink: text("paypal_link"),
+  acceptsStripeLink: boolean("accepts_stripe_link").default(false),
+  stripePaymentLink: text("stripe_payment_link"),
+  acceptsOtherPayment: boolean("accepts_other_payment").default(false),
+  otherPaymentDetails: text("other_payment_details"),
   invoicePrefix: text("invoice_prefix").default("INV"),
   enableEmailNotifications: boolean("enable_email_notifications").default(false),
   enableSessionReminders: boolean("enable_session_reminders").default(false),

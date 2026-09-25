@@ -964,7 +964,7 @@ export async function registerRoutes(
         trainerName: settings?.trainerName || "Your Trainer",
         businessName: settings?.businessName || undefined,
         trainerEmail: settings?.trainerEmail || undefined,
-        paymentLink: settings?.paymentLink || undefined,
+        paymentMethods: settings,
       });
       res.json({ success: true });
     } catch (err) {
@@ -1130,7 +1130,7 @@ export async function registerRoutes(
         businessName: s?.businessName || "",
         businessAddress: s?.businessAddress || undefined,
         trainerEmail: s?.trainerEmail || undefined,
-        paymentLink: s?.paymentLink || undefined,
+        paymentMethods: s,
       });
 
       const updated = await storage.updateInvoice(userId, req.params.id, {

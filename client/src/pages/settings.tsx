@@ -236,8 +236,16 @@ export default function SettingsPage() {
     businessAddress: "",
     cancellationPolicy: "",
     cancellationNoticeHours: 24,
-    paymentLink: "",
-    acceptedPaymentMethods: "",
+    acceptsCash: false,
+    acceptsCardMachine: false,
+    acceptsBankTransfer: false,
+    bankTransferDetails: "",
+    acceptsPaypal: false,
+    paypalLink: "",
+    acceptsStripeLink: false,
+    stripePaymentLink: "",
+    acceptsOtherPayment: false,
+    otherPaymentDetails: "",
     invoicePrefix: "INV",
     lowSessionThreshold: 2,
     enableEmailNotifications: false,
@@ -261,8 +269,16 @@ export default function SettingsPage() {
         businessAddress: settings.businessAddress || "",
         cancellationPolicy: settings.cancellationPolicy || "",
         cancellationNoticeHours: settings.cancellationNoticeHours ?? 24,
-        paymentLink: settings.paymentLink || "",
-        acceptedPaymentMethods: settings.acceptedPaymentMethods || "",
+        acceptsCash: settings.acceptsCash || false,
+        acceptsCardMachine: settings.acceptsCardMachine || false,
+        acceptsBankTransfer: settings.acceptsBankTransfer || false,
+        bankTransferDetails: settings.bankTransferDetails || "",
+        acceptsPaypal: settings.acceptsPaypal || false,
+        paypalLink: settings.paypalLink || "",
+        acceptsStripeLink: settings.acceptsStripeLink || false,
+        stripePaymentLink: settings.stripePaymentLink || "",
+        acceptsOtherPayment: settings.acceptsOtherPayment || false,
+        otherPaymentDetails: settings.otherPaymentDetails || "",
         invoicePrefix: settings.invoicePrefix || "INV",
         lowSessionThreshold: settings.lowSessionThreshold || 2,
         enableEmailNotifications: settings.enableEmailNotifications || false,
@@ -430,28 +446,142 @@ export default function SettingsPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Shield className="w-4 h-4" />
-            Payment Settings
+            Payment Methods
           </CardTitle>
+          <CardDescription>
+            Choose how your clients can pay you. These are all your own arrangements — money
+            never passes through Practably, we just show clients what you accept and (where you
+            give us a link) put a "Pay" button on their invoice.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Payment Link</Label>
-            <Input
-              placeholder="e.g. https://paypal.me/yourname or Stripe link"
-              value={formData.paymentLink}
-              onChange={(e) => setFormData({ ...formData, paymentLink: e.target.value })}
-              data-testid="input-payment-link"
+        <CardContent className="space-y-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label>Cash</Label>
+              <p className="text-xs text-muted-foreground">Client pays you in person.</p>
+            </div>
+            <Switch
+              checked={formData.acceptsCash}
+              onCheckedChange={(v) => setFormData({ ...formData, acceptsCash: v })}
+              data-testid="switch-accepts-cash"
             />
-            <p className="text-xs text-muted-foreground">Add your PayPal, Stripe, or other payment link.</p>
           </div>
-          <div className="space-y-2">
-            <Label>Accepted Payment Methods</Label>
-            <Input
-              placeholder="e.g. Cash, Bank Transfer, PayPal, Card"
-              value={formData.acceptedPaymentMethods}
-              onChange={(e) => setFormData({ ...formData, acceptedPaymentMethods: e.target.value })}
-              data-testid="input-payment-methods"
+
+          <Separator />
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label>Card machine</Label>
+              <p className="text-xs text-muted-foreground">You take card payment in person with your own terminal.</p>
+            </div>
+            <Switch
+              checked={formData.acceptsCardMachine}
+              onCheckedChange={(v) => setFormData({ ...formData, acceptsCardMachine: v })}
+              data-testid="switch-accepts-card-machine"
             />
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label>Bank transfer</Label>
+                <p className="text-xs text-muted-foreground">Client pays directly into your bank account.</p>
+              </div>
+              <Switch
+                checked={formData.acceptsBankTransfer}
+                onCheckedChange={(v) => setFormData({ ...formData, acceptsBankTransfer: v })}
+                data-testid="switch-accepts-bank-transfer"
+              />
+            </div>
+            {formData.acceptsBankTransfer && (
+              <Textarea
+                placeholder="Account name, sort code, account number, reference instructions..."
+                value={formData.bankTransferDetails}
+                onChange={(e) => setFormData({ ...formData, bankTransferDetails: e.target.value })}
+                className="min-h-[70px]"
+                data-testid="input-bank-transfer-details"
+              />
+            )}
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label>PayPal</Label>
+                <p className="text-xs text-muted-foreground">Add your own PayPal.me link.</p>
+              </div>
+              <Switch
+                checked={formData.acceptsPaypal}
+                onCheckedChange={(v) => setFormData({ ...formData, acceptsPaypal: v })}
+                data-testid="switch-accepts-paypal"
+              />
+            </div>
+            {formData.acceptsPaypal && (
+              <Input
+                placeholder="e.g. https://paypal.me/yourname"
+                value={formData.paypalLink}
+                onChange={(e) => setFormData({ ...formData, paypalLink: e.target.value })}
+                data-testid="input-paypal-link"
+              />
+            )}
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label>Stripe payment link</Label>
+                <p className="text-xs text-muted-foreground">
+                  Add a Payment Link from your own Stripe account (create one for free at{" "}
+                  <a href="https://dashboard.stripe.com/payment-links" target="_blank" rel="noopener noreferrer" className="underline">
+                    dashboard.stripe.com/payment-links
+                  </a>
+                  ). Payments go straight into your Stripe account, not ours.
+                </p>
+              </div>
+              <Switch
+                checked={formData.acceptsStripeLink}
+                onCheckedChange={(v) => setFormData({ ...formData, acceptsStripeLink: v })}
+                data-testid="switch-accepts-stripe-link"
+              />
+            </div>
+            {formData.acceptsStripeLink && (
+              <Input
+                placeholder="e.g. https://buy.stripe.com/xxxxx"
+                value={formData.stripePaymentLink}
+                onChange={(e) => setFormData({ ...formData, stripePaymentLink: e.target.value })}
+                data-testid="input-stripe-payment-link"
+              />
+            )}
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label>Other</Label>
+                <p className="text-xs text-muted-foreground">Any other payment method you accept (e.g. Klarna, another provider).</p>
+              </div>
+              <Switch
+                checked={formData.acceptsOtherPayment}
+                onCheckedChange={(v) => setFormData({ ...formData, acceptsOtherPayment: v })}
+                data-testid="switch-accepts-other-payment"
+              />
+            </div>
+            {formData.acceptsOtherPayment && (
+              <Input
+                placeholder="e.g. Klarna - link or instructions"
+                value={formData.otherPaymentDetails}
+                onChange={(e) => setFormData({ ...formData, otherPaymentDetails: e.target.value })}
+                data-testid="input-other-payment-details"
+              />
+            )}
           </div>
         </CardContent>
       </Card>
