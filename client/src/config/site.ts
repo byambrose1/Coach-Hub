@@ -12,10 +12,11 @@ export const siteConfig = {
   governingLaw: "England and Wales",
   effectiveDate: "13 September 2026",
   vatTreatment: "Practably is not VAT-registered, so no VAT is added to these prices.",
-  paymentProviderFees: "Coach subscriptions are billed via Stripe. Direct debit payments from your clients are processed via GoCardless. Both providers charge their own standard transaction fees, which are separate from your Practably subscription price.",
+  paymentProviderFees: "Your Practably subscription is billed via Stripe, which charges its own standard transaction fees separate from your subscription price. How you charge your own clients (cash, card machine, bank transfer, PayPal, your own Stripe payment link, or another method you choose in Settings) is entirely your own arrangement - Practably does not process, hold, or take any share of payments between you and your clients.",
+  cancellationTerms: "You can cancel or downgrade a paid plan at any time from the Billing Portal in Settings. Access to your current plan's features continues until the end of the billing period you've already paid for; we don't issue partial refunds for the remainder of a billing period.",
   paidPlanSupportResponse: "We aim to reply within 4 hours. Messages sent after 8pm GMT are answered the next morning.",
-  retentionPolicy: "30 days after account closure, after which client data is deleted",
-  subprocessors: "Replit Auth, PostgreSQL, Brevo, and GoCardless are used where enabled.",
+  retentionPolicy: "Requesting account deletion in Settings immediately and permanently deletes your account and all client data - this cannot be undone, so export anything you need first.",
+  subprocessors: "Replit Auth, PostgreSQL, Brevo, and Stripe are used to run Practably itself. GoCardless integration exists in the product but is not currently enabled for coach-client payments.",
 };
 
 export const pricingTiers = [

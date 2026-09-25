@@ -71,23 +71,30 @@ export function PrivacyPage() {
   return (
     <LegalLayout title="Privacy" eyebrow="Privacy information">
       <div className="not-prose mb-8 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm text-orange-950">
-        <strong>Owner review required.</strong> This page is a plain-language product summary, not legal advice. Replace every {OWNER_INPUT_REQUIRED} item before launch.
+        <strong>Beta notice.</strong> {siteConfig.name} is in private beta. This page describes how the product actually works today; have a
+        solicitor review it before relying on it for a public launch.
       </div>
       <p><strong>Effective date:</strong> {siteConfig.effectiveDate}</p>
       <h2>What data {siteConfig.name} handles</h2>
       <p>Depending on the features you use, {siteConfig.name} stores coach account details, business and contact details, client names and contact details, bookings, notes, invoices, packages, and PARQ or other health-form responses that you choose to collect.</p>
       <h2>Why data is used</h2>
-      <p>Data is used to provide the dashboard, organise coaching work, send requested emails, create invoices, support direct-debit setup through GoCardless, and keep the service secure. Do not enter information you do not need for your coaching workflow.</p>
+      <p>Data is used to provide the dashboard, organise coaching work, send requested emails, create invoices, and keep the service secure. Do not enter information you do not need for your coaching workflow.</p>
+      <h2>Payments</h2>
+      <p>{siteConfig.paymentProviderFees}</p>
       <h2>Health and PARQ information</h2>
       <p>PARQ responses can be sensitive health information. {siteConfig.name} provides storage and workflow tools; it does not assess medical suitability, provide medical advice, or replace your professional responsibilities. Only collect and share this information where you have an appropriate lawful basis and permission to do so.</p>
-      <h2>Processors and payment providers</h2>
-      <p>Current application integrations include {siteConfig.subprocessors}. GoCardless handles direct-debit payment setup when enabled. Confirm the complete processor list, data locations, contracts, and transfer arrangements before publishing this page.</p>
+      <h2>Processors</h2>
+      <p>{siteConfig.subprocessors} We have not yet confirmed exact data-centre regions or formal data processing agreements with each
+      subprocessor beyond their own standard terms - ask us if this matters for your use case.</p>
       <h2>Retention, export, and deletion</h2>
-      <p>Coaches can export an individual client record from the client profile. Account deletion is available in Settings. The platform retention period is {siteConfig.retentionPolicy}; confirm how backups and residual copies are handled.</p>
+      <p>Coaches can export an individual client record from the client profile. {siteConfig.retentionPolicy} We do not currently
+      commit to a specific database backup schedule, so please keep your own copies of anything critical.</p>
       <h2>Your choices and rights</h2>
-      <p>Requests about access, correction, export, deletion, or other data rights should be sent to {siteConfig.supportEmail}. The correct legal response process and identity checks must be confirmed by the owner.</p>
-      <h2>Cookies, analytics, and security</h2>
-      <p>{siteConfig.name} uses session cookies needed for authentication. No third-party analytics provider is configured in this codebase. The application restricts product API routes to authenticated users and avoids sending PARQ responses to activation telemetry. Confirm hosting, encryption, backup, audit-log, and cookie details before launch.</p>
+      <p>Requests about access, correction, export, deletion, or other data rights should be sent to {siteConfig.supportEmail}.</p>
+      <h2>Cookies and security</h2>
+      <p>{siteConfig.name} uses session cookies needed for authentication only - no third-party analytics or advertising cookies are set.
+      API routes are restricted to authenticated users, and PARQ or other health-form responses are never included in the product-usage
+      telemetry we log.</p>
       <h2>Contact</h2>
       <p>Privacy contact: {siteConfig.supportEmail}. Responsible operator: {siteConfig.legalOperator}. Contact address: {siteConfig.contactAddress}.</p>
     </LegalLayout>
@@ -98,7 +105,8 @@ export function TermsPage() {
   return (
     <LegalLayout title="Terms" eyebrow="Terms of use">
       <div className="not-prose mb-8 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm text-orange-950">
-        <strong>Owner review required.</strong> This draft contains {OWNER_INPUT_REQUIRED} placeholders and is not legal advice.
+        <strong>Beta notice.</strong> {siteConfig.name} is in private beta. These terms describe how the product actually works today; have a
+        solicitor review them before relying on them for a public launch.
       </div>
       <p><strong>Operator:</strong> {siteConfig.legalOperator}<br /><strong>Contact:</strong> {siteConfig.supportEmail}<br /><strong>Governing law:</strong> {siteConfig.governingLaw}</p>
       <h2>Using {siteConfig.name}</h2>
@@ -106,11 +114,16 @@ export function TermsPage() {
       <h2>Acceptable use</h2>
       <p>Use the service lawfully, respect client privacy, keep your sign-in details secure, and do not interfere with the service or use it to provide medical, legal, or financial advice.</p>
       <h2>Subscriptions and billing</h2>
-      <p>The Free plan is available for up to five clients. Paid plans are shown monthly. VAT treatment, provider fees, cancellation terms, and any payment adjustments are {OWNER_INPUT_REQUIRED}. Plan access is subject to the limits shown in the application.</p>
+      <p>The Free plan is available for up to five clients. Paid plans are billed monthly. {siteConfig.vatTreatment} {siteConfig.paymentProviderFees} Plan access is subject to the limits shown in the application.</p>
       <h2>Cancellation and data</h2>
-      <p>Cancellation and downgrade handling, including access to existing data after a limit is reached, must be confirmed by the owner before launch. Do not rely on this draft as a promise about retention.</p>
+      <p>{siteConfig.cancellationTerms} If you're downgraded or your account is limited because you have more clients than a lower plan
+      allows, your existing data is kept - you just can't add new clients until you're back within the limit or upgrade again. Requesting
+      account deletion is different: {siteConfig.retentionPolicy}</p>
       <h2>Intellectual property and liability</h2>
-      <p>{siteConfig.name} and its interfaces are operated by {siteConfig.legalOperator}. The owner must complete the intellectual-property, warranty, liability, and service-availability terms with qualified legal advice.</p>
+      <p>{siteConfig.name} and its interfaces are operated by {siteConfig.legalOperator}. The service is provided "as is" during this beta
+      period without warranty of any kind, and {siteConfig.legalOperator}'s liability is limited to the amount you've paid us in the three
+      months before a claim - nothing here limits liability that can't be limited by law (for example, for fraud or death or personal injury
+      caused by negligence).</p>
       <h2>Contact</h2>
       <p>Questions about these terms: {siteConfig.supportEmail}. Contact address: {siteConfig.contactAddress}.</p>
     </LegalLayout>
