@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import rateLimit from "express-rate-limit";
 import { createServer, type Server } from "http";
 import { storage as defaultStorage, type IStorage } from "./storage";
 import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema, type Session } from "@shared/schema";
@@ -411,7 +412,18 @@ export async function registerRoutes(
   });
 
   // --- Broadcast Email ---
-  app.post("/api/emails/broadcast", isAuthenticated, async (req, res) => {
+  // Tighter limit than the general API guard: this fans out to every client
+  // on the account, so it's the one endpoint that turns abuse or a stolen
+  // session into a spam/cost problem outside the app itself.
+  const broadcastEmailLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many broadcast emails sent. Please try again later." },
+  });
+
+  app.post("/api/emails/broadcast", isAuthenticated, broadcastEmailLimiter, async (req, res) => {
     try {
       const userId = getUserId(req);
       const { subject, message, recipientFilter } = req.body;

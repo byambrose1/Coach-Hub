@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -61,6 +62,21 @@ export function log(message: string, source = "express") {
 }
 
 app.use(createApiRequestLogger(log));
+
+// Blanket abuse guard on every API and auth route: generous enough for normal
+// use, low enough to blunt scripted brute-forcing/scraping during beta
+// testing. Individual endpoints (e.g. broadcast email) add tighter limits
+// of their own on top of this.
+app.use(
+  "/api",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many requests. Please try again shortly." },
+  }),
+);
 
 (async () => {
   const { setupAuth, registerAuthRoutes } = await import("./replit_integrations/auth");
