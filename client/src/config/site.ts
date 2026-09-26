@@ -30,7 +30,7 @@ export const pricingTiers = [
   },
   {
     name: "Starter",
-    price: "£3.99",
+    price: "£1.99",
     period: "/ month",
     clients: "Up to 10 clients",
     description: "For a small roster and a more organised week.",
@@ -38,7 +38,7 @@ export const pricingTiers = [
   },
   {
     name: "Professional",
-    price: "£7.99",
+    price: "£4.99",
     period: "/ month",
     clients: "Up to 20 clients",
     description: "For coaches building a consistent coaching business.",
@@ -46,7 +46,7 @@ export const pricingTiers = [
   },
   {
     name: "Business",
-    price: "£12.99",
+    price: "£7.99",
     period: "/ month",
     clients: "Up to 50 clients",
     description: "For larger rosters that still want a coach-sized tool.",
