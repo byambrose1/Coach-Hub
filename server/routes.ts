@@ -354,6 +354,13 @@ export async function registerRoutes(
       const session = await getStripeClient().checkout.sessions.create({
         mode: "subscription",
         customer,
+        // Stripe Tax needs the customer's address to calculate the right rate;
+        // this collects/updates it on the existing customer record if missing.
+        // Also requires Stripe Tax to be turned on and an origin address set
+        // in the Stripe Dashboard (Settings > Tax) - that part can't be done
+        // from the API.
+        automatic_tax: { enabled: true },
+        customer_update: { address: "auto", name: "auto" },
         line_items: [{ price: priceId, quantity: 1 }],
         success_url: `${siteUrl}/settings?billing=success`,
         cancel_url: `${siteUrl}/settings?billing=cancelled`,
