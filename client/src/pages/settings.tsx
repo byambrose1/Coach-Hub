@@ -32,7 +32,6 @@ interface Tier {
   label: string;
   max: number;
   price: string;
-  paymentLink: string;
 }
 
 const PLAN_ORDER = ["free", "starter", "professional", "business"];
@@ -213,9 +212,6 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
             </div>
           );
         })}
-        <p className="text-xs text-muted-foreground pt-1">
-          Paid-plan changes open secure Stripe Checkout. Your plan changes only after Stripe confirms payment through a verified webhook.
-        </p>
       </CardContent>
     </Card>
   );
