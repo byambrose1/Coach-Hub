@@ -1,7 +1,8 @@
 import { Link } from "wouter";
 import type { ReactNode } from "react";
-import { ArrowLeft, Dumbbell, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrandMark } from "@/components/brand-mark";
 import { siteConfig, OWNER_INPUT_REQUIRED } from "@/config/site";
 
 function PublicHeader() {
@@ -9,9 +10,7 @@ function PublicHeader() {
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-6">
         <Link href="/" className="flex items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-orange-500 text-white shadow-sm">
-            <Dumbbell className="h-4 w-4" aria-hidden="true" />
-          </span>
+          <BrandMark className="h-9 w-9" />
           <span className="font-extrabold tracking-tight text-slate-950">{siteConfig.name}</span>
         </Link>
         <nav aria-label="Primary navigation" className="flex items-center gap-3">
@@ -31,9 +30,12 @@ function PublicFooter() {
   return (
     <footer className="border-t border-slate-200 bg-slate-950 text-slate-300">
       <div className="mx-auto flex max-w-6xl flex-col gap-5 px-5 py-8 sm:px-6 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="font-bold text-white">{siteConfig.name}</p>
-          <p className="mt-1 text-sm text-slate-400">Built for independent coaches in the UK.</p>
+        <div className="flex items-center gap-2">
+          <BrandMark className="h-7 w-7" variant="inverted" />
+          <div>
+            <p className="font-bold text-white">{siteConfig.name}</p>
+            <p className="mt-1 text-sm text-slate-400">Built for independent coaches in the UK.</p>
+          </div>
         </div>
         <nav aria-label="Footer navigation" className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
           <Link href="/privacy" className="rounded underline-offset-4 hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400">Privacy</Link>
