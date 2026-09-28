@@ -12,6 +12,7 @@ import {
   sendParqEmail as defaultSendParqEmail,
   sendLowSessionsEmail as defaultSendLowSessionsEmail,
   sendBroadcastEmail as defaultSendBroadcastEmail,
+  sendFeedbackEmail as defaultSendFeedbackEmail,
 } from "./email";
 import { createMandateLink as defaultCreateMandateLink } from "./payments";
 import type { RequestHandler } from "express";
@@ -155,6 +156,7 @@ export async function registerRoutes(
     sendParqEmail?: typeof defaultSendParqEmail;
     sendLowSessionsEmail?: typeof defaultSendLowSessionsEmail;
     sendBroadcastEmail?: typeof defaultSendBroadcastEmail;
+    sendFeedbackEmail?: typeof defaultSendFeedbackEmail;
     deleteAuthUser?: typeof authStorage.deleteUser;
   } = {},
 ): Promise<Server> {
@@ -170,6 +172,8 @@ export async function registerRoutes(
     dependencies.sendLowSessionsEmail ?? defaultSendLowSessionsEmail;
   const sendBroadcastEmail =
     dependencies.sendBroadcastEmail ?? defaultSendBroadcastEmail;
+  const sendFeedbackEmail =
+    dependencies.sendFeedbackEmail ?? defaultSendFeedbackEmail;
   app.get("/robots.txt", (req, res) => {
     const siteUrl = getPublicSiteUrl(req);
     res.type("text/plain").send([
@@ -465,6 +469,39 @@ export async function registerRoutes(
       res.json(result);
     } catch (err) {
       logError("Failed to send broadcast email", err);
+      res.status(502).json(EMAIL_PROVIDER_ERROR);
+    }
+  });
+
+  // --- Feedback / feature requests ---
+  const FEEDBACK_TYPES = new Set(["bug", "feature", "general"]);
+  const feedbackLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too much feedback sent. Please try again later." },
+  });
+
+  app.post("/api/feedback", isAuthenticated, feedbackLimiter, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { type, message } = req.body || {};
+      if (!message?.trim()) return res.status(400).json({ message: "Message is required" });
+      const feedbackType = FEEDBACK_TYPES.has(type) ? type : "general";
+
+      const s = await storage.getSettings(userId);
+      const claims = (req as any).user?.claims || {};
+      await sendFeedbackEmail({
+        coachName: s?.trainerName || claims.email || "A coach",
+        coachEmail: s?.trainerEmail || claims.email || undefined,
+        businessName: s?.businessName || undefined,
+        type: feedbackType,
+        message: message.trim(),
+      });
+      res.json({ success: true });
+    } catch (err) {
+      logError("Failed to send feedback email", err);
       res.status(502).json(EMAIL_PROVIDER_ERROR);
     }
   });
