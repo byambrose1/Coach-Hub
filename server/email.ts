@@ -1,5 +1,7 @@
 import { BrevoClient } from "@getbrevo/brevo";
 import { logError } from "./safe-logging";
+import { paymentMethodsHtml } from "@shared/payment-methods";
+import type { Settings } from "@shared/schema";
 
 const brevo = new BrevoClient({
   apiKey: process.env.BREVO_API_KEY || "",
@@ -17,11 +19,11 @@ interface InvoiceEmailData {
   businessName: string;
   businessAddress?: string;
   trainerEmail?: string;
-  paymentLink?: string;
+  paymentMethods?: Settings;
 }
 
 export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
-  const { clientName, clientEmail, invoiceNumber, amount, currency, dueDate, notes, trainerName, businessName, businessAddress, trainerEmail, paymentLink } = data;
+  const { clientName, clientEmail, invoiceNumber, amount, currency, dueDate, notes, trainerName, businessName, businessAddress, trainerEmail, paymentMethods } = data;
   const senderName = businessName || trainerName || "Practably";
   const senderEmail = trainerEmail || "noreply@practably.app";
 
@@ -54,7 +56,7 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
         <tr class="amount-row"><td>Amount Due</td><td>${currency}${amount}</td></tr>
       </table>
       ${notes ? `<div class="notes"><strong>Notes:</strong> ${notes}</div>` : ""}
-      ${paymentLink ? `<p style="text-align:center;"><a href="${paymentLink}" class="pay-button">Pay Now</a></p>` : ""}
+      ${paymentMethodsHtml(paymentMethods)}
       <p style="color:#555;font-size:14px;">If you have any questions, please don't hesitate to get in touch.</p>
       <p style="color:#333;font-size:14px;">Thank you,<br><strong>${trainerName}</strong></p>
     </div>
@@ -225,9 +227,9 @@ export async function sendLowSessionsEmail(data: {
   trainerName: string;
   businessName?: string;
   trainerEmail?: string;
-  paymentLink?: string;
+  paymentMethods?: Settings;
 }): Promise<void> {
-  const { clientName, clientEmail, packageName, remainingSessions, trainerName, businessName, trainerEmail, paymentLink } = data;
+  const { clientName, clientEmail, packageName, remainingSessions, trainerName, businessName, trainerEmail, paymentMethods } = data;
   const senderName = businessName || trainerName || "Practably";
   const senderEmail = trainerEmail || "noreply@practably.app";
   const sessionWord = remainingSessions === 1 ? "session" : "sessions";
@@ -256,7 +258,7 @@ export async function sendLowSessionsEmail(data: {
       </div>
       <p style="text-align:center;"><span class="package-name">${packageName}</span></p>
       <p style="color:#555;font-size:14px;">To keep your training on track, please get in touch with <strong>${trainerName}</strong> to renew or top up your sessions.</p>
-      ${paymentLink ? `<p style="text-align:center;"><a href="${paymentLink}" class="renew-button">Renew Sessions</a></p>` : ""}
+      ${paymentMethodsHtml(paymentMethods)}
       <p style="color:#333;font-size:14px;">Thank you,<br><strong>${trainerName}</strong></p>
     </div>
     <div class="footer"><p>Sent via Practably by ${senderName}</p></div>
@@ -373,6 +375,55 @@ export async function sendParqEmail(data: {
     console.log("PAR-Q email sent");
   } catch (error: any) {
     logError("Failed to send PAR-Q email", error);
+    throw error;
+  }
+}
+
+const FEEDBACK_TYPE_LABELS: Record<string, string> = {
+  bug: "Bug report",
+  feature: "Feature request",
+  general: "General feedback",
+};
+
+export async function sendFeedbackEmail(data: {
+  coachName: string;
+  coachEmail?: string;
+  businessName?: string;
+  type: string;
+  message: string;
+}): Promise<void> {
+  const { coachName, coachEmail, businessName, type, message } = data;
+  const recipientEmail = process.env.FEEDBACK_RECIPIENT_EMAIL || "contact@practably.co.uk";
+  const typeLabel = FEEDBACK_TYPE_LABELS[type] || "Feedback";
+
+  const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
+    .container{max-width:600px;margin:0 auto;background:#fff;padding:30px}
+    .header{color:#2563eb;margin-bottom:20px}
+    .meta{background:#f9fafb;padding:15px;border-radius:8px;margin-bottom:20px;font-size:13px;color:#555}
+    .message{white-space:pre-line;font-size:15px;line-height:1.6;color:#333}
+  </style></head><body>
+  <div class="container">
+    <h1 class="header">${typeLabel}</h1>
+    <div class="meta">
+      <p>From: <strong>${coachName}</strong>${businessName ? ` (${businessName})` : ""}</p>
+      ${coachEmail ? `<p>Reply to: ${coachEmail}</p>` : ""}
+    </div>
+    <div class="message">${message.replace(/\n/g, "<br/>")}</div>
+  </div>
+  </body></html>`;
+
+  try {
+    await brevo.transactionalEmails.sendTransacEmail({
+      subject: `[Practably ${typeLabel}] from ${coachName}`,
+      htmlContent,
+      sender: { name: "Practably feedback", email: "noreply@practably.app" },
+      to: [{ email: recipientEmail, name: "Practably" }],
+      replyTo: coachEmail ? { email: coachEmail, name: coachName } : undefined,
+    });
+    console.log("Feedback email sent");
+  } catch (error: any) {
+    logError("Failed to send feedback email", error);
     throw error;
   }
 }

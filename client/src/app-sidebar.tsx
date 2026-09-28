@@ -1,7 +1,15 @@
-import { Calendar, Users, CreditCard, Settings, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { Calendar, Users, CreditCard, Settings, LayoutDashboard, LogOut, ShieldCheck, MessageSquarePlus } from "lucide-react";
 import { useLocation } from "wouter";
+import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { BrandMark } from "@/components/brand-mark";
 import {
   Sidebar,
@@ -27,9 +35,71 @@ const bottomItems = [
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
+function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+  const [type, setType] = useState("general");
+  const [message, setMessage] = useState("");
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/feedback", { type, message });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Thanks for the feedback!", description: "We'll take a look." });
+      setMessage("");
+      setType("general");
+      onOpenChange(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Couldn't send feedback", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Feedback & feature requests</DialogTitle>
+          <DialogDescription>Tell us what's working, what's broken, or what you'd like to see next.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Select value={type} onValueChange={setType}>
+            <SelectTrigger data-testid="select-feedback-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="general">General feedback</SelectItem>
+              <SelectItem value="feature">Feature request</SelectItem>
+              <SelectItem value="bug">Bug report</SelectItem>
+            </SelectContent>
+          </Select>
+          <Textarea
+            placeholder="What's on your mind?"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            className="min-h-[120px]"
+            data-testid="input-feedback-message"
+          />
+        </div>
+        <DialogFooter>
+          <Button
+            onClick={() => mutation.mutate()}
+            disabled={!message.trim() || mutation.isPending}
+            data-testid="button-send-feedback"
+          >
+            {mutation.isPending ? "Sending..." : "Send"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   return (
     <Sidebar>
@@ -81,7 +151,14 @@ export function AppSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => setFeedbackOpen(true)} data-testid="button-open-feedback">
+              <MessageSquarePlus className="w-4 h-4" />
+              <span>Feedback & ideas</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
+        <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
         {user && (
           <div className="p-3 border-t flex items-center gap-3">
             <Avatar className="w-8 h-8">

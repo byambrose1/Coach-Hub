@@ -1,8 +1,9 @@
 import type { Express } from "express";
+import rateLimit from "express-rate-limit";
 import { createServer, type Server } from "http";
 import { storage as defaultStorage, type IStorage } from "./storage";
-import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema, type Session } from "@shared/schema";
-import { isAuthenticated as defaultIsAuthenticated } from "./replit_integrations/auth";
+import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema, insertSettingsSchema, type Session } from "@shared/schema";
+import { isAuthenticated as defaultIsAuthenticated, authStorage } from "./replit_integrations/auth";
 import {
   sendInvoiceEmail as defaultSendInvoiceEmail,
   sendBookingNotificationEmail as defaultSendBookingNotificationEmail,
@@ -11,6 +12,7 @@ import {
   sendParqEmail as defaultSendParqEmail,
   sendLowSessionsEmail as defaultSendLowSessionsEmail,
   sendBroadcastEmail as defaultSendBroadcastEmail,
+  sendFeedbackEmail as defaultSendFeedbackEmail,
 } from "./email";
 import { createMandateLink as defaultCreateMandateLink } from "./payments";
 import type { RequestHandler } from "express";
@@ -154,11 +156,14 @@ export async function registerRoutes(
     sendParqEmail?: typeof defaultSendParqEmail;
     sendLowSessionsEmail?: typeof defaultSendLowSessionsEmail;
     sendBroadcastEmail?: typeof defaultSendBroadcastEmail;
+    sendFeedbackEmail?: typeof defaultSendFeedbackEmail;
+    deleteAuthUser?: typeof authStorage.deleteUser;
   } = {},
 ): Promise<Server> {
   const storage = dependencies.storage ?? defaultStorage;
   const isAuthenticated = dependencies.isAuthenticated ?? defaultIsAuthenticated;
   const createMandateLink = dependencies.createMandateLink ?? defaultCreateMandateLink;
+  const deleteAuthUser = dependencies.deleteAuthUser ?? authStorage.deleteUser.bind(authStorage);
   const sendBookingNotificationEmail =
     dependencies.sendBookingNotificationEmail ?? defaultSendBookingNotificationEmail;
   const sendInvoiceEmail = dependencies.sendInvoiceEmail ?? defaultSendInvoiceEmail;
@@ -167,6 +172,8 @@ export async function registerRoutes(
     dependencies.sendLowSessionsEmail ?? defaultSendLowSessionsEmail;
   const sendBroadcastEmail =
     dependencies.sendBroadcastEmail ?? defaultSendBroadcastEmail;
+  const sendFeedbackEmail =
+    dependencies.sendFeedbackEmail ?? defaultSendFeedbackEmail;
   app.get("/robots.txt", (req, res) => {
     const siteUrl = getPublicSiteUrl(req);
     res.type("text/plain").send([
@@ -351,6 +358,13 @@ export async function registerRoutes(
       const session = await getStripeClient().checkout.sessions.create({
         mode: "subscription",
         customer,
+        // Stripe Tax needs the customer's address to calculate the right rate;
+        // this collects/updates it on the existing customer record if missing.
+        // Also requires Stripe Tax to be turned on and an origin address set
+        // in the Stripe Dashboard (Settings > Tax) - that part can't be done
+        // from the API.
+        automatic_tax: { enabled: true },
+        customer_update: { address: "auto", name: "auto" },
         line_items: [{ price: priceId, quantity: 1 }],
         success_url: `${siteUrl}/settings?billing=success`,
         cancel_url: `${siteUrl}/settings?billing=cancelled`,
@@ -411,7 +425,18 @@ export async function registerRoutes(
   });
 
   // --- Broadcast Email ---
-  app.post("/api/emails/broadcast", isAuthenticated, async (req, res) => {
+  // Tighter limit than the general API guard: this fans out to every client
+  // on the account, so it's the one endpoint that turns abuse or a stolen
+  // session into a spam/cost problem outside the app itself.
+  const broadcastEmailLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many broadcast emails sent. Please try again later." },
+  });
+
+  app.post("/api/emails/broadcast", isAuthenticated, broadcastEmailLimiter, async (req, res) => {
     try {
       const userId = getUserId(req);
       const { subject, message, recipientFilter } = req.body;
@@ -444,6 +469,39 @@ export async function registerRoutes(
       res.json(result);
     } catch (err) {
       logError("Failed to send broadcast email", err);
+      res.status(502).json(EMAIL_PROVIDER_ERROR);
+    }
+  });
+
+  // --- Feedback / feature requests ---
+  const FEEDBACK_TYPES = new Set(["bug", "feature", "general"]);
+  const feedbackLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too much feedback sent. Please try again later." },
+  });
+
+  app.post("/api/feedback", isAuthenticated, feedbackLimiter, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { type, message } = req.body || {};
+      if (!message?.trim()) return res.status(400).json({ message: "Message is required" });
+      const feedbackType = FEEDBACK_TYPES.has(type) ? type : "general";
+
+      const s = await storage.getSettings(userId);
+      const claims = (req as any).user?.claims || {};
+      await sendFeedbackEmail({
+        coachName: s?.trainerName || claims.email || "A coach",
+        coachEmail: s?.trainerEmail || claims.email || undefined,
+        businessName: s?.businessName || undefined,
+        type: feedbackType,
+        message: message.trim(),
+      });
+      res.json({ success: true });
+    } catch (err) {
+      logError("Failed to send feedback email", err);
       res.status(502).json(EMAIL_PROVIDER_ERROR);
     }
   });
@@ -952,7 +1010,7 @@ export async function registerRoutes(
         trainerName: settings?.trainerName || "Your Trainer",
         businessName: settings?.businessName || undefined,
         trainerEmail: settings?.trainerEmail || undefined,
-        paymentLink: settings?.paymentLink || undefined,
+        paymentMethods: settings,
       });
       res.json({ success: true });
     } catch (err) {
@@ -1014,7 +1072,9 @@ export async function registerRoutes(
 
   app.put("/api/settings", async (req, res) => {
     const userId = getUserId(req);
-    const s = await storage.upsertSettings(userId, req.body);
+    const parsed = insertSettingsSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    const s = await storage.upsertSettings(userId, parsed.data);
     res.json(s);
   });
 
@@ -1118,7 +1178,7 @@ export async function registerRoutes(
         businessName: s?.businessName || "",
         businessAddress: s?.businessAddress || undefined,
         trainerEmail: s?.trainerEmail || undefined,
-        paymentLink: s?.paymentLink || undefined,
+        paymentMethods: s,
       });
 
       const updated = await storage.updateInvoice(userId, req.params.id, {
@@ -1131,6 +1191,43 @@ export async function registerRoutes(
       logError("Error sending invoice email", err);
       res.status(502).json(EMAIL_PROVIDER_ERROR);
     }
+  });
+
+  // --- Account deletion (self-service) ---
+  app.delete("/api/account", isAuthenticated, async (req, res) => {
+    if ((req.session as any)?.impersonatedUserId) {
+      return res.status(400).json({ message: "Stop impersonating before deleting an account." });
+    }
+    if (isOwner(req)) {
+      return res.status(403).json({ message: "The platform owner account can't be deleted from here. Contact support." });
+    }
+
+    const userId = getRealUserId(req);
+    let stripeCancelFailed = false;
+
+    try {
+      const currentSettings = await storage.getSettings(userId);
+      if (currentSettings?.stripeSubscriptionId) {
+        try {
+          await getStripeClient().subscriptions.cancel(currentSettings.stripeSubscriptionId);
+        } catch (err) {
+          stripeCancelFailed = true;
+          logError("Failed to cancel Stripe subscription during account deletion", err);
+        }
+      }
+
+      await storage.deleteAccountData(userId);
+      await deleteAuthUser(userId);
+    } catch (err) {
+      logError("Failed to delete account", err);
+      return res.status(500).json({ message: "Unable to delete your account. Please try again or contact support." });
+    }
+
+    req.logout(() => {
+      req.session.destroy(() => {
+        res.status(200).json({ success: true, stripeCancelFailed });
+      });
+    });
   });
 
   return httpServer;

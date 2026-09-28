@@ -19,7 +19,14 @@ function getClient() {
     try {
       const gocardless = requireFn("gocardless-nodejs");
       const { constants } = requireFn("gocardless-nodejs");
-      client = gocardless(process.env.GOCARDLESS_API_KEY, constants.Environments.Sandbox);
+      // Defaults to Sandbox so real bank mandates can never be created by
+      // accident. Set GOCARDLESS_ENVIRONMENT=live once you're ready to take
+      // real client payments and have swapped in a live API key.
+      const environment =
+        process.env.GOCARDLESS_ENVIRONMENT === "live"
+          ? constants.Environments.Live
+          : constants.Environments.Sandbox;
+      client = gocardless(process.env.GOCARDLESS_API_KEY, environment);
     } catch (err) {
       logError("GoCardless not available", err);
     }

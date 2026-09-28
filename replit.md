@@ -99,7 +99,7 @@ A business hub for independent coaches managing in-person and online clients. Fe
 - `sessions` - Auth session storage (connect-pg-simple)
 - `packages` - clientId, name, totalSessions, usedSessions, price, status, billingType, monthlyRate, nextBillingDate
 - `session_notes` - sessionId, clientId, content, date, updatedAt
-- `settings` - trainerName, businessName, trainerEmail, trainerPhone, businessAddress, cancellationPolicy, paymentLink, acceptedPaymentMethods, invoicePrefix, lowSessionThreshold, enableEmailNotifications, enableSessionReminders, reminderHoursBefore, subscriptionStatus, subscriptionPlan, hipaaCompliant, dataRetentionDays, termsAccepted, **currency** (£/$/€)
+- `settings` - trainerName, businessName, trainerEmail, trainerPhone, businessAddress, cancellationPolicy, invoicePrefix, lowSessionThreshold, enableEmailNotifications, enableSessionReminders, reminderHoursBefore, subscriptionStatus, subscriptionPlan, hipaaCompliant, dataRetentionDays, termsAccepted, **currency** (£/$/€), payment methods (see "Payment Methods" below); `paymentLink`/`acceptedPaymentMethods` are deprecated leftover columns, no longer read or written by the UI
 - `client_forms` - clientId, formType, title, responses (JSON), status, date, updatedAt
 - `referrals` - referrerClientId, referredClientId, referredName, referredEmail, referredPhone, status, rewardType, rewardApplied, date, notes
 - `invoices` - clientId, packageId, invoiceNumber, amount, status, dueDate, sentDate, paidDate, notes, paymentMethod
@@ -142,13 +142,34 @@ A business hub for independent coaches managing in-person and online clients. Fe
 - PAR-Q email: POST /api/parq/send-email sends the PAR-Q questions to the client via Brevo
 - Low sessions notification: POST /api/packages/:id/notify-low-sessions - manually triggered from dashboard "Notify" button on each low session alert; sends email to client showing remaining sessions and package name
 
-## GoCardless (Monthly Payments)
+## Payment Methods (client → coach)
+- Coaches choose how their own clients pay them in Settings → Payment Methods. Every option is
+  record-keeping or the coach's own external link - none of it moves money through Practably.
+- Schema (`settings` table): `acceptsCash`, `acceptsCardMachine`, `acceptsBankTransfer` +
+  `bankTransferDetails`, `acceptsPaypal` + `paypalLink`, `acceptsStripeLink` + `stripePaymentLink`
+  (the coach's own Stripe Payment Link, created in their own Stripe dashboard - unrelated to the
+  platform's Stripe Checkout subscription billing below), `acceptsOtherPayment` +
+  `otherPaymentDetails`.
+- Shared rendering logic lives in `shared/payment-methods.ts` (`getPaymentMethods()` /
+  `paymentMethodsHtml()`) so the invoice PDF (client) and invoice/low-sessions emails (server)
+  stay in sync from one place.
+- Shown to clients on: the invoice email (`sendInvoiceEmail`), the low-sessions email
+  (`sendLowSessionsEmail`), and the downloadable/printable invoice PDF.
+- `invoices.paymentMethod` (per-invoice, coach-recorded) options: cash, card_machine,
+  bank_transfer, paypal, stripe, other.
+
+## GoCardless (Monthly Payments) - not recommended to enable yet
 - `gocardless-nodejs` package installed; `server/payments.ts` with `createMandateLink()`
 - Requires `GOCARDLESS_API_KEY` environment secret (not yet configured)
 - "Set Up Monthly Payment" button in client profile generates a redirect link for direct debit mandate setup
 - Uses `createRequire(import.meta.url)` to handle CJS package in ESM context
-- Currently configured to use Sandbox environment
+- Reads `GOCARDLESS_ENVIRONMENT` (defaults to Sandbox; set to `live` to go live)
 - POST `/api/payments/create-mandate-link` endpoint
+- **Important:** this uses one platform-wide API key, so as built today every coach's direct
+  debits would run through Practably's own GoCardless account, not each coach's own. Leave
+  `GOCARDLESS_API_KEY` unset (or don't expose the mandate button) until this moves to per-coach
+  accounts or GoCardless's Partner program - it's the one integration that currently contradicts
+  "payments shouldn't go through Practably."
 
 ## Terms & Conditions
 - `hasAcceptedTerms` field in settings table

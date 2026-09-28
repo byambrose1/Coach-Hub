@@ -16,6 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, Package, CreditCard, AlertTriangle, FileText, Clock, CheckCircle, Pencil, Download, Send, PoundSterling, TrendingUp, Users, Copy, Calendar, RefreshCw } from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import type { Client, Package as PackageType, Settings, Invoice, Session } from "@shared/schema";
+import { paymentMethodsHtml } from "@shared/payment-methods";
 import { trackActivationEvent } from "@/lib/activation";
 import { siteConfig } from "@/config/site";
 
@@ -258,8 +259,10 @@ function NewInvoiceDialog({ open, onOpenChange, clients, currency }: {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="transfer">Transfer</SelectItem>
-                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="card_machine">Card machine</SelectItem>
+                  <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                  <SelectItem value="paypal">PayPal</SelectItem>
+                  <SelectItem value="stripe">Stripe</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
@@ -487,7 +490,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
             </tr>
           </tbody>
         </table>
-        ${settings?.paymentLink ? `<p style="font-size:13px;color:#666;">Pay online: <a href="${settings.paymentLink}" style="color:#2563eb;">${settings.paymentLink}</a></p>` : ""}
+        ${paymentMethodsHtml(settings)}
         <div class="footer">
           <p>Thank you for your business</p>
           <p>${settings?.businessName || siteConfig.name} · Generated on ${formatDateUK(new Date().toISOString().split("T")[0])}</p>
@@ -578,8 +581,10 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="transfer">Transfer</SelectItem>
-                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="card_machine">Card machine</SelectItem>
+                  <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                  <SelectItem value="paypal">PayPal</SelectItem>
+                  <SelectItem value="stripe">Stripe</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>

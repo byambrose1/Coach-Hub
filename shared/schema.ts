@@ -84,6 +84,21 @@ export const settings = pgTable("settings", {
   trainerPhone: text("trainer_phone"),
   businessAddress: text("business_address"),
   acceptedPaymentMethods: text("accepted_payment_methods"),
+  // Payment methods a coach offers their own clients. Each is a simple
+  // record-keeping / link-sharing option - none of it moves money through
+  // Practably. Stripe/PayPal here are the coach's OWN payment links (e.g. a
+  // Stripe Payment Link or paypal.me URL they set up themselves), not a
+  // Practably-run checkout.
+  acceptsCash: boolean("accepts_cash").default(false),
+  acceptsCardMachine: boolean("accepts_card_machine").default(false),
+  acceptsBankTransfer: boolean("accepts_bank_transfer").default(false),
+  bankTransferDetails: text("bank_transfer_details"),
+  acceptsPaypal: boolean("accepts_paypal").default(false),
+  paypalLink: text("paypal_link"),
+  acceptsStripeLink: boolean("accepts_stripe_link").default(false),
+  stripePaymentLink: text("stripe_payment_link"),
+  acceptsOtherPayment: boolean("accepts_other_payment").default(false),
+  otherPaymentDetails: text("other_payment_details"),
   invoicePrefix: text("invoice_prefix").default("INV"),
   enableEmailNotifications: boolean("enable_email_notifications").default(false),
   enableSessionReminders: boolean("enable_session_reminders").default(false),
@@ -167,13 +182,13 @@ export const platformConfig = pgTable("platform_config", {
   tier1Price: text("tier1_price").default("0"),
   tier1PaymentLink: text("tier1_payment_link").default(""),
   tier2MaxClients: integer("tier2_max_clients").default(10),
-  tier2Price: text("tier2_price").default("3.99"),
+  tier2Price: text("tier2_price").default("1.99"),
   tier2PaymentLink: text("tier2_payment_link").default(""),
   tier3MaxClients: integer("tier3_max_clients").default(20),
-  tier3Price: text("tier3_price").default("7.99"),
+  tier3Price: text("tier3_price").default("4.99"),
   tier3PaymentLink: text("tier3_payment_link").default(""),
   tier4MaxClients: integer("tier4_max_clients").default(50),
-  tier4Price: text("tier4_price").default("12.99"),
+  tier4Price: text("tier4_price").default("7.99"),
   tier4PaymentLink: text("tier4_payment_link").default(""),
 });
 
