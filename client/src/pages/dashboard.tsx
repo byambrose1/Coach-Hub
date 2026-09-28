@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { TimeSelect } from "@/components/time-select";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -117,19 +118,17 @@ function QuickBookDialog({ open, onOpenChange, clients }: {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Start Time</Label>
-              <Input
-                type="time"
+              <TimeSelect
                 value={formData.startTime}
-                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                onChange={(value) => setFormData({ ...formData, startTime: value })}
                 data-testid="input-quickbook-start"
               />
             </div>
             <div className="space-y-2">
               <Label>End Time</Label>
-              <Input
-                type="time"
+              <TimeSelect
                 value={formData.endTime}
-                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                onChange={(value) => setFormData({ ...formData, endTime: value })}
                 data-testid="input-quickbook-end"
               />
             </div>

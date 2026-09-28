@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { TimeSelect } from "@/components/time-select";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -169,20 +170,18 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate, presel
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Start Time</Label>
-              <Input
-                type="time"
+              <TimeSelect
                 value={formData.startTime}
-                onChange={(e) => handleStartTimeChange(e.target.value)}
+                onChange={handleStartTimeChange}
                 data-testid="input-start-time"
               />
             </div>
             <div className="space-y-2">
               <Label>End Time</Label>
-              <Input
-                type="time"
+              <TimeSelect
                 value={formData.endTime}
                 min={formData.startTime}
-                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                onChange={(value) => setFormData({ ...formData, endTime: value })}
                 data-testid="input-end-time"
               />
             </div>

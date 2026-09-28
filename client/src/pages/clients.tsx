@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { TimeSelect } from "@/components/time-select";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -1050,11 +1051,9 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Start Time</Label>
-                <Input
-                  type="time"
+                <TimeSelect
                   value={bookFormData.startTime}
-                  onChange={(e) => {
-                    const val = e.target.value;
+                  onChange={(val) => {
                     const [h, m] = val.split(":").map(Number);
                     const endH = (h + 1) % 24;
                     setBookFormData({
@@ -1068,11 +1067,10 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
               </div>
               <div className="space-y-1.5">
                 <Label>End Time</Label>
-                <Input
-                  type="time"
+                <TimeSelect
                   value={bookFormData.endTime}
                   min={bookFormData.startTime}
-                  onChange={(e) => setBookFormData({ ...bookFormData, endTime: e.target.value })}
+                  onChange={(value) => setBookFormData({ ...bookFormData, endTime: value })}
                   data-testid="input-book-end-time"
                 />
               </div>
