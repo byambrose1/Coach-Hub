@@ -7,6 +7,23 @@ const brevo = new BrevoClient({
   apiKey: process.env.BREVO_API_KEY || "",
 });
 
+// All client-facing email sends from this one verified address, never from
+// a coach's own (unverified, and usually on a different domain) address -
+// Brevo will only reliably deliver mail sent from a domain it has
+// authenticated. The coach's identity still comes through: their name leads
+// the display name, and replies go straight to them via replyTo below.
+const PLATFORM_SENDER_EMAIL = process.env.TRANSACTIONAL_SENDER_EMAIL || "noreply@practably.co.uk";
+
+function getSenderIdentity(trainerName?: string, businessName?: string, trainerEmail?: string) {
+  const senderName = trainerName
+    ? businessName
+      ? `${trainerName} - ${businessName}`
+      : trainerName
+    : businessName || "Practably";
+  const replyTo = trainerEmail ? { email: trainerEmail, name: trainerName || businessName || "Coach" } : undefined;
+  return { senderName, senderEmail: PLATFORM_SENDER_EMAIL, replyTo };
+}
+
 interface InvoiceEmailData {
   clientName: string;
   clientEmail: string;
@@ -24,8 +41,7 @@ interface InvoiceEmailData {
 
 export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
   const { clientName, clientEmail, invoiceNumber, amount, currency, dueDate, notes, trainerName, businessName, businessAddress, trainerEmail, paymentMethods } = data;
-  const senderName = businessName || trainerName || "Practably";
-  const senderEmail = trainerEmail || "noreply@practably.app";
+  const { senderName, senderEmail, replyTo } = getSenderIdentity(trainerName, businessName, trainerEmail);
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
@@ -70,6 +86,7 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
       htmlContent,
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
+      replyTo,
     });
     console.log("Invoice email sent");
   } catch (error: any) {
@@ -88,8 +105,7 @@ export async function sendBookingNotificationEmail(data: {
   trainerEmail?: string;
 }): Promise<void> {
   const { clientName, clientEmail, sessionDate, sessionTime, trainerName, businessName, trainerEmail } = data;
-  const senderName = businessName || trainerName || "Practably";
-  const senderEmail = trainerEmail || "noreply@practably.app";
+  const { senderName, senderEmail, replyTo } = getSenderIdentity(trainerName, businessName, trainerEmail);
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
@@ -117,6 +133,7 @@ export async function sendBookingNotificationEmail(data: {
       htmlContent,
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
+      replyTo,
     });
     console.log("Booking notification sent");
   } catch (error) {
@@ -134,8 +151,7 @@ export async function sendSessionCancellationEmail(data: {
   trainerEmail?: string;
 }): Promise<void> {
   const { clientName, clientEmail, sessionDate, sessionTime, trainerName, businessName, trainerEmail } = data;
-  const senderName = businessName || trainerName || "Practably";
-  const senderEmail = trainerEmail || "noreply@practably.app";
+  const { senderName, senderEmail, replyTo } = getSenderIdentity(trainerName, businessName, trainerEmail);
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
@@ -163,6 +179,7 @@ export async function sendSessionCancellationEmail(data: {
       htmlContent,
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
+      replyTo,
     });
     console.log("Cancellation notification sent");
   } catch (error) {
@@ -182,8 +199,7 @@ export async function sendSessionRescheduleEmail(data: {
   trainerEmail?: string;
 }): Promise<void> {
   const { clientName, clientEmail, newDate, newTime, oldDate, oldTime, trainerName, businessName, trainerEmail } = data;
-  const senderName = businessName || trainerName || "Practably";
-  const senderEmail = trainerEmail || "noreply@practably.app";
+  const { senderName, senderEmail, replyTo } = getSenderIdentity(trainerName, businessName, trainerEmail);
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
@@ -212,6 +228,7 @@ export async function sendSessionRescheduleEmail(data: {
       htmlContent,
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
+      replyTo,
     });
     console.log("Reschedule notification sent");
   } catch (error) {
@@ -230,8 +247,7 @@ export async function sendLowSessionsEmail(data: {
   paymentMethods?: Settings;
 }): Promise<void> {
   const { clientName, clientEmail, packageName, remainingSessions, trainerName, businessName, trainerEmail, paymentMethods } = data;
-  const senderName = businessName || trainerName || "Practably";
-  const senderEmail = trainerEmail || "noreply@practably.app";
+  const { senderName, senderEmail, replyTo } = getSenderIdentity(trainerName, businessName, trainerEmail);
   const sessionWord = remainingSessions === 1 ? "session" : "sessions";
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -270,6 +286,7 @@ export async function sendLowSessionsEmail(data: {
       subject: `You have ${remainingSessions} ${sessionWord} remaining - ${packageName}`,
       htmlContent,
       sender: { name: senderName, email: senderEmail },
+      replyTo,
       to: [{ email: clientEmail, name: clientName }],
     });
     console.log("Low sessions notification sent");
@@ -288,8 +305,7 @@ export async function sendBroadcastEmail(data: {
   trainerEmail?: string;
 }): Promise<{ sent: number; failed: number }> {
   const { subject, message, recipients, trainerName, businessName, trainerEmail } = data;
-  const senderName = businessName || trainerName || "Practably";
-  const senderEmail = trainerEmail || "noreply@practably.app";
+  const { senderName, senderEmail, replyTo } = getSenderIdentity(trainerName, businessName, trainerEmail);
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
@@ -316,6 +332,7 @@ export async function sendBroadcastEmail(data: {
         htmlContent,
         sender: { name: senderName, email: senderEmail },
         to: [{ email: recipient.email, name: recipient.name }],
+        replyTo,
       });
       sent++;
     } catch (error) {
@@ -335,8 +352,7 @@ export async function sendParqEmail(data: {
   trainerEmail?: string;
 }): Promise<void> {
   const { clientName, clientEmail, trainerName, businessName, trainerEmail } = data;
-  const senderName = businessName || trainerName || "Practably";
-  const senderEmail = trainerEmail || "noreply@practably.app";
+  const { senderName, senderEmail, replyTo } = getSenderIdentity(trainerName, businessName, trainerEmail);
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
@@ -371,6 +387,7 @@ export async function sendParqEmail(data: {
       htmlContent,
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
+      replyTo,
     });
     console.log("PAR-Q email sent");
   } catch (error: any) {
@@ -417,7 +434,7 @@ export async function sendFeedbackEmail(data: {
     await brevo.transactionalEmails.sendTransacEmail({
       subject: `[Practably ${typeLabel}] from ${coachName}`,
       htmlContent,
-      sender: { name: "Practably feedback", email: "noreply@practably.app" },
+      sender: { name: "Practably feedback", email: PLATFORM_SENDER_EMAIL },
       to: [{ email: recipientEmail, name: "Practably" }],
       replyTo: coachEmail ? { email: coachEmail, name: coachName } : undefined,
     });
