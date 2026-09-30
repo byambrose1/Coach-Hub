@@ -33,6 +33,8 @@ function makeStore() {
     referrals: [] as Row[],
     invoices: [] as Row[],
     settings: new Map<string, Row>(),
+    waitlist: [] as Row[],
+    blogPosts: [] as Row[],
   };
 
   const withId = (collection: Row[], userId: string, data: any): Row => {
@@ -125,6 +127,25 @@ function makeStore() {
     upsertPlatformConfig: async (data) => ({ id: "default", ...data } as any),
     getCoachDetail: async () => undefined as unknown as CoachDetail,
     updateCoachPlan: async () => {},
+
+    createWaitlistSignup: async (data) => withId(state.waitlist, "", data) as any,
+    getWaitlistSignupByEmail: async (email) => state.waitlist.find((w) => w.email === email) as any,
+    getWaitlistSignups: async () => state.waitlist as any,
+
+    getPublishedBlogPosts: async () => state.blogPosts.filter((p) => p.published) as any,
+    getPublishedBlogPost: async (slug) => state.blogPosts.find((p) => p.slug === slug && p.published) as any,
+    getAllBlogPosts: async () => state.blogPosts as any,
+    getBlogPost: async (id) => state.blogPosts.find((p) => p.id === id) as any,
+    createBlogPost: async (data) => withId(state.blogPosts, "", data) as any,
+    updateBlogPost: async (id, data) => {
+      const post = state.blogPosts.find((p) => p.id === id);
+      if (!post) return undefined;
+      Object.assign(post, data);
+      return post as any;
+    },
+    deleteBlogPost: async (id) => {
+      state.blogPosts = state.blogPosts.filter((p) => p.id !== id);
+    },
   };
 
   return { storage, state };
@@ -382,4 +403,85 @@ test("account deletion is blocked while impersonating, to avoid deleting the wro
   assert.ok(!deletedAuthUserIds.includes(COACH_A));
   assert.ok(!deletedAuthUserIds.includes(COACH_B));
   assert.match(body.message, /impersonat/i);
+});
+
+test("waitlist signup is public, stored, and de-duplicated by email", async () => {
+  const { response, body } = await request("/api/waitlist", {
+    method: "POST",
+    body: JSON.stringify({ email: "Coach@Example.com", name: "New Coach" }),
+  });
+  assert.equal(response.status, 200);
+  assert.equal(body.success, true);
+  assert.equal(store.state.waitlist.length, 1);
+  // Stored lowercased, per the schema's z.string().email() + toLowerCase() transform.
+  assert.equal(store.state.waitlist[0].email, "coach@example.com");
+
+  const again = await request("/api/waitlist", {
+    method: "POST",
+    body: JSON.stringify({ email: "coach@example.com", name: "Duplicate" }),
+  });
+  assert.equal(again.response.status, 200);
+  assert.equal(store.state.waitlist.length, 1);
+});
+
+test("waitlist signup rejects an invalid email and ignores a filled-in honeypot", async () => {
+  const invalid = await request("/api/waitlist", {
+    method: "POST",
+    body: JSON.stringify({ email: "not-an-email" }),
+  });
+  assert.equal(invalid.response.status, 400);
+
+  const bot = await request("/api/waitlist", {
+    method: "POST",
+    body: JSON.stringify({ email: "bot@example.com", website: "http://spam.example" }),
+  });
+  assert.equal(bot.response.status, 200);
+  assert.equal(store.state.waitlist.some((w) => w.email === "bot@example.com"), false);
+});
+
+test("only the platform owner can list waitlist signups", async () => {
+  const asCoach = await request("/api/platform-admin/waitlist", { as: COACH_A });
+  assert.equal(asCoach.response.status, 403);
+
+  const asOwner = await request("/api/platform-admin/waitlist", { as: OWNER_ID });
+  assert.equal(asOwner.response.status, 200);
+  assert.ok(Array.isArray(asOwner.body));
+});
+
+test("blog: public list only ever includes published posts, and only the owner can write them", async () => {
+  const draft = await request("/api/platform-admin/blog", {
+    method: "POST",
+    as: OWNER_ID,
+    body: JSON.stringify({ title: "Draft post", slug: "draft-post", contentMarkdown: "Not ready yet.", published: false }),
+  });
+  assert.equal(draft.response.status, 201);
+
+  const published = await request("/api/platform-admin/blog", {
+    method: "POST",
+    as: OWNER_ID,
+    body: JSON.stringify({ title: "Live post", slug: "live-post", contentMarkdown: "Ready to go.", published: true }),
+  });
+  assert.equal(published.response.status, 201);
+
+  const deniedWrite = await request("/api/platform-admin/blog", {
+    method: "POST",
+    as: COACH_A,
+    body: JSON.stringify({ title: "Sneaky", slug: "sneaky", contentMarkdown: "x", published: true }),
+  });
+  assert.equal(deniedWrite.response.status, 403);
+
+  const publicList = await request("/api/blog");
+  assert.equal(publicList.response.status, 200);
+  assert.equal(publicList.body.length, 1);
+  assert.equal(publicList.body[0].slug, "live-post");
+
+  const publicDraft = await request("/api/blog/draft-post");
+  assert.equal(publicDraft.response.status, 404);
+
+  const adminList = await request("/api/platform-admin/blog", { as: OWNER_ID });
+  assert.equal(adminList.response.status, 200);
+  assert.equal(adminList.body.length, 2);
+
+  const deniedList = await request("/api/platform-admin/blog", { as: COACH_A });
+  assert.equal(deniedList.response.status, 403);
 });

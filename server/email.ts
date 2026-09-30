@@ -444,3 +444,66 @@ export async function sendFeedbackEmail(data: {
     throw error;
   }
 }
+
+export async function sendWaitlistConfirmationEmail(data: {
+  email: string;
+  name?: string;
+}): Promise<void> {
+  const { email, name } = data;
+  const greeting = name ? `Hi ${name},` : "Hi there,";
+  const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0">
+  <div style="max-width:560px;margin:0 auto;background:#fff;padding:32px">
+    <h1 style="color:#7c3aed;margin:0 0 16px">You're on the list</h1>
+    <p style="font-size:15px;line-height:1.6;color:#333">${greeting}</p>
+    <p style="font-size:15px;line-height:1.6;color:#333">Thanks for joining the Practably waitlist. Practably is a simple business hub for independent coaches - clients, bookings, PARQ forms, invoices, and payment tracking in one place.</p>
+    <p style="font-size:15px;line-height:1.6;color:#333">We're in private beta and inviting coaches in gradually. We'll email you as soon as a spot opens up.</p>
+    <p style="font-size:15px;line-height:1.6;color:#333">Thanks,<br/>The Practably team</p>
+  </div>
+  </body></html>`;
+
+  try {
+    await brevo.transactionalEmails.sendTransacEmail({
+      subject: "You're on the Practably waitlist",
+      htmlContent,
+      sender: { name: "Practably", email: PLATFORM_SENDER_EMAIL },
+      to: [{ email, name: name || undefined }],
+    });
+    console.log("Waitlist confirmation email sent");
+  } catch (error: any) {
+    logError("Failed to send waitlist confirmation email", error);
+    throw error;
+  }
+}
+
+export async function sendWaitlistNotificationEmail(data: {
+  email: string;
+  name?: string;
+  coachingFocus?: string;
+  howHeard?: string;
+}): Promise<void> {
+  const { email, name, coachingFocus, howHeard } = data;
+  const recipientEmail = process.env.FEEDBACK_RECIPIENT_EMAIL || "contact@practably.co.uk";
+  const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0">
+  <div style="max-width:560px;margin:0 auto;background:#fff;padding:30px">
+    <h1 style="color:#2563eb;margin:0 0 16px">New waitlist signup</h1>
+    <p style="font-size:14px;color:#333">Email: <strong>${email}</strong></p>
+    ${name ? `<p style="font-size:14px;color:#333">Name: ${name}</p>` : ""}
+    ${coachingFocus ? `<p style="font-size:14px;color:#333">Coaching focus: ${coachingFocus}</p>` : ""}
+    ${howHeard ? `<p style="font-size:14px;color:#333">Heard about us via: ${howHeard}</p>` : ""}
+  </div>
+  </body></html>`;
+
+  try {
+    await brevo.transactionalEmails.sendTransacEmail({
+      subject: `[Practably waitlist] ${email}`,
+      htmlContent,
+      sender: { name: "Practably waitlist", email: PLATFORM_SENDER_EMAIL },
+      to: [{ email: recipientEmail, name: "Practably" }],
+    });
+  } catch (error: any) {
+    logError("Failed to send waitlist notification email", error);
+    // Don't throw: the signup itself already succeeded and is stored in the
+    // database - a failed internal notification shouldn't fail the request
+    // or show an error to the person signing up.
+  }
+}

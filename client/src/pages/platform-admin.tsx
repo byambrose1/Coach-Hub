@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
   Users, Activity, FileText, DollarSign, ShieldAlert,
-  Link2, Crown, Search, ExternalLink, Save, ChevronRight
+  Link2, Crown, Search, ExternalLink, Save, ChevronRight, ArrowRight
 } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -168,6 +168,34 @@ export default function PlatformAdmin() {
             <StatCard title="Platform Revenue" value={`£${(stats?.totalRevenue || 0).toFixed(2)}`} icon={DollarSign} color="text-amber-500" />
           </div>
         )}
+      </div>
+
+      {/* Waitlist & Blog */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/platform-admin/waitlist")} data-testid="link-admin-waitlist">
+          <CardContent className="pt-5 pb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Users className="h-6 w-6 text-violet-500" />
+              <div>
+                <p className="font-semibold text-sm">Waitlist</p>
+                <p className="text-xs text-muted-foreground">See and export pre-launch signups</p>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/platform-admin/blog")} data-testid="link-admin-blog">
+          <CardContent className="pt-5 pb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FileText className="h-6 w-6 text-violet-500" />
+              <div>
+                <p className="font-semibold text-sm">Blog</p>
+                <p className="text-xs text-muted-foreground">Write and publish posts for SEO</p>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          </CardContent>
+        </Card>
       </div>
 
       {/* Tier Config */}
