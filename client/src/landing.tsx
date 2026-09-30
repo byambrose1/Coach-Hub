@@ -44,16 +44,27 @@ function setMeta(name: string, content: string, attribute: "name" | "property" =
   element.content = content;
 }
 
+function Callout({ icon: Icon, label, className, tailClassName }: { icon: any; label: string; className: string; tailClassName: string }) {
+  return (
+    <div className={`pointer-events-none absolute z-10 hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-violet-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-violet-700 shadow-lg sm:flex ${className}`}>
+      <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
+      {label}
+      <span className={`absolute h-2.5 w-2.5 rotate-45 border-violet-200 bg-white ${tailClassName}`} aria-hidden="true" />
+    </div>
+  );
+}
+
 function ProductPreview() {
   return (
-    <div className="mx-auto mt-12 max-w-5xl rounded-[1.75rem] border border-slate-200 bg-white p-2 shadow-2xl shadow-violet-200/50 sm:p-3">
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
+    <div className="mx-auto mt-16 max-w-5xl rounded-[1.75rem] border border-slate-200 bg-white p-2 shadow-2xl shadow-violet-200/50 sm:mt-20 sm:p-3">
+      <div className="overflow-visible rounded-2xl border border-slate-200 bg-slate-50">
+        <div className="flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
           <div className="flex items-center gap-2 font-bold text-slate-950"><BrandMark className="h-7 w-7" />Practably</div>
           <div className="hidden items-center gap-2 sm:flex"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden="true" /><span className="text-xs font-medium text-slate-500">Coach dashboard</span></div>
         </div>
         <div className="grid gap-3 p-3 sm:grid-cols-[1.1fr_.9fr] sm:p-5">
-          <section aria-label="Illustrative weekly calendar" className="rounded-xl border border-slate-200 bg-white p-4 text-left">
+          <section aria-label="Illustrative weekly calendar" className="relative rounded-xl border border-slate-200 bg-white p-4 text-left">
+            <Callout icon={CalendarDays} label="Book a session in seconds" className="-top-9 left-2" tailClassName="-bottom-1 left-5 border-b border-r" />
             <div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-violet-600">This week</p><p className="font-bold text-slate-950">Your coaching calendar</p></div><span className="rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">3 upcoming</span></div>
             <div className="grid grid-cols-5 gap-1.5 text-center text-[10px] font-semibold text-slate-500 sm:gap-2 sm:text-xs">
               {["Mon", "Tue", "Wed", "Thu", "Fri"].map((day, index) => <div key={day} className={`rounded-lg py-1.5 ${index === 2 ? "bg-violet-600 text-white" : "bg-slate-100"}`}>{day}<span className="ml-1 opacity-70">{12 + index}</span></div>)}
@@ -64,11 +75,23 @@ function ProductPreview() {
             </div>
           </section>
           <div className="grid gap-3 text-left">
-            <section aria-label="Illustrative client list" className="rounded-xl border border-slate-200 bg-white p-4"><div className="mb-3 flex items-center justify-between"><p className="text-sm font-bold text-slate-950">Clients</p><span className="text-xs font-semibold text-violet-700">5 / 5 free</span></div><div className="space-y-2">{[["Alex M.", "PARQ complete"], ["Sam T.", "PARQ to send"], ["Morgan K.", "Active package"]].map(([name, status], index) => <div key={name} className="flex items-center gap-2"><span className={`grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold text-white ${index === 1 ? "bg-orange-400" : "bg-violet-500"}`}>{name.split(" ").map((part) => part[0]).join("")}</span><div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-800">{name}</p><p className={`text-[10px] ${index === 1 ? "text-orange-700" : "text-emerald-700"}`}>{status}</p></div></div>)}</div></section>
-            <div className="grid grid-cols-2 gap-3"><section aria-label="Illustrative invoice status" className="rounded-xl bg-slate-950 p-3 text-white"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Outstanding</p><p className="mt-1 text-xl font-extrabold">£120</p><p className="mt-1 text-[10px] text-slate-400">1 invoice due</p></section><section aria-label="Illustrative onboarding status" className="rounded-xl bg-emerald-50 p-3"><p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Setup</p><p className="mt-1 text-xl font-extrabold text-emerald-900">4 / 6</p><p className="mt-1 text-[10px] text-emerald-700">steps complete</p></section></div>
+            <section aria-label="Illustrative client list" className="relative rounded-xl border border-slate-200 bg-white p-4">
+              <Callout icon={ClipboardCheck} label="PARQ status at a glance" className="-top-9 right-2" tailClassName="-bottom-1 right-6 border-b border-r" />
+              <div className="mb-3 flex items-center justify-between"><p className="text-sm font-bold text-slate-950">Clients</p><span className="text-xs font-semibold text-violet-700">5 / 5 free</span></div><div className="space-y-2">{[["Alex M.", "PARQ complete"], ["Sam T.", "PARQ to send"], ["Morgan K.", "Active package"]].map(([name, status], index) => <div key={name} className="flex items-center gap-2"><span className={`grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold text-white ${index === 1 ? "bg-orange-400" : "bg-violet-500"}`}>{name.split(" ").map((part) => part[0]).join("")}</span><div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-800">{name}</p><p className={`text-[10px] ${index === 1 ? "text-orange-700" : "text-emerald-700"}`}>{status}</p></div></div>)}</div>
+            </section>
+            <div className="grid grid-cols-2 gap-3">
+              <section aria-label="Illustrative invoice status" className="relative rounded-xl bg-slate-950 p-3 text-white">
+                <Callout icon={CreditCard} label="Chase payments easily" className="-bottom-9 -left-1" tailClassName="-top-1 left-5 border-t border-l" />
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Outstanding</p><p className="mt-1 text-xl font-extrabold">£120</p><p className="mt-1 text-[10px] text-slate-400">1 invoice due</p>
+              </section>
+              <section aria-label="Illustrative onboarding status" className="relative rounded-xl bg-emerald-50 p-3">
+                <Callout icon={Sparkles} label="Guided setup checklist" className="-bottom-9 -right-1" tailClassName="-top-1 right-5 border-t border-l" />
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Setup</p><p className="mt-1 text-xl font-extrabold text-emerald-900">4 / 6</p><p className="mt-1 text-[10px] text-emerald-700">steps complete</p>
+              </section>
+            </div>
           </div>
         </div>
-        <p className="border-t border-slate-200 bg-white px-4 py-2 text-left text-[11px] text-slate-500">Illustrative dashboard preview using Practably workflows.</p>
+        <p className="rounded-b-2xl border-t border-slate-200 bg-white px-4 py-2 text-left text-[11px] text-slate-500">Illustrative dashboard preview using Practably workflows.</p>
       </div>
     </div>
   );
