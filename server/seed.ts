@@ -26,17 +26,17 @@ const STARTER_POSTS: Array<{
     seoDescription: "Practably vs PT Distinction vs TrueCoach compared on price and features, for independent UK personal trainers choosing client management software.",
     contentMarkdown: `If you've searched for personal trainer software, you've probably landed on PT Distinction or TrueCoach. Both are solid, well-reviewed platforms - but both are priced and built for coaches running structured online coaching programmes with dozens of clients, not necessarily for someone managing a smaller in-person roster who mainly needs client records, bookings, PARQ forms, and invoicing sorted.
 
-Here's an honest breakdown, prices correct as of late 2026 - always check the current numbers on each provider's own site before you commit, since software pricing changes often.
+Here's an honest breakdown. Both platforms list prices in US dollars, so we've converted to approximate GBP too - prices correct as of late 2026, always check the current numbers (and live exchange rate) on each provider's own site before you commit, since software pricing changes often.
 
 ## Pricing at a glance
 
-**PT Distinction**: Novice plan from $19.90/month (3 clients), up to Master at $89.90/month (50 clients), plus a per-extra-client fee on top.
+**PT Distinction**: Novice plan from $19.90/month (~£15, 3 clients), up to Master at $89.90/month (~£67, 50 clients), plus a per-extra-client fee on top.
 
-**TrueCoach**: Starter from $29.98/month (5 clients), up to Pro at $164.98/month (50 clients).
+**TrueCoach**: Starter from $29.98/month (~£22, 5 clients), up to Pro at $164.98/month (~£123, 50 clients).
 
-**Practably**: Free for up to 5 clients, then £1.99/month (10 clients), £4.99/month (20 clients), £7.99/month (50 clients) - no per-client add-on fees.
+**Practably**: Free for up to 5 clients, then £1.99/month (10 clients), £4.99/month (20 clients), £7.99/month (50 clients) - no per-client add-on fees, and priced in pounds to begin with.
 
-For a coach with a small roster, that's a meaningful difference: getting to 20 clients costs roughly $60-70/month (around £50-55) on PT Distinction or TrueCoach, versus £4.99/month on Practably.
+For a coach with a small roster, that's a meaningful difference: getting to 20 clients costs roughly £45-55/month on PT Distinction or TrueCoach, versus £4.99/month on Practably.
 
 ## What you're actually paying for
 
@@ -59,7 +59,7 @@ Practably is currently in private beta - if the second one sounds like you, join
     seoDescription: "The best personal trainer software for a small client roster in 2026, comparing Practably, PT Distinction, TrueCoach, and My PT Hub on price and features.",
     contentMarkdown: `Most "best personal trainer software" roundups are written for coaches running 50+ client online coaching businesses. If you're coaching a smaller roster - say, under 20 clients, a mix of in-person and online - a lot of that advice doesn't apply, and a lot of that pricing doesn't make sense yet.
 
-Here's a straight look at four options, focused on what a smaller coaching business actually needs. Prices are correct as of late 2026 - check each provider's live pricing before switching.
+Here's a straight look at four options, focused on what a smaller coaching business actually needs. Prices are correct as of late 2026 - check each provider's live pricing before switching. Three of these list prices in US dollars, so we've added approximate GBP for a UK reader; Practably is priced in pounds to begin with.
 
 ## Practably - simple client and business admin
 
@@ -71,19 +71,19 @@ Here's a straight look at four options, focused on what a smaller coaching busin
 
 ## PT Distinction - deep customisation for structured coaching
 
-**Price**: From $19.90/month (3 clients) to $89.90/month (50 clients).
+**Price**: From $19.90/month (~£15, 3 clients) to $89.90/month (~£67, 50 clients).
 
 **Best for**: coaches running detailed, periodised programmes who want heavy customisation and automation (onboarding sequences, follow-ups) and are happy paying for it.
 
 ## TrueCoach - polished client experience
 
-**Price**: From $29.98/month (5 clients) to $164.98/month (50 clients).
+**Price**: From $29.98/month (~£22, 5 clients) to $164.98/month (~£123, 50 clients).
 
 **Best for**: strength and conditioning or bodybuilding coaches who prioritise a slick client-facing app experience over price.
 
 ## My PT Hub - unlimited clients on one plan
 
-**Price**: From $40/month (3 clients); the mid-tier Premium plan ($105/month) includes unlimited clients on a flat fee.
+**Price**: From $40/month (~£30, 3 clients); the mid-tier Premium plan ($105/month, ~£78) includes unlimited clients on a flat fee.
 
 **Best for**: coaches who expect to scale past 50 clients quickly and want to avoid per-client pricing later, and don't mind paying more up front for that flexibility.
 
