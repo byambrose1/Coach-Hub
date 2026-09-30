@@ -80,7 +80,7 @@ async function upsertUser(claims: any) {
   });
 }
 
-export async function setupAuth(app: Express, options?: { loginGate?: RequestHandler }) {
+export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use(getSession());
   app.use(passport.initialize());
@@ -141,7 +141,7 @@ export async function setupAuth(app: Express, options?: { loginGate?: RequestHan
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
-  app.get("/api/login", ...(options?.loginGate ? [options.loginGate] : []), (req, res, next) => {
+  app.get("/api/login", (req, res, next) => {
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",

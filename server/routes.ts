@@ -188,7 +188,6 @@ export async function registerRoutes(
       "Disallow: /clients",
       "Disallow: /schedule",
       "Disallow: /payments",
-      "Disallow: /join",
       `Sitemap: ${siteUrl}/sitemap.xml`,
       "",
     ].join("\n"));

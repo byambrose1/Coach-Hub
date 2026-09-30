@@ -27,7 +27,6 @@ import type { Settings } from "@shared/schema";
 import { apiRequest } from "./lib/queryClient";
 import { PrivacyPage, TermsPage, SupportPage } from "@/pages/public";
 import { BlogListPage, BlogPostPage } from "@/pages/blog";
-import JoinPage from "@/pages/join";
 import { trackActivationEvent } from "@/lib/activation";
 import { captureAttributionFromUrl } from "@/lib/attribution";
 
@@ -165,7 +164,6 @@ function PublicRouter() {
       <Route path="/support" component={SupportPage} />
       <Route path="/blog" component={BlogListPage} />
       <Route path="/blog/:slug" component={BlogPostPage} />
-      <Route path="/join" component={JoinPage} />
       <Route path="/pricing" component={Landing} />
       <Route component={Landing} />
     </Switch>
@@ -200,7 +198,7 @@ function AppContent() {
   const [location] = useLocation();
   const trackedSignup = useRef(false);
   const isPublicPage =
-    ["/privacy", "/terms", "/support", "/pricing", "/join"].includes(location) ||
+    ["/privacy", "/terms", "/support", "/pricing"].includes(location) ||
     location.startsWith("/blog");
 
   useEffect(() => {
