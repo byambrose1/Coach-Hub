@@ -93,6 +93,49 @@ Before comparing feature lists, ask: do you need software to help you *deliver* 
 
 If it's the second one and your roster is still small, you're likely better off starting with something priced for where you are now rather than where a 50-client business would be. Practably is currently in private beta, built specifically for that - join the waitlist to get early access.`,
   },
+  {
+    slug: "parq-form-template-personal-trainers-uk",
+    title: "PAR-Q Form Template for Personal Trainers (UK): What to Include and How to Use It",
+    excerpt: "What a PAR-Q health screening form needs to cover, the standard questions to include, and how to collect one without a stack of paper.",
+    seoDescription: "A PAR-Q form template and guide for UK personal trainers: what questions to include, why it matters, and how to collect and store PAR-Q responses digitally.",
+    contentMarkdown: `Before a new client's first session, most UK personal trainers use some version of a PAR-Q (Physical Activity Readiness Questionnaire) to screen for health risks. It's a standard part of a responsible onboarding process - not a medical assessment, but a way to flag anything that means a client should check with a doctor before starting an exercise programme.
+
+This isn't medical or legal advice - if you're unsure whether a client needs medical clearance, that's a question for a doctor, not a form.
+
+## Why a PAR-Q matters
+
+A PAR-Q helps you spot risk factors before they become a problem in a session: an undiagnosed heart condition, a joint issue that a particular exercise could aggravate, or a medication that affects how someone responds to exercise. It's also part of showing you've taken reasonable care as a coach, which matters for your own liability and insurance.
+
+## The standard questions
+
+The original Physical Activity Readiness Questionnaire (PAR-Q, developed in Canada and widely used as a baseline in UK fitness qualifications) covers seven core questions. A typical PAR-Q form asks the client to confirm:
+
+- Whether a doctor has ever said they have a heart condition and recommended only medically supervised physical activity
+- Whether they feel chest pain during physical activity
+- Whether they've had chest pain when not doing physical activity in the past month
+- Whether they lose their balance because of dizziness, or ever lose consciousness
+- Whether they have a bone or joint problem that could be made worse by a change in physical activity
+- Whether a doctor is currently prescribing medication for blood pressure or a heart condition
+- Whether they know of any other reason they should not do physical activity
+
+A "yes" to any of these doesn't automatically mean you can't train someone - it means it's worth a conversation, and possibly a note from their GP, before you start.
+
+## What else a good PAR-Q form should cover
+
+Beyond the core seven questions, most coaches add:
+
+- Contact details and emergency contact
+- Current medications and allergies
+- Previous injuries or surgeries
+- Current activity level and exercise history
+- Specific goals for training
+
+## Paper form vs. digital
+
+A paper PAR-Q works, but it's easy to lose, awkward to search back through, and not great if a client needs to update their answers later (a new diagnosis, a new medication). Collecting PAR-Q responses digitally against the client's own record means you can find them instantly, and they don't get left in a gym bag.
+
+Practably includes PARQ form collection built into each client record, so responses are stored alongside bookings, notes, and invoices rather than in a separate paper file. Practably is currently in private beta - join the waitlist to get early access.`,
+  },
 ];
 
 export async function seedBlogPosts() {
