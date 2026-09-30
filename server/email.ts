@@ -13,6 +13,7 @@ const brevo = new BrevoClient({
 // authenticated. The coach's identity still comes through: their name leads
 // the display name, and replies go straight to them via replyTo below.
 const PLATFORM_SENDER_EMAIL = process.env.TRANSACTIONAL_SENDER_EMAIL || "noreply@practably.co.uk";
+console.log(`[email] platform sender configured as: ${PLATFORM_SENDER_EMAIL}`);
 
 function getSenderIdentity(trainerName?: string, businessName?: string, trainerEmail?: string) {
   const senderName = trainerName
@@ -21,6 +22,7 @@ function getSenderIdentity(trainerName?: string, businessName?: string, trainerE
       : trainerName
     : businessName || "Practably";
   const replyTo = trainerEmail ? { email: trainerEmail, name: trainerName || businessName || "Coach" } : undefined;
+  console.log(`[email] sending as ${PLATFORM_SENDER_EMAIL} (reply-to: ${trainerEmail || "none"})`);
   return { senderName, senderEmail: PLATFORM_SENDER_EMAIL, replyTo };
 }
 
