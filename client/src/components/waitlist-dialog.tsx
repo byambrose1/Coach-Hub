@@ -4,23 +4,41 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { trackActivationEvent } from "@/lib/activation";
+import { getAttribution } from "@/lib/attribution";
+
+const HOW_HEARD_OPTIONS = [
+  "Facebook group",
+  "Reddit",
+  "Google search",
+  "A software comparison site",
+  "Referral from a coach",
+  "Blog post",
+  "Other",
+];
 
 export function WaitlistDialog({ trigger }: { trigger: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [coachingFocus, setCoachingFocus] = useState("");
+  const [howHeard, setHowHeard] = useState("");
   const [website, setWebsite] = useState(""); // honeypot - left blank by real people
 
   const mutation = useMutation({
     mutationFn: async () => {
+      // A visitor who arrived via a tracked link (e.g. a paid ad with
+      // ?utm_source=...) is attributed automatically; otherwise fall back to
+      // what they picked in the dropdown below.
+      const attribution = getAttribution();
       const res = await apiRequest("POST", "/api/waitlist", {
         email,
         name: name || undefined,
         coachingFocus: coachingFocus || undefined,
+        howHeard: attribution || howHeard || undefined,
         website,
       });
       return res.json();
@@ -38,6 +56,7 @@ export function WaitlistDialog({ trigger }: { trigger: ReactNode }) {
         setEmail("");
         setName("");
         setCoachingFocus("");
+        setHowHeard("");
       }, 200);
     }
   }
@@ -78,6 +97,21 @@ export function WaitlistDialog({ trigger }: { trigger: ReactNode }) {
                 <Label htmlFor="waitlist-focus">What kind of coaching do you do? (optional)</Label>
                 <Input id="waitlist-focus" value={coachingFocus} onChange={(e) => setCoachingFocus(e.target.value)} placeholder="e.g. personal training, running club" data-testid="input-waitlist-focus" />
               </div>
+              {!getAttribution() && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="waitlist-how-heard">How did you hear about us? (optional)</Label>
+                  <Select value={howHeard} onValueChange={setHowHeard}>
+                    <SelectTrigger id="waitlist-how-heard" data-testid="select-waitlist-how-heard">
+                      <SelectValue placeholder="Select one" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HOW_HEARD_OPTIONS.map((option) => (
+                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="hidden" aria-hidden="true">
                 <Label htmlFor="waitlist-website">Website</Label>
                 <Input id="waitlist-website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />

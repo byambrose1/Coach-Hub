@@ -29,6 +29,9 @@ import { PrivacyPage, TermsPage, SupportPage } from "@/pages/public";
 import { BlogListPage, BlogPostPage } from "@/pages/blog";
 import JoinPage from "@/pages/join";
 import { trackActivationEvent } from "@/lib/activation";
+import { captureAttributionFromUrl } from "@/lib/attribution";
+
+captureAttributionFromUrl();
 
 function TermsModal() {
   const { isAuthenticated } = useAuth();

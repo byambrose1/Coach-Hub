@@ -95,8 +95,9 @@ app.use(
   // be registered after that call.
   registerBetaAccessRoutes(app);
 
-  const { seedDatabase } = await import("./seed");
+  const { seedDatabase, seedBlogPosts } = await import("./seed");
   await seedDatabase();
+  await seedBlogPosts();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

@@ -81,6 +81,7 @@ export default function PlatformAdminWaitlist() {
                   <TableHead>Email</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Coaching focus</TableHead>
+                  <TableHead>How heard</TableHead>
                   <TableHead>Joined</TableHead>
                 </TableRow>
               </TableHeader>
@@ -90,6 +91,7 @@ export default function PlatformAdminWaitlist() {
                     <TableCell className="font-medium">{s.email}</TableCell>
                     <TableCell>{s.name || "-"}</TableCell>
                     <TableCell>{s.coachingFocus || "-"}</TableCell>
+                    <TableCell>{s.howHeard || "-"}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {s.createdAt ? format(new Date(s.createdAt), "dd/MM/yyyy") : "-"}
                     </TableCell>
