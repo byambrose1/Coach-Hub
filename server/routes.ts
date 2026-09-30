@@ -2,7 +2,7 @@ import type { Express } from "express";
 import rateLimit from "express-rate-limit";
 import { createServer, type Server } from "http";
 import { storage as defaultStorage, type IStorage } from "./storage";
-import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema, insertSettingsSchema, type Session } from "@shared/schema";
+import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema, insertSettingsSchema, insertWaitlistSignupSchema, insertBlogPostSchema, type Session } from "@shared/schema";
 import { isAuthenticated as defaultIsAuthenticated, authStorage } from "./replit_integrations/auth";
 import {
   sendInvoiceEmail as defaultSendInvoiceEmail,
@@ -13,6 +13,8 @@ import {
   sendLowSessionsEmail as defaultSendLowSessionsEmail,
   sendBroadcastEmail as defaultSendBroadcastEmail,
   sendFeedbackEmail as defaultSendFeedbackEmail,
+  sendWaitlistConfirmationEmail,
+  sendWaitlistNotificationEmail,
 } from "./email";
 import { createMandateLink as defaultCreateMandateLink } from "./payments";
 import type { RequestHandler } from "express";
@@ -186,16 +188,140 @@ export async function registerRoutes(
       "Disallow: /clients",
       "Disallow: /schedule",
       "Disallow: /payments",
+      "Disallow: /join",
       `Sitemap: ${siteUrl}/sitemap.xml`,
       "",
     ].join("\n"));
   });
 
-  app.get("/sitemap.xml", (req, res) => {
+  app.get("/sitemap.xml", async (req, res) => {
     const siteUrl = getPublicSiteUrl(req);
-    const publicPaths = ["/", "/pricing", "/privacy", "/terms", "/support"];
-    const urls = publicPaths.map((pathname) => `  <url><loc>${siteUrl}${pathname}</loc></url>`).join("\n");
+    const publicPaths = ["/", "/pricing", "/privacy", "/terms", "/support", "/blog"];
+    let blogUrls: string[] = [];
+    try {
+      const posts = await storage.getPublishedBlogPosts();
+      blogUrls = posts.map((p) => `/blog/${p.slug}`);
+    } catch (err) {
+      logError("Failed to load blog posts for sitemap", err);
+    }
+    const urls = [...publicPaths, ...blogUrls]
+      .map((pathname) => `  <url><loc>${siteUrl}${pathname}</loc></url>`)
+      .join("\n");
     res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`);
+  });
+
+  // --- Waitlist (public, pre-launch signup capture) ---
+  const waitlistLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many signups from this connection. Please try again later." },
+  });
+
+  app.post("/api/waitlist", waitlistLimiter, async (req, res) => {
+    // Honeypot: a real visitor never fills this hidden field in; a bot filling
+    // every field usually does. Pretend success so scrapers don't learn to skip it.
+    if (req.body?.website) return res.status(200).json({ success: true });
+
+    const parsed = insertWaitlistSignupSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Please enter a valid email address." });
+    }
+    try {
+      const existing = await storage.getWaitlistSignupByEmail(parsed.data.email);
+      if (existing) return res.status(200).json({ success: true });
+
+      await storage.createWaitlistSignup(parsed.data);
+      sendWaitlistConfirmationEmail({ email: parsed.data.email, name: parsed.data.name || undefined }).catch((err) =>
+        logError("Waitlist confirmation email failed", err),
+      );
+      sendWaitlistNotificationEmail({
+        email: parsed.data.email,
+        name: parsed.data.name || undefined,
+        coachingFocus: parsed.data.coachingFocus || undefined,
+        howHeard: parsed.data.howHeard || undefined,
+      }).catch((err) => logError("Waitlist notification email failed", err));
+      res.status(200).json({ success: true });
+    } catch (err) {
+      logError("Failed to save waitlist signup", err);
+      res.status(500).json({ message: "Something went wrong. Please try again." });
+    }
+  });
+
+  app.get("/api/platform-admin/waitlist", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const signups = await storage.getWaitlistSignups();
+      res.json(signups);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // --- Blog (public read; owner-only write) ---
+  app.get("/api/blog", async (req, res) => {
+    try {
+      const posts = await storage.getPublishedBlogPosts();
+      res.json(posts);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/blog/:slug", async (req, res) => {
+    try {
+      const post = await storage.getPublishedBlogPost(getRouteParam(req.params.slug));
+      if (!post) return res.status(404).json({ message: "Post not found" });
+      res.json(post);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/platform-admin/blog", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const posts = await storage.getAllBlogPosts();
+      res.json(posts);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/platform-admin/blog", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    const parsed = insertBlogPostSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Title, slug, and content are required." });
+    try {
+      const post = await storage.createBlogPost(parsed.data);
+      res.status(201).json(post);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message?.includes("unique") ? "That slug is already in use." : err.message });
+    }
+  });
+
+  app.put("/api/platform-admin/blog/:id", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    const parsed = insertBlogPostSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid post data." });
+    try {
+      const post = await storage.updateBlogPost(getRouteParam(req.params.id), parsed.data);
+      if (!post) return res.status(404).json({ message: "Post not found" });
+      res.json(post);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message?.includes("unique") ? "That slug is already in use." : err.message });
+    }
+  });
+
+  app.delete("/api/platform-admin/blog/:id", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    try {
+      await storage.deleteBlogPost(getRouteParam(req.params.id));
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   app.post("/api/activation-events", (req, res) => {

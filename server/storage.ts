@@ -1,7 +1,8 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   clients, trainingSessions, packages, sessionNotes, settings, clientForms, referrals, invoices, users, platformConfig,
+  waitlistSignups, blogPosts,
   type Client, type InsertClient,
   type Session, type InsertSession,
   type Package, type InsertPackage,
@@ -11,6 +12,8 @@ import {
   type Referral, type InsertReferral,
   type Invoice, type InsertInvoice,
   type User, type PlatformConfig,
+  type WaitlistSignup, type InsertWaitlistSignup,
+  type BlogPost, type InsertBlogPost,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -69,6 +72,20 @@ export interface IStorage {
   upsertPlatformConfig(data: Partial<PlatformConfig>): Promise<PlatformConfig>;
   getCoachDetail(coachId: string): Promise<CoachDetail | undefined>;
   updateCoachPlan(coachId: string, plan: string): Promise<void>;
+
+  // Waitlist (pre-launch signups, gathered while the app is invite-only)
+  createWaitlistSignup(data: InsertWaitlistSignup): Promise<WaitlistSignup>;
+  getWaitlistSignupByEmail(email: string): Promise<WaitlistSignup | undefined>;
+  getWaitlistSignups(): Promise<WaitlistSignup[]>;
+
+  // Blog (owner-authored posts for SEO/content marketing)
+  getPublishedBlogPosts(): Promise<BlogPost[]>;
+  getPublishedBlogPost(slug: string): Promise<BlogPost | undefined>;
+  getAllBlogPosts(): Promise<BlogPost[]>;
+  getBlogPost(id: string): Promise<BlogPost | undefined>;
+  createBlogPost(data: InsertBlogPost): Promise<BlogPost>;
+  updateBlogPost(id: string, data: Partial<InsertBlogPost>): Promise<BlogPost | undefined>;
+  deleteBlogPost(id: string): Promise<void>;
 }
 
 export interface CoachDetail {
@@ -370,6 +387,64 @@ export class DatabaseStorage implements IStorage {
       newUsersThisMonth,
       activeUsersThisMonth: activeUserIds.size,
     };
+  }
+
+  // Waitlist
+  async createWaitlistSignup(data: InsertWaitlistSignup): Promise<WaitlistSignup> {
+    const rows = await db.insert(waitlistSignups).values(data).returning();
+    return rows[0];
+  }
+
+  async getWaitlistSignupByEmail(email: string): Promise<WaitlistSignup | undefined> {
+    const rows = await db.select().from(waitlistSignups).where(eq(waitlistSignups.email, email));
+    return rows[0];
+  }
+
+  async getWaitlistSignups(): Promise<WaitlistSignup[]> {
+    return db.select().from(waitlistSignups).orderBy(desc(waitlistSignups.createdAt));
+  }
+
+  // Blog
+  async getPublishedBlogPosts(): Promise<BlogPost[]> {
+    return db.select().from(blogPosts).where(eq(blogPosts.published, true)).orderBy(desc(blogPosts.publishedAt));
+  }
+
+  async getPublishedBlogPost(slug: string): Promise<BlogPost | undefined> {
+    const rows = await db.select().from(blogPosts).where(and(eq(blogPosts.slug, slug), eq(blogPosts.published, true)));
+    return rows[0];
+  }
+
+  async getAllBlogPosts(): Promise<BlogPost[]> {
+    return db.select().from(blogPosts).orderBy(desc(blogPosts.createdAt));
+  }
+
+  async getBlogPost(id: string): Promise<BlogPost | undefined> {
+    const rows = await db.select().from(blogPosts).where(eq(blogPosts.id, id));
+    return rows[0];
+  }
+
+  async createBlogPost(data: InsertBlogPost): Promise<BlogPost> {
+    const rows = await db.insert(blogPosts).values({
+      ...data,
+      publishedAt: data.published ? new Date() : null,
+    }).returning();
+    return rows[0];
+  }
+
+  async updateBlogPost(id: string, data: Partial<InsertBlogPost>): Promise<BlogPost | undefined> {
+    const existing = await this.getBlogPost(id);
+    if (!existing) return undefined;
+    const justPublished = data.published && !existing.published;
+    const rows = await db.update(blogPosts).set({
+      ...data,
+      updatedAt: new Date(),
+      ...(justPublished ? { publishedAt: new Date() } : {}),
+    }).where(eq(blogPosts.id, id)).returning();
+    return rows[0];
+  }
+
+  async deleteBlogPost(id: string): Promise<void> {
+    await db.delete(blogPosts).where(eq(blogPosts.id, id));
   }
 }
 

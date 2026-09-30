@@ -18,12 +18,16 @@ import Landing from "@/landing";
 import Admin from "@/pages/admin";
 import PlatformAdmin from "@/pages/platform-admin";
 import PlatformAdminCoach from "@/pages/platform-admin-coach";
+import PlatformAdminWaitlist from "@/pages/platform-admin-waitlist";
+import PlatformAdminBlog from "@/pages/platform-admin-blog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Settings } from "@shared/schema";
 import { apiRequest } from "./lib/queryClient";
 import { PrivacyPage, TermsPage, SupportPage } from "@/pages/public";
+import { BlogListPage, BlogPostPage } from "@/pages/blog";
+import JoinPage from "@/pages/join";
 import { trackActivationEvent } from "@/lib/activation";
 
 function TermsModal() {
@@ -142,6 +146,8 @@ function Router() {
       <Route path="/settings" component={SettingsPage} />
       <Route path="/admin" component={Admin} />
       <Route path="/platform-admin" component={PlatformAdmin} />
+      <Route path="/platform-admin/waitlist" component={PlatformAdminWaitlist} />
+      <Route path="/platform-admin/blog" component={PlatformAdminBlog} />
       <Route path="/platform-admin/coaches/:coachId" component={PlatformAdminCoach} />
       <Route component={NotFound} />
     </Switch>
@@ -154,6 +160,9 @@ function PublicRouter() {
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/support" component={SupportPage} />
+      <Route path="/blog" component={BlogListPage} />
+      <Route path="/blog/:slug" component={BlogPostPage} />
+      <Route path="/join" component={JoinPage} />
       <Route path="/pricing" component={Landing} />
       <Route component={Landing} />
     </Switch>
@@ -187,7 +196,9 @@ function AppContent() {
   const { isLoading, isAuthenticated } = useAuth();
   const [location] = useLocation();
   const trackedSignup = useRef(false);
-  const isPublicPage = ["/privacy", "/terms", "/support", "/pricing"].includes(location);
+  const isPublicPage =
+    ["/privacy", "/terms", "/support", "/pricing", "/join"].includes(location) ||
+    location.startsWith("/blog");
 
   useEffect(() => {
     if (isAuthenticated && !trackedSignup.current) {

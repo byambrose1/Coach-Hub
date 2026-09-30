@@ -80,8 +80,9 @@ app.use(
 
 (async () => {
   const { setupAuth, registerAuthRoutes } = await import("./replit_integrations/auth");
+  const { betaAccessGate, registerBetaAccessRoutes } = await import("./beta-access");
   try {
-    await setupAuth(app);
+    await setupAuth(app, { loginGate: betaAccessGate });
   } catch (error) {
     // setupAuth already handles the expected "sign-in provider unreachable"
     // case internally and returns instead of throwing. This catch is a last
@@ -90,6 +91,9 @@ app.use(
     logError("Unexpected error during auth setup", error);
   }
   registerAuthRoutes(app);
+  // Relies on the session middleware setupAuth() just installed, so it must
+  // be registered after that call.
+  registerBetaAccessRoutes(app);
 
   const { seedDatabase } = await import("./seed");
   await seedDatabase();

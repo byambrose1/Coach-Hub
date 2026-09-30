@@ -195,3 +195,42 @@ export const platformConfig = pgTable("platform_config", {
 export type PlatformConfig = typeof platformConfig.$inferSelect;
 export const insertPlatformConfigSchema = createInsertSchema(platformConfig).omit({ id: true });
 export type InsertPlatformConfig = z.infer<typeof insertPlatformConfigSchema>;
+
+export const waitlistSignups = pgTable("waitlist_signups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  name: text("name"),
+  coachingFocus: text("coaching_focus"),
+  howHeard: text("how_heard"),
+  createdAt: timestamp("created_at").defaultNow(),
+  invited: boolean("invited").default(false),
+});
+
+export const insertWaitlistSignupSchema = createInsertSchema(waitlistSignups)
+  .omit({ id: true, createdAt: true, invited: true })
+  .extend({ email: z.string().trim().toLowerCase().email() });
+export type InsertWaitlistSignup = z.infer<typeof insertWaitlistSignupSchema>;
+export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
+
+export const blogPosts = pgTable("blog_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: text("slug").notNull().unique(),
+  title: text("title").notNull(),
+  excerpt: text("excerpt"),
+  contentMarkdown: text("content_markdown").notNull(),
+  seoTitle: text("seo_title"),
+  seoDescription: text("seo_description"),
+  authorName: text("author_name").default("The Practably Team"),
+  published: boolean("published").default(false),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
+export type BlogPost = typeof blogPosts.$inferSelect;
