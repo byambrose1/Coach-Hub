@@ -1,25 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   ArrowRight, CalendarDays, CheckCircle2, ChevronDown, ClipboardCheck, CreditCard,
-  FileText, Menu, ShieldCheck, Sparkles, TrendingUp, Users, X, Zap,
+  Menu, ShieldCheck, Sparkles, X,
 } from "lucide-react";
 import { Link } from "wouter";
 import { BrandMark } from "@/components/brand-mark";
 import { WaitlistDialog } from "@/components/waitlist-dialog";
 import { getPublicSiteUrl, OWNER_INPUT_REQUIRED, pricingTiers, siteConfig } from "@/config/site";
-
-const features = [
-  { icon: Users, title: "Know every client at a glance", description: "Keep profiles, contact details, notes, packages, and session history together instead of scattered across documents." },
-  { icon: CalendarDays, title: "Make the week easier to run", description: "Book sessions, manage your calendar, and keep availability visible without rebuilding a spreadsheet each week." },
-  { icon: CreditCard, title: "Invoice and collect payments clearly", description: "Create invoices, see outstanding balances, and set up GoCardless direct debit workflows when your account is configured." },
-  { icon: ClipboardCheck, title: "Collect PARQ forms in the workflow", description: "Create, store, and send PARQ forms from the client record, with the information your coaching process needs." },
-  { icon: Zap, title: "Keep routine messages moving", description: "Use booking, cancellation, invoice, PARQ, and low-session email workflows without manually writing the same message every time." },
-  { icon: TrendingUp, title: "See the business, not just the bookings", description: "Track revenue, packages, and invoices from a dashboard built around the decisions solo coaches make." },
-];
 
 const faqItems = [
   ["Who is Practably for?", "Practably is designed for independent coaches who want one place to manage a small client roster, sessions, forms, invoices, and payment workflows."],
@@ -54,46 +45,150 @@ function Callout({ icon: Icon, label, className, tailClassName }: { icon: any; l
   );
 }
 
-function ProductPreview() {
+function MockupChrome({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="mx-auto mt-16 max-w-5xl rounded-[1.75rem] border border-slate-200 bg-white p-2 shadow-2xl shadow-violet-200/50 sm:mt-20 sm:p-3">
-      <div className="overflow-visible rounded-2xl border border-slate-200 bg-slate-50">
-        <div className="flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
-          <div className="flex items-center gap-2 font-bold text-slate-950"><BrandMark className="h-7 w-7" />Practably</div>
-          <div className="hidden items-center gap-2 sm:flex"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden="true" /><span className="text-xs font-medium text-slate-500">Coach dashboard</span></div>
-        </div>
-        <div className="grid gap-3 p-3 sm:grid-cols-[1.1fr_.9fr] sm:p-5">
-          <section aria-label="Illustrative weekly calendar" className="relative rounded-xl border border-slate-200 bg-white p-4 text-left">
-            <Callout icon={CalendarDays} label="Book a session in seconds" className="-top-9 left-2" tailClassName="-bottom-1 left-5 border-b border-r" />
-            <div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-violet-600">This week</p><p className="font-bold text-slate-950">Your coaching calendar</p></div><span className="rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">3 upcoming</span></div>
-            <div className="grid grid-cols-5 gap-1.5 text-center text-[10px] font-semibold text-slate-500 sm:gap-2 sm:text-xs">
-              {["Mon", "Tue", "Wed", "Thu", "Fri"].map((day, index) => <div key={day} className={`rounded-lg py-1.5 ${index === 2 ? "bg-violet-600 text-white" : "bg-slate-100"}`}>{day}<span className="ml-1 opacity-70">{12 + index}</span></div>)}
-            </div>
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center gap-3 rounded-lg border-l-4 border-violet-500 bg-violet-50 p-2.5"><span className="text-xs font-bold text-violet-700">09:00</span><div><p className="text-xs font-bold text-slate-900">Session with Alex M.</p><p className="text-[11px] text-slate-500">Strength · Studio</p></div></div>
-              <div className="flex items-center gap-3 rounded-lg border-l-4 border-orange-400 bg-orange-50 p-2.5"><span className="text-xs font-bold text-orange-700">17:30</span><div><p className="text-xs font-bold text-slate-900">Session with Sam T.</p><p className="text-[11px] text-slate-500">Online · 1:1</p></div></div>
-            </div>
-          </section>
-          <div className="grid gap-3 text-left">
-            <section aria-label="Illustrative client list" className="relative rounded-xl border border-slate-200 bg-white p-4">
-              <Callout icon={ClipboardCheck} label="PARQ status at a glance" className="-top-9 right-2" tailClassName="-bottom-1 right-6 border-b border-r" />
-              <div className="mb-3 flex items-center justify-between"><p className="text-sm font-bold text-slate-950">Clients</p><span className="text-xs font-semibold text-violet-700">5 / 5 free</span></div><div className="space-y-2">{[["Alex M.", "PARQ complete"], ["Sam T.", "PARQ to send"], ["Morgan K.", "Active package"]].map(([name, status], index) => <div key={name} className="flex items-center gap-2"><span className={`grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold text-white ${index === 1 ? "bg-orange-400" : "bg-violet-500"}`}>{name.split(" ").map((part) => part[0]).join("")}</span><div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-800">{name}</p><p className={`text-[10px] ${index === 1 ? "text-orange-700" : "text-emerald-700"}`}>{status}</p></div></div>)}</div>
-            </section>
-            <div className="grid grid-cols-2 gap-3">
-              <section aria-label="Illustrative invoice status" className="relative rounded-xl bg-slate-950 p-3 text-white">
-                <Callout icon={CreditCard} label="Chase payments easily" className="-bottom-9 -left-1" tailClassName="-top-1 left-5 border-t border-l" />
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Outstanding</p><p className="mt-1 text-xl font-extrabold">£120</p><p className="mt-1 text-[10px] text-slate-400">1 invoice due</p>
-              </section>
-              <section aria-label="Illustrative onboarding status" className="relative rounded-xl bg-emerald-50 p-3">
-                <Callout icon={Sparkles} label="Guided setup checklist" className="-bottom-9 -right-1" tailClassName="-top-1 right-5 border-t border-l" />
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Setup</p><p className="mt-1 text-xl font-extrabold text-emerald-900">4 / 6</p><p className="mt-1 text-[10px] text-emerald-700">steps complete</p>
-              </section>
-            </div>
-          </div>
-        </div>
-        <p className="rounded-b-2xl border-t border-slate-200 bg-white px-4 py-2 text-left text-[11px] text-slate-500">Illustrative dashboard preview using Practably workflows.</p>
+    <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-violet-200/50">
+      <div className="flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-white px-4 py-3">
+        <div className="flex items-center gap-2 font-bold text-slate-950"><BrandMark className="h-6 w-6" />Practably</div>
+        <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-500">{label}</span>
       </div>
+      <div className="p-4">{children}</div>
     </div>
+  );
+}
+
+function CalendarMockup() {
+  return (
+    <MockupChrome label="Schedule">
+      <div className="relative">
+        <Callout icon={CalendarDays} label="Clashes blocked automatically" className="-top-8 right-0" tailClassName="-bottom-1 right-6 border-b border-r" />
+        <div className="mb-3 flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-violet-600">This week</p><p className="font-bold text-slate-950">Your coaching calendar</p></div><span className="rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">4 upcoming</span></div>
+        <div className="grid grid-cols-5 gap-2 text-center text-xs font-semibold text-slate-500">
+          {["Mon", "Tue", "Wed", "Thu", "Fri"].map((day, index) => <div key={day} className={`rounded-lg py-2 ${index === 2 ? "bg-violet-600 text-white" : "bg-slate-100"}`}>{day}<span className="ml-1 opacity-70">{12 + index}</span></div>)}
+        </div>
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center gap-3 rounded-lg border-l-4 border-violet-500 bg-violet-50 p-3"><span className="text-xs font-bold text-violet-700">09:00</span><div><p className="text-xs font-bold text-slate-900">Session with Alex M.</p><p className="text-[11px] text-slate-500">Strength · Studio</p></div></div>
+          <div className="flex items-center gap-3 rounded-lg border-l-4 border-orange-400 bg-orange-50 p-3"><span className="text-xs font-bold text-orange-700">12:30</span><div><p className="text-xs font-bold text-slate-900">Group class</p><p className="text-[11px] text-slate-500">Outdoor · 6 spots</p></div></div>
+          <div className="flex items-center gap-3 rounded-lg border-l-4 border-emerald-400 bg-emerald-50 p-3"><span className="text-xs font-bold text-emerald-700">17:30</span><div><p className="text-xs font-bold text-slate-900">Session with Sam T.</p><p className="text-[11px] text-slate-500">Online · 1:1</p></div></div>
+        </div>
+      </div>
+    </MockupChrome>
+  );
+}
+
+function ClientsMockup() {
+  return (
+    <MockupChrome label="Clients">
+      <div className="relative">
+        <Callout icon={ClipboardCheck} label="PARQ tracked per client" className="-top-3 right-0" tailClassName="-bottom-1 right-6 border-b border-r" />
+        <div className="mb-3 flex items-center justify-between"><p className="text-sm font-bold text-slate-950">Clients</p><span className="text-xs font-semibold text-violet-700">5 / 5 free</span></div>
+        <div className="space-y-2.5">
+          {[["Alex M.", "PARQ complete", "Package: 8 of 10 used", "bg-violet-500", "text-emerald-700"], ["Sam T.", "PARQ to send", "New client · online", "bg-orange-400", "text-orange-700"], ["Morgan K.", "PARQ complete", "Package: 3 of 5 used", "bg-emerald-500", "text-emerald-700"]].map(([name, parq, detail, color, parqColor]) => (
+            <div key={name} className="flex items-center gap-3 rounded-lg border border-slate-100 p-2.5">
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold text-white ${color}`}>{name.split(" ").map((part) => part[0]).join("")}</span>
+              <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-800">{name}</p><p className="text-[11px] text-slate-500">{detail}</p></div>
+              <span className={`shrink-0 text-[10px] font-bold ${parqColor}`}>{parq}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </MockupChrome>
+  );
+}
+
+function InvoicingMockup() {
+  return (
+    <MockupChrome label="Invoices">
+      <div className="relative">
+        <Callout icon={CreditCard} label="Any payment method works" className="-top-8 right-0" tailClassName="-bottom-1 right-6 border-b border-r" />
+        <div className="mb-3 grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-slate-950 p-3 text-white"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Outstanding</p><p className="mt-1 text-xl font-extrabold">£240</p><p className="mt-1 text-[10px] text-slate-400">2 invoices due</p></div>
+          <div className="rounded-xl bg-emerald-50 p-3"><p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Paid this month</p><p className="mt-1 text-xl font-extrabold text-emerald-900">£860</p><p className="mt-1 text-[10px] text-emerald-700">6 invoices</p></div>
+        </div>
+        <div className="space-y-2">
+          {[["Alex M.", "£120", "Bank transfer", "text-orange-700", "bg-orange-50"], ["Sam T.", "£120", "Card machine", "text-orange-700", "bg-orange-50"], ["Morgan K.", "£90", "Paid · Stripe link", "text-emerald-700", "bg-emerald-50"]].map(([name, amount, method, color, bg]) => (
+            <div key={name} className="flex items-center justify-between rounded-lg border border-slate-100 p-2.5">
+              <div><p className="text-xs font-semibold text-slate-800">{name}</p><span className={`mt-0.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${color} ${bg}`}>{method}</span></div>
+              <span className="text-xs font-bold text-slate-900">{amount}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </MockupChrome>
+  );
+}
+
+const showcaseSlides = [
+  {
+    key: "schedule",
+    tab: "Scheduling",
+    headline: "Your whole week, without the spreadsheet",
+    description: "Book sessions, see your week at a glance, and Practably checks for clashing times automatically - no more double-booked slots.",
+    bullets: ["Weekly and daily views", "Automatic clash detection", "1:1, group, and online session types"],
+    Mockup: CalendarMockup,
+  },
+  {
+    key: "clients",
+    tab: "Clients & PARQ",
+    headline: "Every client, one record - health screening included",
+    description: "Contact details, notes, package status, and PARQ health screening all live on the same client profile, so nothing gets left in a separate file.",
+    bullets: ["PARQ forms built into onboarding", "Package and session history in one view", "Export a client's record any time"],
+    Mockup: ClientsMockup,
+  },
+  {
+    key: "invoicing",
+    tab: "Invoicing & payments",
+    headline: "Get paid without the awkward follow-up message",
+    description: "See exactly who owes what, track whichever payment method each client actually uses, and send a proper invoice in seconds.",
+    bullets: ["Outstanding balances at a glance", "Cash, card, bank transfer, PayPal, or your own Stripe link", "Automatic reminders when sessions run low"],
+    Mockup: InvoicingMockup,
+  },
+];
+
+function FeatureShowcase() {
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActive((prev) => (prev + 1) % showcaseSlides.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const slide = showcaseSlides[active];
+
+  return (
+    <section id="features" className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20">
+      <div className="mx-auto max-w-2xl text-center">
+        <p className="text-sm font-bold uppercase tracking-[0.16em] text-violet-700">See it in action</p>
+        <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">Less tool switching. More time with clients.</h2>
+      </div>
+      <div className="mt-8 flex flex-wrap justify-center gap-2">
+        {showcaseSlides.map((s, index) => (
+          <button
+            key={s.key}
+            type="button"
+            onClick={() => setActive(index)}
+            className={`rounded-full px-4 py-2 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${active === index ? "bg-violet-600 text-white shadow-md shadow-violet-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+            aria-pressed={active === index}
+          >
+            {s.tab}
+          </button>
+        ))}
+      </div>
+      <div className="mt-10 grid items-center gap-10 lg:grid-cols-2">
+        <div className="order-2 text-left lg:order-1">
+          <h3 className="text-2xl font-extrabold tracking-tight text-slate-950">{slide.headline}</h3>
+          <p className="mt-3 text-base leading-relaxed text-slate-600">{slide.description}</p>
+          <ul className="mt-5 space-y-2.5">
+            {slide.bullets.map((bullet) => <li key={bullet} className="flex gap-2 text-sm font-medium text-slate-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />{bullet}</li>)}
+          </ul>
+        </div>
+        <div className="order-1 lg:order-2">
+          <slide.Mockup />
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -155,21 +250,20 @@ export default function Landing() {
       <main>
         <section className="relative isolate overflow-hidden"><div className="absolute -right-40 -top-48 -z-10 h-[36rem] w-[36rem] rounded-full bg-violet-300/30 blur-3xl" /><div className="absolute -bottom-48 -left-40 -z-10 h-[32rem] w-[32rem] rounded-full bg-orange-200/50 blur-3xl" />
           <div className="mx-auto max-w-6xl px-5 pb-16 pt-16 text-center sm:px-6 sm:pb-20 sm:pt-20">
-            <Badge className="mb-6 rounded-full border border-violet-200 bg-violet-50 px-3.5 py-1.5 font-semibold text-violet-800"><Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />Private beta - join the waitlist for early access.</Badge>
+            <Badge className="mb-6 rounded-full border border-violet-200 bg-violet-50 px-3.5 py-1.5 font-semibold text-violet-800"><Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />Beta - join the waitlist for early access.</Badge>
             <h1 className="mx-auto max-w-4xl text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-950 sm:text-6xl">The simple business hub for <span className="bg-gradient-to-r from-violet-600 to-orange-500 bg-clip-text text-transparent">independent coaches.</span></h1>
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-relaxed text-slate-600 sm:text-xl">Manage clients, bookings, PARQ forms, invoices, and payments in one place, without stitching together spreadsheets and five different apps.</p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <WaitlistDialog trigger={<Button size="lg" className="w-full rounded-full bg-violet-600 px-7 py-6 text-base font-bold shadow-lg shadow-violet-200 hover:bg-violet-700 sm:w-auto">Join the waitlist <ArrowRight className="ml-2 h-5 w-5" aria-hidden="true" /></Button>} />
-              <a href="#dashboard-preview" className="inline-flex min-h-12 items-center rounded-full border border-slate-300 bg-white px-6 text-sm font-bold text-slate-700 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">See the dashboard <ChevronDown className="ml-1 h-4 w-4" aria-hidden="true" /></a>
+              <a href="#features" className="inline-flex min-h-12 items-center rounded-full border border-slate-300 bg-white px-6 text-sm font-bold text-slate-700 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">See the dashboard <ChevronDown className="ml-1 h-4 w-4" aria-hidden="true" /></a>
             </div>
             <ul className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm font-medium text-slate-600"><li className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />Free for your first 5 clients</li><li className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />No credit card required</li><li className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />Coach-sized plans</li></ul>
-            <div id="dashboard-preview"><ProductPreview /></div>
           </div>
         </section>
 
         <section id="how-it-works" className="border-y border-slate-200 bg-slate-50"><div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20"><div className="max-w-2xl"><p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-600">How it works</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">Start with the workflow you already know.</h2></div><ol className="mt-10 grid gap-5 md:grid-cols-3">{[["01", "Add your clients", "Create a clear client record with contact details, notes, and the coaching context you need."], ["02", "Run bookings and forms", "Schedule sessions, manage packages, and collect PARQ forms from the same client workflow."], ["03", "Get paid and track revenue", "Create invoices, follow outstanding amounts, and use payment workflows when you are ready."]].map(([number, title, description]) => <li key={number} className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200"><p className="text-sm font-extrabold text-violet-600">{number}</p><h3 className="mt-5 text-xl font-bold text-slate-950">{title}</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{description}</p></li>)}</ol></div></section>
 
-        <section id="features" className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20"><div className="mx-auto max-w-2xl text-center"><p className="text-sm font-bold uppercase tracking-[0.16em] text-violet-700">Designed for day-to-day coaching</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">Less tool switching. More time with clients.</h2><p className="mt-4 text-lg text-slate-600">Practably brings the tasks that make a solo coaching business feel fragmented into one calm, focused dashboard.</p></div><div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{features.map((feature) => <article key={feature.title} className="rounded-2xl border border-slate-200 bg-white p-6 transition hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-lg"><div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-violet-100 to-orange-100 text-violet-700"><feature.icon className="h-5 w-5" aria-hidden="true" /></div><h3 className="mt-5 text-lg font-bold text-slate-950">{feature.title}</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{feature.description}</p></article>)}</div></section>
+        <FeatureShowcase />
 
         <section className="bg-slate-950 text-white"><div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 sm:px-6 sm:py-20 lg:grid-cols-[.9fr_1.1fr] lg:items-center"><div><p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-300">Why coaches switch</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">A business hub built for the gap between spreadsheets and enterprise software.</h2><p className="mt-5 max-w-xl text-lg leading-relaxed text-slate-300">Practably is for coaches who need client, booking, form, invoice, and direct-debit workflows to work together, but do not need a huge platform with a huge learning curve.</p></div><ul className="grid gap-3 sm:grid-cols-2">{["One client record, not multiple versions", "A faster start with a five-client free plan", "PARQ collection beside coaching work", "GoCardless direct-debit setup when configured", "Invoices and revenue in the same place", "Clear limits that fit a solo practice"].map((item) => <li key={item} className="flex gap-3 rounded-xl border border-white/10 bg-white/5 p-4 text-sm font-medium text-slate-100"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-orange-300" aria-hidden="true" />{item}</li>)}</ul></div></section>
 

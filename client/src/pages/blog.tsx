@@ -149,7 +149,7 @@ export function BlogPostPage() {
         />
         <div className="mt-14 rounded-2xl border border-violet-200 bg-violet-50 p-6 text-center">
           <p className="text-lg font-bold text-slate-950">Want early access to Practably?</p>
-          <p className="mt-1 text-sm text-slate-600">We're in private beta and inviting coaches gradually.</p>
+          <p className="mt-1 text-sm text-slate-600">We're in beta and inviting coaches gradually.</p>
           <WaitlistDialog trigger={<Button className="mt-4 rounded-full bg-violet-600 px-6 font-bold hover:bg-violet-700">Join the waitlist</Button>} />
         </div>
       </main>

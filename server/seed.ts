@@ -50,7 +50,7 @@ Practably is built for a different job: the day-to-day admin of running a coachi
 
 **Pick Practably if**: you're mostly coaching in person or already have your own way of programming workouts, you want simple, affordable client and business admin, and you don't want to pay enterprise pricing for a small roster.
 
-Practably is currently in private beta - if the second one sounds like you, join the waitlist below and we'll email you when a spot opens up.`,
+Practably is currently in beta - if the second one sounds like you, join the waitlist below and we'll email you when a spot opens up.`,
   },
   {
     slug: "best-personal-trainer-software-small-client-roster-2026",
@@ -91,7 +91,7 @@ Here's a straight look at four options, focused on what a smaller coaching busin
 
 Before comparing feature lists, ask: do you need software to help you *deliver* coaching (programme builders, video libraries, in-app messaging), or software to help you *run the business* around coaching you already know how to deliver (bookings, forms, invoices, payment tracking)?
 
-If it's the second one and your roster is still small, you're likely better off starting with something priced for where you are now rather than where a 50-client business would be. Practably is currently in private beta, built specifically for that - join the waitlist to get early access.`,
+If it's the second one and your roster is still small, you're likely better off starting with something priced for where you are now rather than where a 50-client business would be. Practably is currently in beta, built specifically for that - join the waitlist to get early access.`,
   },
   {
     slug: "parq-form-template-personal-trainers-uk",
@@ -134,7 +134,7 @@ Beyond the core seven questions, most coaches add:
 
 A paper PAR-Q works, but it's easy to lose, awkward to search back through, and not great if a client needs to update their answers later (a new diagnosis, a new medication). Collecting PAR-Q responses digitally against the client's own record means you can find them instantly, and they don't get left in a gym bag.
 
-Practably includes PARQ form collection built into each client record, so responses are stored alongside bookings, notes, and invoices rather than in a separate paper file. Practably is currently in private beta - join the waitlist to get early access.`,
+Practably includes PARQ form collection built into each client record, so responses are stored alongside bookings, notes, and invoices rather than in a separate paper file. Practably is currently in beta - join the waitlist to get early access.`,
   },
 ];
 

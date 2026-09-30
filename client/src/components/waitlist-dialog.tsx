@@ -75,7 +75,7 @@ export function WaitlistDialog({ trigger }: { trigger: ReactNode }) {
           <>
             <DialogHeader>
               <DialogTitle>Join the waitlist</DialogTitle>
-              <DialogDescription>Practably is currently in private beta. Pop your details in and we'll email you when a spot opens up.</DialogDescription>
+              <DialogDescription>Practably is currently in beta. Pop your details in and we'll email you when a spot opens up.</DialogDescription>
             </DialogHeader>
             <form
               className="space-y-4"
