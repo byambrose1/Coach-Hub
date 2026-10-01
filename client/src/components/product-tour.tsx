@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   ArrowLeft, ArrowRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight,
   ClipboardCheck, CreditCard, Mail, Plus, Search, ShieldCheck,
@@ -81,12 +81,22 @@ export function ProductTour() {
   const [active, setActive] = useState(0);
   const CurrentSlide = visualSlides[active];
   const step = (n: number) => setActive((active + n + slides.length) % slides.length);
+  const handleCarouselKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      step(-1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      step(1);
+    }
+  };
   return <>
     <Button size="lg" variant="outline" onClick={() => setOpen(true)} className="min-h-12 rounded-full border-slate-300 bg-white px-6 text-sm font-bold text-slate-800 hover:border-violet-300 hover:text-violet-800 focus-visible:ring-violet-500">
       Take the product tour <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
     </Button>
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="flex max-h-[96dvh] w-[calc(100%-1rem)] max-w-6xl flex-col gap-0 overflow-hidden border-0 bg-[#f3f4f8] p-0 sm:w-[calc(100%-2rem)] sm:rounded-2xl">
+      <DialogContent onKeyDown={handleCarouselKeyDown} className="!flex !max-h-[96dvh] !w-[calc(100%-1rem)] !max-w-[min(96vw,1440px)] flex-col gap-0 overflow-hidden border-0 bg-[#f3f4f8] p-0 sm:!w-[calc(100%-2rem)] sm:rounded-2xl">
         <DialogHeader className="sr-only">
           <DialogTitle>Practably product tour</DialogTitle>
           <DialogDescription>Explore five illustrative coaching workflows using fictional sample data.</DialogDescription>
@@ -127,4 +137,85 @@ export function ProductTour() {
       </DialogContent>
     </Dialog>
   </>;
+}
+
+export function ProductShowcase() {
+  const [active, setActive] = useState(0);
+  const CurrentSlide = visualSlides[active];
+  const step = (direction: number) => setActive((current) => (current + direction + slides.length) % slides.length);
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      step(-1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      step(1);
+    }
+  };
+
+  return (
+    <section
+      id="product-showcase"
+      aria-label="Explore the Practably workspace"
+      aria-roledescription="carousel"
+      className="mx-auto max-w-[1440px] px-5 pb-16 sm:px-6 sm:pb-20"
+      data-testid="product-showcase-carousel"
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+    >
+      <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[#f7f8fb] shadow-[0_24px_80px_-42px_rgba(28,25,55,.42)]">
+        <div className="flex flex-col gap-4 border-b border-slate-200 bg-white px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-8 sm:py-6">
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-[.17em] text-violet-700">Inside the workspace</p>
+            <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">The work behind each session, in one place.</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">Explore the everyday flow, from client context and bookings to forms and invoices.</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button type="button" onClick={() => step(-1)} aria-label="Previous workflow preview" className="grid h-10 w-10 place-items-center rounded-full border border-slate-300 bg-white text-slate-700 transition-colors hover:border-violet-400 hover:text-violet-800 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">
+              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <p aria-live="polite" className="min-w-[3.5rem] text-center text-xs font-semibold tabular-nums text-slate-500">{active + 1} <span className="text-slate-300">/</span> {slides.length}</p>
+            <button type="button" onClick={() => step(1)} aria-label="Next workflow preview" className="grid h-10 w-10 place-items-center rounded-full bg-violet-700 text-white transition-colors hover:bg-violet-800 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">
+              <ChevronRight className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <nav aria-label="Choose a workflow preview" className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-5 py-3 sm:px-8">
+          {slides.map((slide, index) => (
+            <button
+              key={slide.label}
+              type="button"
+              aria-current={active === index ? "step" : undefined}
+              aria-label={`Show ${slide.label} workflow preview`}
+              onClick={() => setActive(index)}
+              className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full px-4 text-xs font-bold transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${active === index ? "bg-violet-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-violet-50 hover:text-violet-800"}`}
+            >
+              <slide.icon className="h-3.5 w-3.5" aria-hidden="true" />
+              {slide.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="grid items-start gap-6 p-4 sm:p-7 lg:p-8">
+          <div className="grid items-center gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-[.18em] text-violet-700">{slides[active].label}</p>
+              <h3 className="mt-2 text-2xl font-extrabold leading-tight tracking-tight text-slate-950 sm:text-3xl">{slides[active].title}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">{slides[active].detail}</p>
+            </div>
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-950">
+              Fictional sample only. No real client details are shown, and this preview cannot send emails or take payments.
+            </p>
+          </div>
+          <div className="min-w-0" data-testid="product-showcase-active-preview" aria-label={`${slides[active].label} sample interface`}>
+            <div key={active} className="animate-in fade-in slide-in-from-right-2 duration-300 motion-reduce:animate-none">
+              <CurrentSlide />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }

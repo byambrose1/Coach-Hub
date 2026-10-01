@@ -10,7 +10,7 @@ import {
 import { Link } from "wouter";
 import { BrandMark } from "@/components/brand-mark";
 import { WaitlistDialog } from "@/components/waitlist-dialog";
-import { ProductTour } from "@/components/product-tour";
+import { ProductShowcase, ProductTour } from "@/components/product-tour";
 import { getPublicSiteUrl, OWNER_INPUT_REQUIRED, pricingTiers, siteConfig } from "@/config/site";
 
 const features = [
@@ -113,6 +113,7 @@ export default function Landing() {
             </div>
             <ul className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm font-medium text-slate-600"><li className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />Free for your first 5 clients</li><li className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />No credit card required</li><li className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />Coach-sized plans</li></ul>
           </div>
+          <ProductShowcase />
         </section>
 
         <section id="how-it-works" className="border-y border-slate-200 bg-slate-50"><div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20"><div className="max-w-2xl"><p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-600">How it works</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">Start with the workflow you already know.</h2></div><ol className="mt-10 grid gap-5 md:grid-cols-3">{[["01", "Add your clients", "Create a clear client record with contact details, notes, and the coaching context you need."], ["02", "Run bookings and forms", "Schedule sessions, manage packages, and collect PARQ forms from the same client workflow."], ["03", "Get paid and track revenue", "Create invoices, follow outstanding amounts, and use payment workflows when you are ready."]].map(([number, title, description]) => <li key={number} className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200"><p className="text-sm font-extrabold text-violet-600">{number}</p><h3 className="mt-5 text-xl font-bold text-slate-950">{title}</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{description}</p></li>)}</ol></div></section>
