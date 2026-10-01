@@ -10,7 +10,7 @@ import {
 import { Link } from "wouter";
 import { BrandMark } from "@/components/brand-mark";
 import { WaitlistDialog } from "@/components/waitlist-dialog";
-import { getPublicSiteUrl, OWNER_INPUT_REQUIRED, pricingTiers, siteConfig } from "@/config/site";
+import { getPublicSiteUrl, pricingTiers, siteConfig } from "@/config/site";
 
 const faqItems = [
   ["Who is Practably for?", "Practably is designed for independent coaches who want one place to manage a small client roster, sessions, forms, invoices, and payment workflows."],
@@ -19,9 +19,9 @@ const faqItems = [
   ["Do my clients need a Practably login?", "No. Coaches use Practably to manage their own workflow. Clients can receive emails and PARQ forms without a Practably dashboard login."],
   ["How do payments and GoCardless work?", "Practably can create a GoCardless direct-debit setup link when your account has GoCardless configured. GoCardless handles the payment mandate flow. Check your GoCardless account for its terms and fees."],
   ["How are PARQ and health details handled?", "PARQ responses are stored against the relevant client record so a coach can manage their workflow. Practably is software, not medical advice; collect and use health information only where appropriate for your practice."],
-  ["Can I export or delete data?", "You can export an individual client record from that client's profile. Account deletion is available from Settings. The account retention and backup process is owner review required before launch."],
-  ["What happens if I cancel or downgrade?", "The app prevents a downgrade if your current client count exceeds the new plan limit. Billing, access, and retention details after cancellation are owner review required before public launch."],
-  ["Are VAT or payment-provider fees included?", `Prices are shown monthly. VAT treatment and separate payment-provider fees are ${OWNER_INPUT_REQUIRED}; check the completed pricing and payment terms before subscribing.`],
+  ["Can I export or delete data?", `You can export an individual client record from that client's profile. ${siteConfig.retentionPolicy}`],
+  ["What happens if I cancel or downgrade?", `The app prevents a downgrade if your current client count exceeds the new plan limit. ${siteConfig.cancellationTerms}`],
+  ["Are VAT or payment-provider fees included?", `Prices are shown monthly. ${siteConfig.vatTreatment} ${siteConfig.paymentProviderFees}`],
   ["How do I contact support?", `Support contact: ${siteConfig.supportEmail}. Do not send health responses, passwords, or payment credentials in a support message.`],
 ];
 

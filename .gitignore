@@ -4,3 +4,6 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Local-only QA harness that stubs real login - never committed/deployed
+server/qa-server.ts
