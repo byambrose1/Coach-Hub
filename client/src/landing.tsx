@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
-  ArrowRight, CalendarDays, CheckCircle2, ChevronDown, ClipboardCheck, CreditCard,
-  FileText, Menu, ShieldCheck, Sparkles, TrendingUp, Users, X, Zap,
+  ArrowRight, CalendarDays, CheckCircle2, ClipboardCheck, CreditCard,
+  Menu, ShieldCheck, Sparkles, TrendingUp, Users, X, Zap,
 } from "lucide-react";
 import { Link } from "wouter";
 import { BrandMark } from "@/components/brand-mark";
 import { WaitlistDialog } from "@/components/waitlist-dialog";
+import { ProductTour } from "@/components/product-tour";
 import { getPublicSiteUrl, OWNER_INPUT_REQUIRED, pricingTiers, siteConfig } from "@/config/site";
 
 const features = [
@@ -42,36 +43,6 @@ function setMeta(name: string, content: string, attribute: "name" | "property" =
     document.head.appendChild(element);
   }
   element.content = content;
-}
-
-function ProductPreview() {
-  return (
-    <div className="mx-auto mt-12 max-w-5xl rounded-[1.75rem] border border-slate-200 bg-white p-2 shadow-2xl shadow-violet-200/50 sm:p-3">
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
-          <div className="flex items-center gap-2 font-bold text-slate-950"><BrandMark className="h-7 w-7" />Practably</div>
-          <div className="hidden items-center gap-2 sm:flex"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden="true" /><span className="text-xs font-medium text-slate-500">Coach dashboard</span></div>
-        </div>
-        <div className="grid gap-3 p-3 sm:grid-cols-[1.1fr_.9fr] sm:p-5">
-          <section aria-label="Illustrative weekly calendar" className="rounded-xl border border-slate-200 bg-white p-4 text-left">
-            <div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-violet-600">This week</p><p className="font-bold text-slate-950">Your coaching calendar</p></div><span className="rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">3 upcoming</span></div>
-            <div className="grid grid-cols-5 gap-1.5 text-center text-[10px] font-semibold text-slate-500 sm:gap-2 sm:text-xs">
-              {["Mon", "Tue", "Wed", "Thu", "Fri"].map((day, index) => <div key={day} className={`rounded-lg py-1.5 ${index === 2 ? "bg-violet-600 text-white" : "bg-slate-100"}`}>{day}<span className="ml-1 opacity-70">{12 + index}</span></div>)}
-            </div>
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center gap-3 rounded-lg border-l-4 border-violet-500 bg-violet-50 p-2.5"><span className="text-xs font-bold text-violet-700">09:00</span><div><p className="text-xs font-bold text-slate-900">Session with Alex M.</p><p className="text-[11px] text-slate-500">Strength · Studio</p></div></div>
-              <div className="flex items-center gap-3 rounded-lg border-l-4 border-orange-400 bg-orange-50 p-2.5"><span className="text-xs font-bold text-orange-700">17:30</span><div><p className="text-xs font-bold text-slate-900">Session with Sam T.</p><p className="text-[11px] text-slate-500">Online · 1:1</p></div></div>
-            </div>
-          </section>
-          <div className="grid gap-3 text-left">
-            <section aria-label="Illustrative client list" className="rounded-xl border border-slate-200 bg-white p-4"><div className="mb-3 flex items-center justify-between"><p className="text-sm font-bold text-slate-950">Clients</p><span className="text-xs font-semibold text-violet-700">5 / 5 free</span></div><div className="space-y-2">{[["Alex M.", "PARQ complete"], ["Sam T.", "PARQ to send"], ["Morgan K.", "Active package"]].map(([name, status], index) => <div key={name} className="flex items-center gap-2"><span className={`grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold text-white ${index === 1 ? "bg-orange-400" : "bg-violet-500"}`}>{name.split(" ").map((part) => part[0]).join("")}</span><div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-800">{name}</p><p className={`text-[10px] ${index === 1 ? "text-orange-700" : "text-emerald-700"}`}>{status}</p></div></div>)}</div></section>
-            <div className="grid grid-cols-2 gap-3"><section aria-label="Illustrative invoice status" className="rounded-xl bg-slate-950 p-3 text-white"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Outstanding</p><p className="mt-1 text-xl font-extrabold">£120</p><p className="mt-1 text-[10px] text-slate-400">1 invoice due</p></section><section aria-label="Illustrative onboarding status" className="rounded-xl bg-emerald-50 p-3"><p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Setup</p><p className="mt-1 text-xl font-extrabold text-emerald-900">4 / 6</p><p className="mt-1 text-[10px] text-emerald-700">steps complete</p></section></div>
-          </div>
-        </div>
-        <p className="border-t border-slate-200 bg-white px-4 py-2 text-left text-[11px] text-slate-500">Illustrative dashboard preview using Practably workflows.</p>
-      </div>
-    </div>
-  );
 }
 
 export default function Landing() {
@@ -122,11 +93,12 @@ export default function Landing() {
             <Link href="/blog" className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">Blog</Link>
           </nav>
           <div className="flex items-center gap-2">
+            <a href="/api/login" className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-bold text-slate-700 hover:bg-violet-50 hover:text-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">Sign in</a>
             <WaitlistDialog trigger={<Button size="sm" className="hidden rounded-full bg-violet-600 px-5 font-semibold hover:bg-violet-700 sm:inline-flex">Join the waitlist</Button>} />
             <button type="button" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} className="grid h-10 w-10 place-items-center rounded-md text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 md:hidden" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
           </div>
         </div>
-        {menuOpen && <nav aria-label="Mobile navigation" className="border-t border-slate-200 bg-white px-5 py-3 md:hidden"><div className="mx-auto flex max-w-6xl flex-col gap-1">{["How it works", "Features", "Pricing", "FAQ"].map((item) => <a key={item} href={`#${item.toLowerCase().replaceAll(" ", "-")}`} onClick={() => setMenuOpen(false)} className="rounded-md px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">{item}</a>)}<Link href="/blog" onClick={() => setMenuOpen(false)} className="rounded-md px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">Blog</Link><WaitlistDialog trigger={<button type="button" className="mt-2 rounded-full bg-violet-600 px-4 py-2.5 text-center text-sm font-bold text-white">Join the waitlist</button>} /></div></nav>}
+        {menuOpen && <nav aria-label="Mobile navigation" className="border-t border-slate-200 bg-white px-5 py-3 md:hidden"><div className="mx-auto flex max-w-6xl flex-col gap-1">{["How it works", "Features", "Pricing", "FAQ"].map((item) => <a key={item} href={`#${item.toLowerCase().replaceAll(" ", "-")}`} onClick={() => setMenuOpen(false)} className="rounded-md px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">{item}</a>)}<Link href="/blog" onClick={() => setMenuOpen(false)} className="rounded-md px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">Blog</Link><a href="/api/login" className="rounded-md px-3 py-2.5 text-sm font-bold text-violet-800 hover:bg-violet-50">Sign in</a><WaitlistDialog trigger={<button type="button" className="mt-2 rounded-full bg-violet-600 px-4 py-2.5 text-center text-sm font-bold text-white">Join the waitlist</button>} /></div></nav>}
       </header>
 
       <main>
@@ -137,10 +109,9 @@ export default function Landing() {
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-relaxed text-slate-600 sm:text-xl">Manage clients, bookings, PARQ forms, invoices, and payments in one place, without stitching together spreadsheets and five different apps.</p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <WaitlistDialog trigger={<Button size="lg" className="w-full rounded-full bg-violet-600 px-7 py-6 text-base font-bold shadow-lg shadow-violet-200 hover:bg-violet-700 sm:w-auto">Join the waitlist <ArrowRight className="ml-2 h-5 w-5" aria-hidden="true" /></Button>} />
-              <a href="#dashboard-preview" className="inline-flex min-h-12 items-center rounded-full border border-slate-300 bg-white px-6 text-sm font-bold text-slate-700 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">See the dashboard <ChevronDown className="ml-1 h-4 w-4" aria-hidden="true" /></a>
+              <ProductTour />
             </div>
             <ul className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm font-medium text-slate-600"><li className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />Free for your first 5 clients</li><li className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />No credit card required</li><li className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />Coach-sized plans</li></ul>
-            <div id="dashboard-preview"><ProductPreview /></div>
           </div>
         </section>
 
