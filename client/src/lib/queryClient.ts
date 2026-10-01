@@ -3,7 +3,17 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    // API errors are JSON ({ message, ...extra fields like a conflicting-session
+    // id }) - surface just the human message to the UI rather than the raw
+    // body, which otherwise shows up verbatim in error toasts.
+    let message = text;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed.message === "string") message = parsed.message;
+    } catch {
+      // not JSON - fall back to the raw text as-is
+    }
+    throw new Error(`${res.status}: ${message}`);
   }
 }
 

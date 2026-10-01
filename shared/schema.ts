@@ -75,7 +75,7 @@ export type SessionNote = typeof sessionNotes.$inferSelect;
 
 export const settings = pgTable("settings", {
   id: varchar("id").primaryKey().default(sql`'default'`),
-  trainerName: text("trainer_name").default("Coach"),
+  trainerName: text("trainer_name"),
   cancellationPolicy: text("cancellation_policy"),
   paymentLink: text("payment_link"),
   businessName: text("business_name"),

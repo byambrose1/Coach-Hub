@@ -1185,7 +1185,6 @@ export async function registerRoutes(
     let s = await storage.getSettings(userId);
     if (!s) {
       s = await storage.upsertSettings(userId, {
-        trainerName: "Coach",
         cancellationPolicy: "",
         paymentLink: "",
         businessName: "",

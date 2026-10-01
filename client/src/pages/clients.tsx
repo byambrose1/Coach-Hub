@@ -471,7 +471,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-left truncate">{currentClient.name}</p>
+                  <p className="text-left truncate min-w-0 flex-1" title={currentClient.name}>{currentClient.name}</p>
                   <Button
                     size="icon"
                     variant="ghost"

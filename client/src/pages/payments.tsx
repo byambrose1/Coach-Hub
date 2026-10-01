@@ -700,7 +700,7 @@ export default function Payments() {
   const [newPackageOpen, setNewPackageOpen] = useState(false);
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [editingPkg, setEditingPkg] = useState<PackageType | null>(null);
-  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [revenueScope, setRevenueScope] = useState<"week" | "month">("month");
   const [mandateLinks, setMandateLinks] = useState<Record<string, string>>({});
   const [generatingMandateFor, setGeneratingMandateFor] = useState<string | null>(null);
@@ -716,6 +716,10 @@ export default function Payments() {
   const { data: invoices = [], isLoading: invoicesLoading } = useQuery<Invoice[]>({
     queryKey: ["/api/invoices"],
   });
+  // Derived from the live query rather than a snapshot held in state, so the
+  // open dialog reflects a status change (e.g. Mark Paid) immediately instead
+  // of showing stale data until it's closed and reopened.
+  const viewingInvoice = viewingInvoiceId ? invoices.find((inv) => inv.id === viewingInvoiceId) || null : null;
 
   const { data: sessions = [] } = useQuery<Session[]>({
     queryKey: ["/api/sessions"],
@@ -1078,7 +1082,7 @@ export default function Payments() {
                 <Card
                   key={inv.id}
                   className="cursor-pointer hover-elevate"
-                  onClick={() => setViewingInvoice(inv)}
+                  onClick={() => setViewingInvoiceId(inv.id)}
                   data-testid={`card-invoice-${inv.id}`}
                 >
                   <CardContent className="p-4">
@@ -1236,7 +1240,7 @@ export default function Payments() {
           invoice={viewingInvoice}
           clientName={clientMap.get(viewingInvoice.clientId) || "Unknown"}
           settings={settings}
-          onClose={() => setViewingInvoice(null)}
+          onClose={() => setViewingInvoiceId(null)}
         />
       )}
     </div>
