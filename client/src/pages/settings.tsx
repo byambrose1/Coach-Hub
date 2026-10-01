@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SubscriptionUpgradeButton } from "@/components/subscription-upgrade-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -352,17 +353,13 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
                 {isCurrent ? (
                   <span className="text-xs text-muted-foreground">{currentPlan === "free" ? "Active" : "Current"}</span>
                 ) : isUpgrade ? (
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className="gap-1.5 text-xs"
-                    onClick={() => checkoutMutation.mutate(tier.name)}
+                  <SubscriptionUpgradeButton
+                    plan={tier.name}
+                    selectedPlan={checkoutMutation.variables}
+                    pending={checkoutMutation.isPending}
+                    onUpgrade={(plan) => checkoutMutation.mutate(plan)}
                     disabled={subscriptionMutationPending || subscriptionStatusQuery.data?.ready !== true}
-                    data-testid={`button-upgrade-${tier.name}`}
-                  >
-                    <ArrowUp className="h-3 w-3" />
-                    {checkoutMutation.isPending ? "Opening..." : "Upgrade"}
-                  </Button>
+                  />
                 ) : canDowngrade ? (
                   <Button
                     size="sm"

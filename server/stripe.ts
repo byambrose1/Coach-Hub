@@ -97,3 +97,47 @@ export function validateStripeModeForBilling(): "live" | "test" {
 export function getStripeWebhookSecret(): string {
   return process.env.STRIPE_WEBHOOK_SECRET || "";
 }
+
+// Scope branding to Practably checkout; the account also serves other businesses.
+export function getPractablyCheckoutBranding(
+  siteUrl: string,
+): Stripe.Checkout.SessionCreateParams.BrandingSettings {
+  const fileId = process.env.STRIPE_PRACTABLY_LOGO_FILE_ID;
+  const iconFileId = process.env.STRIPE_PRACTABLY_ICON_FILE_ID;
+  const image = fileId
+    ? { type: "file" as const, file: fileId }
+    : { type: "url" as const, url: `${siteUrl}/practably-stripe-logo.png` };
+  return {
+    display_name: "Practably",
+    logo: image,
+    // Stripe requires a separate business_icon upload, even for the same image.
+    icon: iconFileId
+      ? { type: "file", file: iconFileId }
+      : { type: "url", url: `${siteUrl}/practably-stripe-logo.png` },
+    background_color: "#ffffff",
+    button_color: "#4c1d95",
+    font_family: "inter",
+  };
+}
+
+export function hasPractablyCheckoutBranding(
+  session: Stripe.Checkout.Session,
+  expected: Stripe.Checkout.SessionCreateParams.BrandingSettings,
+): boolean {
+  const actual = session.branding_settings;
+  if (!actual) return false;
+  const matchesImage = (
+    actualImage: NonNullable<typeof actual>["logo"],
+    expectedImage: typeof expected.logo,
+  ) => !!actualImage && !!expectedImage &&
+    actualImage.type === expectedImage.type &&
+    (expectedImage.type === "file"
+      ? actualImage.file === expectedImage.file
+      : actualImage.url === expectedImage.url);
+  return actual.display_name === expected.display_name &&
+    matchesImage(actual.logo, expected.logo) &&
+    matchesImage(actual.icon, expected.icon) &&
+    actual.background_color === expected.background_color &&
+    actual.button_color === expected.button_color &&
+    actual.font_family === expected.font_family;
+}

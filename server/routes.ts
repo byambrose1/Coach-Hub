@@ -23,6 +23,8 @@ import { logError } from "./safe-logging";
 import { withBillingCheckoutLock } from "./db";
 import {
   getStripeClient,
+  getPractablyCheckoutBranding,
+  hasPractablyCheckoutBranding,
   getStripeMode,
   getStripePlanForPrice,
   getStripePriceId,
@@ -874,6 +876,8 @@ export async function registerRoutes(
         });
       }
 
+      const siteUrl = getPublicSiteUrl(req);
+      const checkoutBranding = getPractablyCheckoutBranding(siteUrl);
       let reusableSession: Stripe.Checkout.Session | undefined;
       const sessionsToExpire: Stripe.Checkout.Session[] = [];
       for (const openSession of openSessions) {
@@ -884,7 +888,8 @@ export async function registerRoutes(
         const sessionBelongsToUser = openSession.metadata?.userId === userId;
         const notExpired =
           typeof openSession.expires_at === "number" && openSession.expires_at * 1000 > Date.now();
-        if (sessionBelongsToUser && openPlan === plan && notExpired && openSession.url) {
+        if (sessionBelongsToUser && openPlan === plan && notExpired && openSession.url &&
+          hasPractablyCheckoutBranding(openSession, checkoutBranding)) {
           if (!reusableSession) reusableSession = openSession;
           else sessionsToExpire.push(openSession);
         } else {
@@ -894,9 +899,9 @@ export async function registerRoutes(
       await expireCheckoutSessions(sessionsToExpire);
       if (reusableSession?.url) return res.json({ url: reusableSession.url });
 
-      const siteUrl = getPublicSiteUrl(req);
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
+        branding_settings: checkoutBranding,
         customer,
         ...(process.env.STRIPE_AUTOMATIC_TAX_ENABLED === "true"
           ? {

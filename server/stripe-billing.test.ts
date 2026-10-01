@@ -324,6 +324,10 @@ describe("hardened Stripe subscription billing", () => {
     assert.equal(state.checkoutCreateCalls.length, 1);
     const call = state.checkoutCreateCalls[0];
     assert.equal(call.params.line_items[0].price, "price_starter");
+    assert.equal(call.params.branding_settings.display_name, "Practably");
+    assert.ok(call.params.branding_settings.logo.file || call.params.branding_settings.logo.url);
+    assert.ok(call.params.branding_settings.icon.file || call.params.branding_settings.icon.url);
+    assert.equal(call.params.branding_settings.button_color, "#4c1d95");
     assert.match(call.params.success_url, /billing=success&session_id=\{CHECKOUT_SESSION_ID\}$/);
     assert.equal("automatic_tax" in call.params, false);
     assert.match(call.options.idempotencyKey, /^coach-subscription-billing-coach-a-starter-/);
@@ -429,6 +433,36 @@ describe("hardened Stripe subscription billing", () => {
     assert.equal((await third.json()).url, "https://checkout.example.test/1");
     assert.equal(state.checkoutSessions.get("cs_test_duplicate").status, "expired");
     assert.equal(state.checkoutCreateCalls.length, 1);
+  });
+
+  test("old business branding is expired instead of reusing its checkout", async () => {
+    await request("/api/subscription/checkout", {
+      method: "POST",
+      body: JSON.stringify({ plan: "starter" }),
+    });
+    const original = state.checkoutSessions.get("cs_test_1");
+    original.branding_settings = {
+      ...original.branding_settings,
+      display_name: "Previous business",
+    };
+    const response = await request("/api/subscription/checkout", {
+      method: "POST",
+      body: JSON.stringify({ plan: "starter" }),
+    });
+    assert.equal(response.status, 200);
+    assert.equal(original.status, "expired");
+    assert.equal(state.checkoutCreateCalls.length, 2);
+    assert.equal(state.checkoutCreateCalls[1].params.branding_settings.display_name, "Practably");
+
+    const second = state.checkoutSessions.get("cs_test_2");
+    second.branding_settings.logo = { type: "file", file: "file_old_business_logo" };
+    const updated = await request("/api/subscription/checkout", {
+      method: "POST",
+      body: JSON.stringify({ plan: "starter" }),
+    });
+    assert.equal(updated.status, 200);
+    assert.equal(second.status, "expired");
+    assert.equal(state.checkoutCreateCalls.length, 3);
   });
 
   test("expired Checkout sessions are not reused", async () => {

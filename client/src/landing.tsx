@@ -105,7 +105,7 @@ export default function Landing() {
         <section className="relative isolate overflow-hidden"><div className="absolute -right-40 -top-48 -z-10 h-[36rem] w-[36rem] rounded-full bg-violet-300/30 blur-3xl" /><div className="absolute -bottom-48 -left-40 -z-10 h-[32rem] w-[32rem] rounded-full bg-orange-200/50 blur-3xl" />
           <div className="mx-auto max-w-6xl px-5 pb-16 pt-16 text-center sm:px-6 sm:pb-20 sm:pt-20">
             <Badge className="mb-6 rounded-full border border-violet-200 bg-violet-50 px-3.5 py-1.5 font-semibold text-violet-800"><Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />Private beta - join the waitlist for early access.</Badge>
-            <h1 className="mx-auto max-w-4xl text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-950 sm:text-6xl">The simple business hub for <span className="bg-gradient-to-r from-violet-600 to-orange-500 bg-clip-text text-transparent">independent coaches.</span></h1>
+            <h1 className="mx-auto max-w-4xl text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-950 sm:text-6xl">The simple business hub for independent coaches.</h1>
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-relaxed text-slate-600 sm:text-xl">Manage clients, bookings, PARQ forms, invoices, and payments in one place, without stitching together spreadsheets and five different apps.</p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <WaitlistDialog trigger={<Button size="lg" className="w-full rounded-full bg-violet-600 px-7 py-6 text-base font-bold shadow-lg shadow-violet-200 hover:bg-violet-700 sm:w-auto">Join the waitlist <ArrowRight className="ml-2 h-5 w-5" aria-hidden="true" /></Button>} />
