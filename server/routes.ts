@@ -18,12 +18,18 @@ import {
 } from "./email";
 import { createMandateLink as defaultCreateMandateLink } from "./payments";
 import type { RequestHandler } from "express";
+import type Stripe from "stripe";
 import { logError } from "./safe-logging";
+import { withBillingCheckoutLock } from "./db";
 import {
   getStripeClient,
+  getStripeMode,
   getStripePlanForPrice,
   getStripePriceId,
   getStripeWebhookSecret,
+  StripeBillingConfigurationError,
+  validateStripeModeForBilling,
+  validateStripePrice,
 } from "./stripe";
 
 const PAYMENT_PROVIDER_ERROR = {
@@ -123,6 +129,23 @@ function getUserId(req: any): string {
   return (req.session as any)?.impersonatedUserId || getRealUserId(req);
 }
 
+function stripeObjectId(value: string | { id: string } | null | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  return value?.id;
+}
+
+function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | undefined {
+  const currentShape = (invoice as any).parent?.subscription_details?.subscription;
+  return stripeObjectId(currentShape) || stripeObjectId((invoice as any).subscription);
+}
+
+class StripeBillingOwnershipError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StripeBillingOwnershipError";
+  }
+}
+
 function isOwner(req: any): boolean {
   const userId = getRealUserId(req);
   const ownerId = process.env.OWNER_USER_ID;
@@ -152,6 +175,8 @@ export async function registerRoutes(
   dependencies: {
     storage?: IStorage;
     isAuthenticated?: RequestHandler;
+    stripeClient?: Stripe;
+    withBillingCheckoutLock?: typeof withBillingCheckoutLock;
     createMandateLink?: typeof defaultCreateMandateLink;
     sendBookingNotificationEmail?: typeof defaultSendBookingNotificationEmail;
     sendInvoiceEmail?: typeof defaultSendInvoiceEmail;
@@ -164,6 +189,8 @@ export async function registerRoutes(
 ): Promise<Server> {
   const storage = dependencies.storage ?? defaultStorage;
   const isAuthenticated = dependencies.isAuthenticated ?? defaultIsAuthenticated;
+  const getBillingStripeClient = () => dependencies.stripeClient ?? getStripeClient();
+  const lockBillingUser = dependencies.withBillingCheckoutLock ?? withBillingCheckoutLock;
   const createMandateLink = dependencies.createMandateLink ?? defaultCreateMandateLink;
   const deleteAuthUser = dependencies.deleteAuthUser ?? authStorage.deleteUser.bind(authStorage);
   const sendBookingNotificationEmail =
@@ -366,16 +393,211 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  const resolveStripePrice = async (plan: string): Promise<string> => {
+    const priceId = getStripePriceId(plan);
+    if (!priceId) {
+      throw new StripeBillingConfigurationError(
+        `The Stripe ${plan} price ID is missing. Configure its price before enabling this plan.`,
+      );
+    }
+    const mode = validateStripeModeForBilling();
+    const price = await getBillingStripeClient().prices.retrieve(priceId);
+    validateStripePrice(price, plan, mode);
+    return priceId;
+  };
+
+  const inspectStripeSubscription = async (subscriptionId: string) => {
+    const stripe = getBillingStripeClient();
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ["items.data.price", "latest_invoice"],
+    });
+    const customerId = stripeObjectId(subscription.customer);
+    if (!customerId) {
+      throw new StripeBillingConfigurationError("Stripe returned a subscription without a customer.");
+    }
+    if (subscription.items.data.length !== 1 || subscription.items.data[0]?.quantity !== 1) {
+      throw new StripeBillingConfigurationError(
+        "The Stripe subscription does not match the supported single monthly plan.",
+      );
+    }
+    const priceId = stripeObjectId(subscription.items.data[0]?.price);
+    const plan = priceId ? getStripePlanForPrice(priceId) : undefined;
+    if (!plan) {
+      throw new StripeBillingConfigurationError(
+        "The Stripe subscription uses a price that is not configured for this service.",
+      );
+    }
+    await resolveStripePrice(plan);
+    const rawLatestInvoice = subscription.latest_invoice;
+    const latestInvoice =
+      typeof rawLatestInvoice === "string"
+        ? await stripe.invoices.retrieve(rawLatestInvoice)
+        : rawLatestInvoice;
+    const latestInvoiceId =
+      typeof rawLatestInvoice === "string" ? rawLatestInvoice : rawLatestInvoice?.id;
+    return {
+      subscription,
+      customerId,
+      plan,
+      latestInvoiceId,
+      latestInvoicePaid:
+        latestInvoice?.status === "paid" || (latestInvoice as any)?.paid === true,
+      hasPendingUpdate: !!subscription.pending_update,
+    };
+  };
+
+  const writeSubscriptionState = async (
+    userId: string,
+    settings: any,
+    inspected: Awaited<ReturnType<typeof inspectStripeSubscription>>,
+    customerId: string,
+    checkoutPaymentVerified: boolean,
+    noPaymentRequired: boolean,
+    forcedStatus?: string,
+  ) => {
+    const { subscription, plan, latestInvoiceId, latestInvoicePaid, hasPendingUpdate } = inspected;
+    const stripeIsEntitled = ["active", "trialing"].includes(subscription.status);
+    const previousPlanWasVerified =
+      settings?.stripeSubscriptionId === subscription.id &&
+      settings?.subscriptionPlan === plan &&
+      ["active", "trialing"].includes(settings?.subscriptionStatus || "");
+    const currentPaymentVerified =
+      latestInvoicePaid ||
+      (checkoutPaymentVerified && noPaymentRequired && !latestInvoiceId);
+    const pendingUpdateCanPreservePreviousPlan =
+      hasPendingUpdate &&
+      settings?.stripeSubscriptionId === subscription.id &&
+      settings?.subscriptionPlan === plan &&
+      ["active", "trialing"].includes(settings?.subscriptionStatus || "") &&
+      ["starter", "professional", "business"].includes(settings?.subscriptionPlan || "");
+    const entitled =
+      stripeIsEntitled &&
+      !forcedStatus &&
+      !hasPendingUpdate &&
+      (currentPaymentVerified || previousPlanWasVerified);
+    const preservedPlan = pendingUpdateCanPreservePreviousPlan
+      ? settings.subscriptionPlan
+      : undefined;
+    const status =
+      forcedStatus ||
+      (entitled
+        ? subscription.status
+        : preservedPlan
+          ? subscription.status
+        : stripeIsEntitled
+          ? "pending_payment"
+          : subscription.status);
+    return storage.upsertSettings(userId, {
+      ...(settings || {}),
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscription.id,
+      subscriptionPlan: entitled ? plan : preservedPlan || "free",
+      subscriptionStatus: status,
+    });
+  };
+
+  const verifyStripeCustomerOwnership = async (customerId: string, userId: string) => {
+    const customer = await getBillingStripeClient().customers.retrieve(customerId);
+    if ("deleted" in customer || customer.metadata.userId !== userId) {
+      throw new StripeBillingOwnershipError(
+        "This Stripe customer is not connected to the authenticated account.",
+      );
+    }
+    return customer;
+  };
+
+  const listOpenSubscriptionCheckoutSessions = async (customerId: string) => {
+    const stripe = getBillingStripeClient();
+    const sessions: Stripe.Checkout.Session[] = [];
+    let startingAfter: string | undefined;
+    for (let page = 0; page < 10; page += 1) {
+      const result = await stripe.checkout.sessions.list({
+        customer: customerId,
+        limit: 100,
+        expand: ["data.line_items"],
+        ...(startingAfter ? { starting_after: startingAfter } : {}),
+      });
+      sessions.push(...result.data);
+      if (!result.has_more || result.data.length === 0) break;
+      startingAfter = result.data[result.data.length - 1].id;
+    }
+    return sessions.filter(
+      (session) =>
+        session.mode === "subscription" &&
+        session.status === "open" &&
+        stripeObjectId(session.customer) === customerId,
+    );
+  };
+
+  const expireCheckoutSessions = async (sessions: Stripe.Checkout.Session[]) => {
+    const stripe = getBillingStripeClient();
+    for (const session of sessions) {
+      await stripe.checkout.sessions.expire(session.id);
+    }
+  };
+
+  app.get("/api/subscription/status", isAuthenticated, async (_req, res) => {
+    const mode = getStripeMode();
+    const livemode = mode === "live";
+    const messages: string[] = [];
+    if (mode === "unconfigured") messages.push("Stripe credentials are not configured.");
+    else if (mode === "unknown") messages.push("Stripe credentials have an unrecognized mode.");
+    else if (process.env.NODE_ENV === "production" && mode !== "live") {
+      messages.push("Live Stripe credentials are required in production.");
+    }
+    if (!getStripeWebhookSecret() || process.env.STRIPE_WEBHOOK_CONFIGURED !== "true") {
+      messages.push("The Stripe webhook signing secret has not been verified for this endpoint.");
+    }
+    if (!process.env.STRIPE_PORTAL_CONFIGURATION_ID) {
+      messages.push("The Stripe Billing Portal configuration has not been configured.");
+    }
+
+    if (mode === "live" || mode === "test") {
+      try {
+        const stripe = getBillingStripeClient();
+        const modeForValidation = validateStripeModeForBilling();
+        for (const plan of ["starter", "professional", "business"]) {
+          const priceId = getStripePriceId(plan);
+          if (!priceId) {
+            messages.push(`The Stripe ${plan} price ID is not configured.`);
+            continue;
+          }
+          validateStripePrice(await stripe.prices.retrieve(priceId), plan, modeForValidation);
+        }
+      } catch (err) {
+        if (err instanceof StripeBillingConfigurationError) {
+          messages.push(err.message);
+        } else {
+          logError("Stripe billing readiness check failed", err);
+          messages.push("Stripe prices could not be verified. Check Stripe configuration and try again.");
+        }
+      }
+    }
+
+    return res.json({
+      livemode,
+      ready: messages.length === 0,
+      ...(messages.length
+        ? { message: messages.filter((message, index) => messages.indexOf(message) === index).join(" ") }
+        : {}),
+    });
+  });
+
   app.post("/api/webhooks/stripe", async (req, res) => {
     const signature = req.header("stripe-signature");
     const webhookSecret = getStripeWebhookSecret();
-    if (!signature || !webhookSecret || !req.rawBody) {
+    if (
+      !signature ||
+      !webhookSecret ||
+      process.env.STRIPE_WEBHOOK_CONFIGURED !== "true" ||
+      !req.rawBody
+    ) {
       return res.status(503).json({ message: "Stripe webhook is not configured." });
     }
 
     let event: import("stripe").default.Event;
     try {
-      event = getStripeClient().webhooks.constructEvent(
+      event = getBillingStripeClient().webhooks.constructEvent(
         req.rawBody as Buffer,
         signature,
         webhookSecret,
@@ -386,61 +608,136 @@ export async function registerRoutes(
     }
 
     try {
+      const mode = validateStripeModeForBilling();
+      if (event.livemode !== (mode === "live")) {
+        return res.status(400).json({ message: "Stripe webhook mode does not match the configured account." });
+      }
+
       if (
         event.type === "checkout.session.completed" ||
+        event.type === "checkout.session.async_payment_succeeded" ||
+        event.type === "checkout.session.async_payment_failed"
+      ) {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const userId = session.metadata?.userId;
+        const customerId = stripeObjectId(session.customer);
+        const subscriptionId = stripeObjectId(session.subscription);
+        if (
+          !userId ||
+          !customerId ||
+          !subscriptionId ||
+          session.mode !== "subscription" ||
+          session.status !== "complete"
+        ) {
+          return res.status(204).send();
+        }
+        await lockBillingUser(userId, async () => {
+          const settings = await storage.getSettings(userId);
+          if (!settings || settings.stripeCustomerId !== customerId) return;
+
+          const inspected = await inspectStripeSubscription(subscriptionId);
+          if (
+            inspected.customerId !== customerId ||
+            (inspected.subscription.metadata?.userId &&
+              inspected.subscription.metadata.userId !== userId) ||
+            (settings.stripeSubscriptionId &&
+              settings.stripeSubscriptionId !== subscriptionId &&
+              ["active", "trialing"].includes(settings.subscriptionStatus || ""))
+          ) {
+            return;
+          }
+          const failed = event.type === "checkout.session.async_payment_failed";
+          const paymentVerified =
+            !failed &&
+            (event.type === "checkout.session.async_payment_succeeded" ||
+              session.payment_status === "paid" ||
+              session.payment_status === "no_payment_required");
+          await writeSubscriptionState(
+            userId,
+            settings,
+            inspected,
+            customerId,
+            paymentVerified,
+            session.payment_status === "no_payment_required",
+            failed ? "payment_failed" : undefined,
+          );
+        });
+      } else if (
         event.type === "customer.subscription.updated" ||
         event.type === "customer.subscription.deleted"
       ) {
-        const object = event.data.object as import("stripe").default.Checkout.Session | import("stripe").default.Subscription;
-        const metadata = object.metadata || {};
-        const customerId = typeof object.customer === "string" ? object.customer : object.customer?.id;
-        const rawSubscriptionId =
-          event.type === "checkout.session.completed"
-            ? (object as import("stripe").default.Checkout.Session).subscription
-            : (object as import("stripe").default.Subscription).id;
-        const subscriptionId =
-          typeof rawSubscriptionId === "string" ? rawSubscriptionId : rawSubscriptionId?.id;
-        const userId = metadata.userId;
-        const plan =
-          metadata.plan ||
-          (event.type !== "checkout.session.completed"
-            ? getStripePlanForPrice(
-                (object as import("stripe").default.Subscription).items.data[0]?.price.id || "",
-              )
-            : undefined);
-
-        if (userId && plan && customerId) {
-          const subscriptionStatus =
-            event.type === "checkout.session.completed"
-              ? "active"
-              : (object as import("stripe").default.Subscription).status;
-          const hasAccess = ["active", "trialing"].includes(subscriptionStatus);
-          const current = await storage.getSettings(userId);
-          await storage.upsertSettings(userId, {
-            ...(current || {}),
-            stripeCustomerId: customerId,
-            stripeSubscriptionId: subscriptionId || current?.stripeSubscriptionId,
-            subscriptionPlan: hasAccess ? plan : "free",
-            subscriptionStatus: hasAccess ? "active" : subscriptionStatus,
-          });
+        const eventSubscription = event.data.object as Stripe.Subscription;
+        const linkedSettings = await storage.getSettingsByStripeSubscriptionId(eventSubscription.id);
+        if (!linkedSettings || linkedSettings.stripeSubscriptionId !== eventSubscription.id) {
+          return res.status(204).send();
         }
+        await lockBillingUser(linkedSettings.id, async () => {
+          const settings = await storage.getSettingsByStripeSubscriptionId(eventSubscription.id);
+          if (!settings || settings.stripeSubscriptionId !== eventSubscription.id) return;
+          const inspected = await inspectStripeSubscription(eventSubscription.id);
+          if (
+            inspected.customerId !== settings.stripeCustomerId ||
+            (inspected.subscription.metadata?.userId &&
+              inspected.subscription.metadata.userId !== settings.id)
+          ) {
+            return;
+          }
+          await writeSubscriptionState(
+            settings.id,
+            settings,
+            inspected,
+            inspected.customerId,
+            false,
+            false,
+          );
+        });
       }
 
-      if (event.type === "invoice.payment_failed") {
-        const invoice = event.data.object as import("stripe").default.Invoice & {
-          subscription?: string | import("stripe").default.Subscription | null;
-        };
-        const subscriptionId =
-          typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+      if (event.type === "invoice.payment_failed" || event.type === "invoice.paid") {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId = getInvoiceSubscriptionId(invoice);
         if (subscriptionId) {
-          const settings = await storage.getSettingsByStripeSubscriptionId(subscriptionId);
-          if (settings) {
-            await storage.upsertSettings(settings.id, {
-              ...settings,
-              subscriptionPlan: "free",
-              subscriptionStatus: "past_due",
-            });
+          const linkedSettings = await storage.getSettingsByStripeSubscriptionId(subscriptionId);
+          if (!linkedSettings || linkedSettings.stripeSubscriptionId !== subscriptionId) {
+            return res.status(204).send();
           }
+          await lockBillingUser(linkedSettings.id, async () => {
+            const settings = await storage.getSettingsByStripeSubscriptionId(subscriptionId);
+            if (!settings || settings.stripeSubscriptionId !== subscriptionId) return;
+            const inspected = await inspectStripeSubscription(subscriptionId);
+            const invoiceCustomerId = stripeObjectId(invoice.customer);
+            if (
+              inspected.customerId !== settings.stripeCustomerId ||
+              (invoiceCustomerId && invoiceCustomerId !== settings.stripeCustomerId) ||
+              (inspected.subscription.metadata?.userId &&
+                inspected.subscription.metadata.userId !== settings.id)
+            ) {
+              return;
+            }
+            if (
+              !invoice.id ||
+              invoice.id !== inspected.latestInvoiceId ||
+              (event.type === "invoice.paid" && !inspected.latestInvoicePaid) ||
+              (event.type === "invoice.payment_failed" && inspected.latestInvoicePaid)
+            ) {
+              return;
+            }
+            const paymentFailed = event.type === "invoice.payment_failed";
+            const hasPaidPlanToPreserve =
+              inspected.hasPendingUpdate &&
+              settings.subscriptionPlan === inspected.plan &&
+              ["starter", "professional", "business"].includes(settings.subscriptionPlan || "") &&
+              ["active", "trialing"].includes(settings.subscriptionStatus || "");
+            await writeSubscriptionState(
+              settings.id,
+              settings,
+              inspected,
+              inspected.customerId,
+              false,
+              false,
+              paymentFailed && !hasPaidPlanToPreserve ? "past_due" : undefined,
+            );
+          });
         }
       }
 
@@ -452,22 +749,29 @@ export async function registerRoutes(
   });
 
   app.post("/api/subscription/checkout", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    return lockBillingUser(userId, async () => {
     try {
-      const userId = getUserId(req);
       const { plan } = req.body || {};
       if (!["starter", "professional", "business"].includes(plan)) {
         return res.status(400).json({ message: "A paid plan is required." });
       }
-      const priceId = getStripePriceId(plan);
-      if (!priceId) {
-        return res.status(503).json({ message: "Paid plans are not configured yet." });
-      }
+      const priceId = await resolveStripePrice(plan);
 
       const current = await storage.getSettings(userId);
+      if (
+        !current?.stripeCustomerId &&
+        (process.env.STRIPE_WEBHOOK_CONFIGURED !== "true" || !getStripeWebhookSecret())
+      ) {
+        return res.status(503).json({
+          message: "Stripe billing is not ready because the webhook signing secret has not been verified for this endpoint.",
+        });
+      }
       const claims = (req as any).user?.claims || {};
+      const stripe = getBillingStripeClient();
       const customer = current?.stripeCustomerId
         ? current.stripeCustomerId
-        : await getStripeClient().customers.create({
+        : await stripe.customers.create({
             email: claims.email,
             metadata: { userId },
           }).then((created) => created.id);
@@ -478,34 +782,247 @@ export async function registerRoutes(
           stripeCustomerId: customer,
         });
       }
+      await verifyStripeCustomerOwnership(customer, userId);
+      const openSessions = await listOpenSubscriptionCheckoutSessions(customer);
+
+      const subscriptions = await stripe.subscriptions.list({
+        customer,
+        status: "all",
+        limit: 100,
+      });
+      const existingSubscription =
+        subscriptions.data.find(
+          (subscription) =>
+            subscription.status !== "canceled" && subscription.status !== "incomplete_expired",
+        ) || null;
+      if (existingSubscription) {
+        await expireCheckoutSessions(openSessions);
+        const linkedSettings = await storage.getSettings(userId);
+        if (
+          (existingSubscription.metadata?.userId &&
+            existingSubscription.metadata.userId !== userId) ||
+          (linkedSettings?.stripeSubscriptionId &&
+            linkedSettings.stripeSubscriptionId !== existingSubscription.id &&
+            ["active", "trialing"].includes(linkedSettings.subscriptionStatus || ""))
+        ) {
+          return res.status(409).json({
+            message:
+              "An active Stripe subscription already exists for this billing account. Manage it in the Billing Portal before starting another subscription.",
+          });
+        }
+        if (
+          existingSubscription.metadata?.userId === userId ||
+          linkedSettings?.stripeSubscriptionId === existingSubscription.id
+        ) {
+          const portalConfig = process.env.STRIPE_PORTAL_CONFIGURATION_ID;
+          if (!portalConfig) {
+            return res.status(503).json({
+              message: "Stripe Billing Portal is not configured. Contact support to manage this subscription.",
+            });
+          }
+          const commonPortalParams: Stripe.BillingPortal.SessionCreateParams = {
+            customer,
+            configuration: portalConfig,
+            return_url: `${getPublicSiteUrl(req)}/settings`,
+          };
+          if (
+            !["active", "trialing"].includes(existingSubscription.status) ||
+            existingSubscription.items.data.length !== 1
+          ) {
+            const portal = await stripe.billingPortal.sessions.create(commonPortalParams);
+            return res.json({ url: portal.url, billingPortal: true });
+          }
+          try {
+            const portal = await stripe.billingPortal.sessions.create({
+              ...commonPortalParams,
+              flow_data: {
+                type: "subscription_update_confirm",
+                subscription_update_confirm: {
+                  subscription: existingSubscription.id,
+                  items: [
+                    {
+                      id: existingSubscription.items.data[0].id,
+                      price: priceId,
+                      quantity: 1,
+                    },
+                  ],
+                },
+              },
+            });
+            return res.json({ url: portal.url, billingPortal: true });
+          } catch (portalFlowError) {
+            logError("Targeted Stripe subscription update portal was unavailable", portalFlowError);
+            const portal = await stripe.billingPortal.sessions.create(commonPortalParams);
+            return res.json({ url: portal.url, billingPortal: true });
+          }
+        }
+        return res.status(409).json({
+          message:
+            "An active Stripe subscription already exists for this billing account. Manage it in the Billing Portal before starting another subscription.",
+        });
+      }
+
+      if (!process.env.STRIPE_PORTAL_CONFIGURATION_ID) {
+        return res.status(503).json({
+          message: "Stripe Billing Portal is not configured. Subscription management is unavailable.",
+        });
+      }
+      if (process.env.STRIPE_WEBHOOK_CONFIGURED !== "true" || !getStripeWebhookSecret()) {
+        await expireCheckoutSessions(openSessions);
+        return res.status(503).json({
+          message: "Stripe billing is not ready because the webhook signing secret has not been verified for this endpoint.",
+        });
+      }
+
+      let reusableSession: Stripe.Checkout.Session | undefined;
+      const sessionsToExpire: Stripe.Checkout.Session[] = [];
+      for (const openSession of openSessions) {
+        const lineItems = (openSession as any).line_items?.data || [];
+        const openPriceId =
+          lineItems.length === 1 ? stripeObjectId(lineItems[0]?.price) : undefined;
+        const openPlan = openPriceId ? getStripePlanForPrice(openPriceId) : undefined;
+        const sessionBelongsToUser = openSession.metadata?.userId === userId;
+        const notExpired =
+          typeof openSession.expires_at === "number" && openSession.expires_at * 1000 > Date.now();
+        if (sessionBelongsToUser && openPlan === plan && notExpired && openSession.url) {
+          if (!reusableSession) reusableSession = openSession;
+          else sessionsToExpire.push(openSession);
+        } else {
+          sessionsToExpire.push(openSession);
+        }
+      }
+      await expireCheckoutSessions(sessionsToExpire);
+      if (reusableSession?.url) return res.json({ url: reusableSession.url });
 
       const siteUrl = getPublicSiteUrl(req);
-      const session = await getStripeClient().checkout.sessions.create({
+      const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer,
-        // Stripe Tax needs the customer's address to calculate the right rate;
-        // this collects/updates it on the existing customer record if missing.
-        // Also requires Stripe Tax to be turned on and an origin address set
-        // in the Stripe Dashboard (Settings > Tax) - that part can't be done
-        // from the API.
-        automatic_tax: { enabled: true },
-        customer_update: { address: "auto", name: "auto" },
+        ...(process.env.STRIPE_AUTOMATIC_TAX_ENABLED === "true"
+          ? {
+              automatic_tax: { enabled: true },
+              customer_update: { address: "auto" as const, name: "auto" as const },
+            }
+          : {}),
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${siteUrl}/settings?billing=success`,
+        success_url: `${siteUrl}/settings?billing=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${siteUrl}/settings?billing=cancelled`,
         metadata: { userId, plan },
         subscription_data: { metadata: { userId, plan } },
         allow_promotion_codes: true,
+      }, {
+        idempotencyKey: `coach-subscription-${userId}-${plan}-${Math.floor(Date.now() / 1000)}`,
       });
 
       if (!session.url) {
-        return res.status(502).json({ message: "Unable to create checkout session." });
+        return res.status(502).json({ message: "Stripe did not return a Checkout URL. Please try again." });
       }
       return res.json({ url: session.url });
     } catch (err) {
       logError("Failed to create Stripe checkout session", err);
-      return res.status(502).json(PAYMENT_PROVIDER_ERROR);
+      if (err instanceof StripeBillingOwnershipError) {
+        return res.status(403).json({ message: err.message });
+      }
+      if (err instanceof StripeBillingConfigurationError) {
+        return res.status(503).json({ message: err.message });
+      }
+      return res.status(502).json({
+        code: "PAYMENT_PROVIDER_ERROR",
+        message: "Stripe could not start this subscription. Check billing configuration or try again.",
+      });
     }
+    });
+  });
+
+  app.post("/api/subscription/confirm", isAuthenticated, async (req, res) => {
+    const candidateSessionId = req.body?.sessionId ?? req.body?.session_id;
+    const sessionId = typeof candidateSessionId === "string" ? candidateSessionId : "";
+    if (!sessionId || !/^cs_[A-Za-z0-9_]+$/.test(sessionId)) {
+      return res.status(400).json({ message: "A valid Stripe Checkout session_id is required." });
+    }
+    const userId = getUserId(req);
+    return lockBillingUser(userId, async () => {
+    try {
+      const stripe = getBillingStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      if (
+        session.mode !== "subscription" ||
+        session.status !== "complete" ||
+        session.metadata?.userId !== userId
+      ) {
+        return res.status(403).json({ message: "This Checkout session does not belong to your account." });
+      }
+      if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") {
+        return res.status(409).json({
+          message: "Stripe has not confirmed payment for this subscription yet. Please wait and refresh billing status.",
+        });
+      }
+      const subscriptionId = stripeObjectId(session.subscription);
+      const customerId = stripeObjectId(session.customer);
+      if (!subscriptionId || !customerId) {
+        return res.status(409).json({ message: "Stripe has not attached a subscription to this Checkout session." });
+      }
+      const settings = await storage.getSettings(userId);
+      if (!settings || settings.stripeCustomerId !== customerId) {
+        return res.status(403).json({ message: "This Checkout session is not linked to your billing account." });
+      }
+      await verifyStripeCustomerOwnership(customerId, userId);
+      if (
+        settings.stripeSubscriptionId &&
+        settings.stripeSubscriptionId !== subscriptionId &&
+        ["active", "trialing"].includes(settings.subscriptionStatus || "")
+      ) {
+        return res.status(409).json({
+          message: "A different active subscription is already linked to your account.",
+        });
+      }
+      const inspected = await inspectStripeSubscription(subscriptionId);
+      if (
+        inspected.customerId !== customerId ||
+        (inspected.subscription.metadata?.userId &&
+          inspected.subscription.metadata.userId !== userId)
+      ) {
+        return res.status(403).json({ message: "The Stripe subscription does not belong to your billing account." });
+      }
+      if (!["active", "trialing"].includes(inspected.subscription.status)) {
+        return res.status(409).json({
+          message: "The Checkout payment is confirmed, but the subscription is not active yet.",
+        });
+      }
+      const synchronized = await writeSubscriptionState(
+        userId,
+        settings,
+        inspected,
+        customerId,
+        true,
+        session.payment_status === "no_payment_required",
+      );
+      if (
+        synchronized.subscriptionPlan !== inspected.plan ||
+        !["active", "trialing"].includes(synchronized.subscriptionStatus || "")
+      ) {
+        return res.status(409).json({
+          message: "The latest subscription invoice or pending plan update is not yet confirmed as paid.",
+        });
+      }
+      return res.json({
+        verified: true,
+        subscriptionPlan: inspected.plan,
+        subscriptionStatus: inspected.subscription.status,
+      });
+    } catch (err) {
+      logError("Stripe Checkout confirmation failed", err);
+      if (err instanceof StripeBillingConfigurationError) {
+        return res.status(503).json({ message: err.message });
+      }
+      if (err instanceof StripeBillingOwnershipError) {
+        return res.status(403).json({ message: err.message });
+      }
+      return res.status(502).json({
+        message: "Stripe could not verify this Checkout session. Please try again shortly.",
+      });
+    }
+    });
   });
 
   app.post("/api/subscription/portal", isAuthenticated, async (req, res) => {
@@ -515,14 +1032,32 @@ export async function registerRoutes(
       if (!settings?.stripeCustomerId) {
         return res.status(400).json({ message: "No Stripe billing account is connected yet." });
       }
-      const portal = await getStripeClient().billingPortal.sessions.create({
+      const portalConfiguration = process.env.STRIPE_PORTAL_CONFIGURATION_ID;
+      if (!portalConfiguration) {
+        return res.status(503).json({
+          message: "Stripe Billing Portal is not configured. Contact support to manage your subscription.",
+        });
+      }
+      validateStripeModeForBilling();
+      await verifyStripeCustomerOwnership(settings.stripeCustomerId, userId);
+      const portal = await getBillingStripeClient().billingPortal.sessions.create({
         customer: settings.stripeCustomerId,
+        configuration: portalConfiguration,
         return_url: `${getPublicSiteUrl(req)}/settings`,
       });
       return res.json({ url: portal.url });
     } catch (err) {
       logError("Failed to create Stripe customer portal session", err);
-      return res.status(502).json(PAYMENT_PROVIDER_ERROR);
+      if (err instanceof StripeBillingOwnershipError) {
+        return res.status(403).json({ message: err.message });
+      }
+      if (err instanceof StripeBillingConfigurationError) {
+        return res.status(503).json({ message: err.message });
+      }
+      return res.status(502).json({
+        code: "PAYMENT_PROVIDER_ERROR",
+        message: "Stripe could not open the Billing Portal. Please try again.",
+      });
     }
   });
 
@@ -807,10 +1342,31 @@ export async function registerRoutes(
       const targetMax = tierMaxMap[plan];
       const currentPlan = currentSettings?.subscriptionPlan || "free";
       const isDowngrade = PLAN_TIER[plan] < PLAN_TIER[currentPlan];
-      if (currentPlan !== "free" && currentSettings?.stripeSubscriptionId) {
+      if (currentSettings?.stripeSubscriptionId) {
+        if (!currentSettings.stripeCustomerId) {
+          return res.status(409).json({
+            code: "BILLING_ACCOUNT_INCOMPLETE",
+            message: "This Stripe subscription needs support before the local plan can be changed.",
+          });
+        }
+        const portalConfiguration = process.env.STRIPE_PORTAL_CONFIGURATION_ID;
+        if (!portalConfiguration) {
+          return res.status(503).json({
+            code: "BILLING_PORTAL_UNAVAILABLE",
+            message: "Stripe Billing Portal is not configured. Contact support to manage or cancel your subscription.",
+          });
+        }
+        validateStripeModeForBilling();
+        await verifyStripeCustomerOwnership(currentSettings.stripeCustomerId, userId);
+        const portal = await getBillingStripeClient().billingPortal.sessions.create({
+          customer: currentSettings.stripeCustomerId,
+          configuration: portalConfiguration,
+          return_url: `${getPublicSiteUrl(req)}/settings`,
+        });
         return res.status(409).json({
           code: "BILLING_PORTAL_REQUIRED",
-          message: "Manage your paid subscription through Stripe Billing.",
+          message: "Manage or cancel your Stripe subscription through the Stripe Billing Portal.",
+          portalUrl: portal.url,
         });
       }
       if (isDowngrade && existingClients.length > targetMax) {
@@ -827,7 +1383,14 @@ export async function registerRoutes(
       });
       res.json(updated);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      if (err instanceof StripeBillingOwnershipError) {
+        return res.status(403).json({ message: err.message });
+      }
+      if (err instanceof StripeBillingConfigurationError) {
+        return res.status(503).json({ message: err.message });
+      }
+      logError("Failed to update coach subscription plan", err);
+      res.status(502).json({ message: "Unable to update the plan. Please try again." });
     }
   });
 
@@ -1197,7 +1760,12 @@ export async function registerRoutes(
 
   app.put("/api/settings", async (req, res) => {
     const userId = getUserId(req);
-    const parsed = insertSettingsSchema.partial().safeParse(req.body);
+    const settingsInput = { ...(req.body || {}) };
+    delete settingsInput.stripeCustomerId;
+    delete settingsInput.stripeSubscriptionId;
+    delete settingsInput.subscriptionPlan;
+    delete settingsInput.subscriptionStatus;
+    const parsed = insertSettingsSchema.partial().safeParse(settingsInput);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const s = await storage.upsertSettings(userId, parsed.data);
     res.json(s);
@@ -1334,7 +1902,8 @@ export async function registerRoutes(
       const currentSettings = await storage.getSettings(userId);
       if (currentSettings?.stripeSubscriptionId) {
         try {
-          await getStripeClient().subscriptions.cancel(currentSettings.stripeSubscriptionId);
+          validateStripeModeForBilling();
+          await getBillingStripeClient().subscriptions.cancel(currentSettings.stripeSubscriptionId);
         } catch (err) {
           stripeCancelFailed = true;
           logError("Failed to cancel Stripe subscription during account deletion", err);

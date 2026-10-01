@@ -2,3 +2,4 @@
 - [GitHub upload layout](github-upload-layout.md) — verify the workflow root before syncing; uploads can create inactive nested client/server copies.
 - [Stale Preview email process](stale-preview-email-process.md) — compare server startup with sender changes before blaming Brevo or secrets.
 - [Product showcase boundary](product-showcase-boundary.md) — a public workflow tour and real signed-in billing access meet different needs; never conflate them.
+- [Subscription provider choice](subscription-provider-choice.md) — owner chose the existing live Stripe account; do not replace it when another billing integration appears.

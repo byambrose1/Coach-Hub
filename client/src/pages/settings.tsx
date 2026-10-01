@@ -22,8 +22,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, User, FileText, CreditCard, Bell, Shield, Trash2, Mail, Phone, MapPin, Receipt, Crown, ArrowUp, ArrowDown, ExternalLink, Check } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Save, User, FileText, CreditCard, Bell, Shield, Trash2, Mail, Phone, MapPin, Receipt, Crown, ArrowUp, ArrowDown, ExternalLink, Check, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import type { Settings } from "@shared/schema";
 import { siteConfig } from "@/config/site";
 
@@ -34,7 +34,30 @@ interface Tier {
   price: string;
 }
 
+interface SubscriptionStatus {
+  ready: boolean;
+  livemode: boolean;
+  status?: string;
+  subscriptionStatus?: string;
+}
+
+interface SubscriptionConfirmation {
+  verified?: boolean;
+  status?: string;
+  subscriptionStatus?: string;
+  paymentStatus?: string;
+  payment_status?: string;
+  subscription?: { status?: string };
+  message?: string;
+}
+
 const PLAN_ORDER = ["free", "starter", "professional", "business"];
+const SERVER_MANAGED_SETTINGS_FIELDS = new Set([
+  "stripeCustomerId",
+  "stripeSubscriptionId",
+  "subscriptionPlan",
+  "subscriptionStatus",
+]);
 const TIMEZONE_OPTIONS = [
   { value: "Europe/London", label: "London (GMT/BST)" },
   { value: "Europe/Dublin", label: "Dublin (GMT/IST)" },
@@ -51,9 +74,22 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
   const { toast } = useToast();
   const currentPlan = settings?.subscriptionPlan || "free";
   const currentTierIndex = PLAN_ORDER.indexOf(currentPlan);
+  const canManageBilling = Boolean(
+    settings?.stripeSubscriptionId || settings?.stripeCustomerId || currentPlan !== "free",
+  );
+  const [billingFeedback, setBillingFeedback] = useState<{
+    kind: "verifying" | "active" | "unpaid" | "pending" | "failure" | "cancelled";
+    message?: string;
+  } | null>(null);
+  const processedCheckoutRef = useRef<string | null>(null);
 
   const { data: tiers = [], isLoading: tiersLoading } = useQuery<Tier[]>({
     queryKey: ["/api/subscription/tiers"],
+    enabled: !!settings,
+  });
+
+  const subscriptionStatusQuery = useQuery<SubscriptionStatus>({
+    queryKey: ["/api/subscription/status"],
     enabled: !!settings,
   });
 
@@ -106,6 +142,93 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
     },
   });
 
+  const confirmationMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const res = await apiRequest("POST", "/api/subscription/confirm", { sessionId });
+      return res.json() as Promise<SubscriptionConfirmation>;
+    },
+    onSuccess: (confirmation) => {
+      if (confirmation.verified !== true) {
+        setBillingFeedback({
+          kind: "failure",
+          message: "We couldn't verify this checkout. Check your billing status or manage billing before trying again.",
+        });
+        return;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      const status = (
+        confirmation.subscription?.status
+        ?? confirmation.subscriptionStatus
+        ?? confirmation.status
+        ?? confirmation.paymentStatus
+        ?? confirmation.payment_status
+        ?? ""
+      ).toLowerCase();
+
+      if (status === "active" || status === "trialing") {
+        setBillingFeedback({ kind: "active" });
+      } else if (status === "unpaid") {
+        setBillingFeedback({
+          kind: "unpaid",
+          message: "Checkout was verified, but payment is still unpaid. Your plan will update once payment completes.",
+        });
+      } else if (status === "pending" || status === "incomplete" || status === "processing") {
+        setBillingFeedback({
+          kind: "pending",
+          message: "Checkout was verified and payment is still processing. Your plan will update when it is confirmed.",
+        });
+      } else {
+        setBillingFeedback({
+          kind: "failure",
+          message: confirmation.message || "Checkout was verified, but the subscription is not active. Please manage billing or contact support.",
+        });
+      }
+    },
+    onError: (err: Error) => {
+      setBillingFeedback({
+        kind: "failure",
+        message: `We couldn't verify this checkout. Check your billing status or manage billing before trying again. ${err.message}`,
+      });
+    },
+  });
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const billing = url.searchParams.get("billing");
+    if (billing === "cancelled" || billing === "canceled") {
+      setBillingFeedback({ kind: "cancelled" });
+      url.searchParams.delete("billing");
+      url.searchParams.delete("session_id");
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+      return;
+    }
+    if (billing !== "success") return;
+
+    const sessionId = url.searchParams.get("session_id");
+    url.searchParams.delete("billing");
+    url.searchParams.delete("session_id");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+
+    if (!sessionId) {
+      setBillingFeedback({
+        kind: "failure",
+        message: "We couldn't verify this checkout because its session is missing. Check your billing status before trying again.",
+      });
+      return;
+    }
+    if (processedCheckoutRef.current === sessionId) return;
+
+    processedCheckoutRef.current = sessionId;
+    setBillingFeedback({ kind: "verifying" });
+    confirmationMutation.mutate(sessionId);
+  }, [confirmationMutation.mutate]);
+
+  const subscriptionMutationPending = planMutation.isPending
+    || checkoutMutation.isPending
+    || portalMutation.isPending
+    || confirmationMutation.isPending;
+
   if (tiersLoading) {
     return <Card><CardContent className="pt-6 h-32 animate-pulse bg-muted rounded" /></Card>;
   }
@@ -113,21 +236,83 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <Crown className="h-4 w-4 text-amber-500" />
-          <CardTitle className="text-base">Subscription Plan</CardTitle>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Crown className="h-4 w-4 text-amber-500" />
+            <CardTitle className="text-base">Subscription Plan</CardTitle>
+          </div>
+          {canManageBilling && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-xs"
+              onClick={() => portalMutation.mutate()}
+              disabled={subscriptionMutationPending}
+            >
+              <CreditCard className="h-3 w-3" />
+              {portalMutation.isPending ? "Opening..." : "Manage billing"}
+            </Button>
+          )}
         </div>
         <CardDescription>
           You currently have {clients.length} client{clients.length !== 1 ? "s" : ""}. Upgrade for more capacity, or downgrade if you're within the limit.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        {subscriptionStatusQuery.isLoading ? (
+          <p className="text-xs text-muted-foreground">Checking billing setup...</p>
+        ) : subscriptionStatusQuery.data?.ready === true
+          && typeof subscriptionStatusQuery.data.livemode === "boolean" ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">
+              Stripe {subscriptionStatusQuery.data.livemode ? "live mode" : "test mode"}
+            </Badge>
+            {(subscriptionStatusQuery.data.subscriptionStatus || subscriptionStatusQuery.data.status) && (
+              <Badge variant="secondary">
+                Billing status: {subscriptionStatusQuery.data.subscriptionStatus || subscriptionStatusQuery.data.status}
+              </Badge>
+            )}
+          </div>
+        ) : (
+          <div role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
+            Billing is not ready{subscriptionStatusQuery.isError ? " or its status could not be checked" : ""}. Checkout may be unavailable; please try again later or contact support.
+          </div>
+        )}
+
+        {billingFeedback && (
+          <div
+            role={billingFeedback.kind === "failure" ? "alert" : "status"}
+            className={`rounded-md border p-3 text-sm ${
+              billingFeedback.kind === "active"
+                ? "border-green-500/40 bg-green-500/10 text-green-800 dark:text-green-200"
+                : billingFeedback.kind === "failure"
+                  ? "border-destructive/40 bg-destructive/10 text-destructive"
+                  : billingFeedback.kind === "cancelled"
+                    ? "border-border bg-muted/50 text-muted-foreground"
+                    : "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200"
+            }`}
+          >
+            {billingFeedback.kind === "verifying" ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Verifying your checkout with Stripe...
+              </span>
+            ) : billingFeedback.kind === "active" ? (
+              "Payment confirmed. Your subscription is active."
+            ) : billingFeedback.kind === "cancelled" ? (
+              "Checkout was cancelled. If you completed payment in another tab, check billing status before trying again."
+            ) : (
+              billingFeedback.message
+            )}
+          </div>
+        )}
+
         {tiers.map((tier, i) => {
           const isCurrent = tier.name === currentPlan;
           const isUpgrade = i > currentTierIndex;
           const isDowngrade = i < currentTierIndex;
           const canDowngrade = isDowngrade && clients.length <= tier.max;
-          const blockedDowngrade = isDowngrade && clients.length > tier.max;
+          const blockedDowngrade = isDowngrade && clients.length > tier.max && !settings?.stripeSubscriptionId;
 
           return (
             <div
@@ -165,27 +350,14 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
 
               <div className="flex-shrink-0">
                 {isCurrent ? (
-                  currentPlan !== "free" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5 text-xs"
-                      onClick={() => portalMutation.mutate()}
-                      disabled={portalMutation.isPending}
-                    >
-                      <CreditCard className="h-3 w-3" />
-                      {portalMutation.isPending ? "Opening..." : "Manage billing"}
-                    </Button>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Active</span>
-                  )
+                  <span className="text-xs text-muted-foreground">{currentPlan === "free" ? "Active" : "Current"}</span>
                 ) : isUpgrade ? (
                   <Button
                     size="sm"
                     variant="default"
                     className="gap-1.5 text-xs"
                     onClick={() => checkoutMutation.mutate(tier.name)}
-                    disabled={checkoutMutation.isPending}
+                    disabled={subscriptionMutationPending || subscriptionStatusQuery.data?.ready !== true}
                     data-testid={`button-upgrade-${tier.name}`}
                   >
                     <ArrowUp className="h-3 w-3" />
@@ -196,12 +368,29 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
                     size="sm"
                     variant="outline"
                     className="gap-1.5 text-xs"
-                    onClick={() => planMutation.mutate(tier.name)}
-                    disabled={planMutation.isPending}
+                    onClick={() => settings?.stripeSubscriptionId
+                      ? portalMutation.mutate()
+                      : planMutation.mutate(tier.name)}
+                    disabled={subscriptionMutationPending}
                     data-testid={`button-downgrade-${tier.name}`}
                   >
-                    <ArrowDown className="h-3 w-3" />
-                    Downgrade
+                    {settings?.stripeSubscriptionId ? <CreditCard className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                    {portalMutation.isPending
+                      ? "Opening..."
+                      : settings?.stripeSubscriptionId
+                        ? "Change in billing"
+                        : "Downgrade"}
+                  </Button>
+                ) : isDowngrade && settings?.stripeSubscriptionId ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs"
+                    onClick={() => portalMutation.mutate()}
+                    disabled={subscriptionMutationPending}
+                  >
+                    <CreditCard className="h-3 w-3" />
+                    {portalMutation.isPending ? "Opening..." : "Change in billing"}
                   </Button>
                 ) : blockedDowngrade ? (
                   <span className="text-xs text-muted-foreground text-right max-w-[120px]">
@@ -292,7 +481,10 @@ export default function SettingsPage() {
 
   const mutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const res = await apiRequest("PUT", "/api/settings", data);
+      const payload = Object.fromEntries(
+        Object.entries(data).filter(([field]) => !SERVER_MANAGED_SETTINGS_FIELDS.has(field)),
+      );
+      const res = await apiRequest("PUT", "/api/settings", payload);
       return res.json();
     },
     onSuccess: () => {
