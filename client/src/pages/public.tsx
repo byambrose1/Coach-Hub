@@ -120,6 +120,8 @@ export function TermsPage() {
       <p>Use the service lawfully, respect client privacy, keep your sign-in details secure, and do not interfere with the service or use it to provide medical, legal, or financial advice.</p>
       <h2>Subscriptions and billing</h2>
       <p>The Free plan is available for up to five clients. Paid plans are billed monthly. {siteConfig.vatTreatment} {siteConfig.paymentProviderFees} Plan access is subject to the limits shown in the application.</p>
+      <h2>24-hour first-payment refund guarantee</h2>
+      <p>{siteConfig.refundTerms}</p>
       <h2>Cancellation and data</h2>
       <p>{siteConfig.cancellationTerms} If you're downgraded or your account is limited because you have more clients than a lower plan
       allows, your existing data is kept - you just can't add new clients until you're back within the limit or upgrade again. Requesting

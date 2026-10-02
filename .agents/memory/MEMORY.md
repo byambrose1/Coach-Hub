@@ -3,3 +3,5 @@
 - [Stale Preview email process](stale-preview-email-process.md) — compare server startup with sender changes before blaming Brevo or secrets.
 - [Product showcase boundary](product-showcase-boundary.md) — a public workflow tour and real signed-in billing access meet different needs; never conflate them.
 - [Subscription provider choice](subscription-provider-choice.md) — owner chose the existing live Stripe account; do not replace it when another billing integration appears.
+- [Subscription refund policy](subscription-refund-policy.md) — owner approved a 24-hour first-payment refund guarantee with immediate cancellation and retained client data.
+- [Browser testing capabilities](browser-testing-capabilities.md) — the documented testing helper may be unavailable; isolated Chromium checks must block financial side effects.

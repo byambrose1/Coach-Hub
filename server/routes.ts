@@ -21,6 +21,7 @@ import type { RequestHandler } from "express";
 import type Stripe from "stripe";
 import { logError } from "./safe-logging";
 import { withBillingCheckoutLock } from "./db";
+import { cancelAndRefundSubscription, getSubscriptionRefundStatus, SubscriptionRefundError } from "./subscription-refunds";
 import {
   getStripeClient,
   getPractablyCheckoutBranding,
@@ -1028,6 +1029,48 @@ export async function registerRoutes(
       });
     }
     });
+  });
+
+  app.get("/api/subscription/refund", isAuthenticated, async (req, res) => {
+    try {
+      return res.json(await getSubscriptionRefundStatus(getUserId(req), {
+        stripe: getBillingStripeClient(),
+        storage,
+      }));
+    } catch (err) {
+      logError("Subscription refund eligibility check failed", err);
+      if (err instanceof SubscriptionRefundError) {
+        return res.status(err.status).json({ code: err.code, message: err.message });
+      }
+      if (err instanceof StripeBillingConfigurationError) {
+        return res.status(503).json({ message: err.message });
+      }
+      return res.status(502).json({ message: "Refund eligibility could not be checked. Please try again." });
+    }
+  });
+
+  app.post("/api/subscription/refund", isAuthenticated, async (req, res) => {
+    if (req.session?.impersonatedUserId) {
+      return res.status(403).json({ message: "Refunds cannot be requested while impersonating another coach." });
+    }
+    if (req.body?.confirm !== true || Object.keys(req.body).some(key => key !== "confirm")) {
+      return res.status(400).json({ message: "Confirm cancellation and refund without supplying payment or account identifiers." });
+    }
+    try {
+      return res.json(await lockBillingUser(getRealUserId(req), () => cancelAndRefundSubscription(getRealUserId(req), {
+        stripe: getBillingStripeClient(),
+        storage,
+      })));
+    } catch (err) {
+      logError("Subscription cancellation and refund failed", err);
+      if (err instanceof SubscriptionRefundError) {
+        return res.status(err.status).json({ code: err.code, message: err.message });
+      }
+      if (err instanceof StripeBillingConfigurationError) {
+        return res.status(503).json({ message: err.message });
+      }
+      return res.status(502).json({ message: "The refund and cancellation could not both be confirmed. Please refresh refund status and retry to finish. Do not submit another payment." });
+    }
   });
 
   app.post("/api/subscription/portal", isAuthenticated, async (req, res) => {

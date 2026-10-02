@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SubscriptionUpgradeButton } from "@/components/subscription-upgrade-button";
+import { SubscriptionRefund } from "@/components/subscription-refund";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, User, FileText, CreditCard, Bell, Shield, Trash2, Mail, Phone, MapPin, Receipt, Crown, ArrowUp, ArrowDown, ExternalLink, Check, Loader2 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { Settings } from "@shared/schema";
 import { siteConfig } from "@/config/site";
 
@@ -82,6 +83,10 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
     kind: "verifying" | "active" | "unpaid" | "pending" | "failure" | "cancelled";
     message?: string;
   } | null>(null);
+  const [refundPending, setRefundPending] = useState(false);
+  const handleRefundPendingChange = useCallback((pending: boolean) => {
+    setRefundPending(pending);
+  }, []);
   const processedCheckoutRef = useRef<string | null>(null);
 
   const { data: tiers = [], isLoading: tiersLoading } = useQuery<Tier[]>({
@@ -158,6 +163,7 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/refund"] });
       const status = (
         confirmation.subscription?.status
         ?? confirmation.subscriptionStatus
@@ -225,10 +231,11 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
     confirmationMutation.mutate(sessionId);
   }, [confirmationMutation.mutate]);
 
-  const subscriptionMutationPending = planMutation.isPending
+  const billingOperationPending = planMutation.isPending
     || checkoutMutation.isPending
     || portalMutation.isPending
     || confirmationMutation.isPending;
+  const subscriptionMutationPending = billingOperationPending || refundPending;
 
   if (tiersLoading) {
     return <Card><CardContent className="pt-6 h-32 animate-pulse bg-muted rounded" /></Card>;
@@ -279,6 +286,12 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
             Billing is not ready{subscriptionStatusQuery.isError ? " or its status could not be checked" : ""}. Checkout may be unavailable; please try again later or contact support.
           </div>
         )}
+
+        <SubscriptionRefund
+          enabled={Boolean(settings)}
+          disabled={billingOperationPending}
+          onPendingChange={handleRefundPendingChange}
+        />
 
         {billingFeedback && (
           <div

@@ -235,7 +235,9 @@ describe("hardened Stripe subscription billing", () => {
     const userId = req.get("x-test-user") || USER_A;
     req.user = { claims: { sub: userId }, expires_at: Math.floor(Date.now() / 1000) + 3600 };
     req.isAuthenticated = () => true;
-    (req as any).session = {};
+    (req as any).session = req.get("x-test-impersonated-user")
+      ? { impersonatedUserId: req.get("x-test-impersonated-user") }
+      : {};
     next();
   };
 
@@ -599,6 +601,44 @@ describe("hardened Stripe subscription billing", () => {
       subscriptionStatus: "active",
     });
     assert.equal(state.settings.get(USER_A).subscriptionPlan, "starter");
+  });
+
+  test("automatic refunds require confirmation and reject client-selected financial identifiers", async () => {
+    for (const body of [{}, { confirm: false }, { confirm: true, chargeId: "ch_other" }, { confirm: true, userId: USER_B }]) {
+      const response = await request("/api/subscription/refund", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      assert.equal(response.status, 400);
+      assert.equal(state.settings.get(USER_A).subscriptionPlan, "free");
+    }
+  });
+
+  test("automatic refunds cannot run while impersonating another coach", async () => {
+    const response = await request("/api/subscription/refund", {
+      method: "POST",
+      headers: { "x-test-impersonated-user": USER_B },
+      body: JSON.stringify({ confirm: true }),
+    });
+    assert.equal(response.status, 403);
+    assert.match((await response.json()).message, /impersonating/);
+  });
+
+  test("refund eligibility and requests reject another coach's Stripe customer", async () => {
+    state.settings.set(USER_B, {
+      id: USER_B,
+      stripeCustomerId: "cus_a",
+      subscriptionPlan: "free",
+    });
+    for (const method of ["GET", "POST"]) {
+      const response = await request("/api/subscription/refund", {
+        method,
+        headers: { "x-test-user": USER_B },
+        ...(method === "POST" ? { body: JSON.stringify({ confirm: true }) } : {}),
+      });
+      assert.equal(response.status, 403);
+      assert.equal(state.settings.get(USER_A).subscriptionPlan, "free");
+    }
   });
 
   test("real Stripe signature verification rejects tampering, stale signatures, and wrong-mode events", async () => {
