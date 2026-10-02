@@ -12,13 +12,11 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, cacheSavedRecord } from "@/lib/queryClient";
 import { Plus, Package, CreditCard, AlertTriangle, FileText, Clock, CheckCircle, Pencil, Download, Send, PoundSterling, TrendingUp, Users, Copy, Calendar, RefreshCw } from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import type { Client, Package as PackageType, Settings, Invoice, Session } from "@shared/schema";
-import { paymentMethodsHtml } from "@shared/payment-methods";
 import { trackActivationEvent } from "@/lib/activation";
-import { siteConfig } from "@/config/site";
 
 function formatDateUK(dateStr: string): string {
   try {
@@ -52,8 +50,8 @@ function NewPackageDialog({ open, onOpenChange, clients, currency }: {
       const res = await apiRequest("POST", "/api/packages", data);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+    onSuccess: async (saved) => {
+      await cacheSavedRecord("/api/packages", saved);
       onOpenChange(false);
       toast({ title: "Package created successfully" });
       setFormData({ clientId: "", name: "", totalSessions: 10, usedSessions: 0, price: "", status: "active", billingType: "block", monthlyRate: "", nextBillingDate: "" });
@@ -179,8 +177,8 @@ function NewInvoiceDialog({ open, onOpenChange, clients, currency }: {
       const res = await apiRequest("POST", "/api/invoices", data);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+    onSuccess: async (saved) => {
+      await cacheSavedRecord("/api/invoices", saved);
       onOpenChange(false);
       toast({ title: "Invoice created successfully" });
       trackActivationEvent("first_invoice_created");
@@ -316,8 +314,8 @@ function EditSessionsDialog({ open, onOpenChange, pkg }: {
       const res = await apiRequest("PATCH", `/api/packages/${pkg.id}`, { totalSessions, usedSessions });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+    onSuccess: async (saved) => {
+      await cacheSavedRecord("/api/packages", saved);
       toast({ title: "Sessions updated" });
       onOpenChange(false);
     },
@@ -415,97 +413,17 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
     },
   });
 
-  const handleDownload = () => {
-    const invoiceHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Invoice ${invoice.invoiceNumber}</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #333; }
-          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
-          .business-info { text-align: right; }
-          .business-info h2 { margin: 0; color: #2563eb; }
-          .business-info p { margin: 2px 0; font-size: 13px; color: #666; }
-          .invoice-title { font-size: 32px; font-weight: bold; color: #2563eb; margin-bottom: 20px; }
-          .invoice-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-          .meta-group h4 { margin: 0 0 5px; color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
-          .meta-group p { margin: 2px 0; font-size: 14px; }
-          .line-items { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-          .line-items th { background: #f8f9fa; padding: 10px 15px; text-align: left; font-size: 12px; text-transform: uppercase; color: #666; border-bottom: 2px solid #e5e7eb; }
-          .line-items td { padding: 12px 15px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
-          .total-row { background: #f0f4ff; }
-          .total-row td { font-weight: bold; font-size: 16px; color: #2563eb; }
-          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #999; text-align: center; }
-          .status-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
-          .status-pending { background: #fef3c7; color: #92400e; }
-          .status-sent { background: #dbeafe; color: #1e40af; }
-          .status-paid { background: #d1fae5; color: #065f46; }
-          .status-overdue { background: #fee2e2; color: #991b1b; }
-          @media print { body { padding: 20px; } .no-print { display: none; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div>
-            <div class="invoice-title">INVOICE</div>
-            <p style="font-size:14px;color:#666;">Invoice No: <strong>${invoice.invoiceNumber}</strong></p>
-          </div>
-          <div class="business-info">
-            <h2>${settings?.businessName || siteConfig.name}</h2>
-            <p>${settings?.trainerName || "Coach"}</p>
-            ${settings?.trainerEmail ? `<p>${settings.trainerEmail}</p>` : ""}
-            ${settings?.trainerPhone ? `<p>${settings.trainerPhone}</p>` : ""}
-            ${settings?.businessAddress ? `<p>${settings.businessAddress}</p>` : ""}
-          </div>
-        </div>
-        <div class="invoice-meta">
-          <div class="meta-group">
-            <h4>Bill To</h4>
-            <p><strong>${clientName}</strong></p>
-          </div>
-          <div class="meta-group">
-            <h4>Invoice Details</h4>
-            <p>Date: ${formatDateUK(new Date().toISOString().split("T")[0])}</p>
-            <p>Due: ${formatDateUK(invoice.dueDate)}</p>
-            <p>Status: <span class="status-badge status-${invoice.status || "pending"}">${invoice.status || "pending"}</span></p>
-            ${invoice.paymentMethod ? `<p>Payment: ${invoice.paymentMethod}</p>` : ""}
-          </div>
-        </div>
-        <table class="line-items">
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th style="text-align:right;">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>${invoice.notes || "Training services"}</td>
-              <td style="text-align:right;">${currency}${invoice.amount}</td>
-            </tr>
-            <tr class="total-row">
-              <td>Total Due</td>
-              <td style="text-align:right;">${currency}${invoice.amount}</td>
-            </tr>
-          </tbody>
-        </table>
-        ${paymentMethodsHtml(settings)}
-        <div class="footer">
-          <p>Thank you for your business</p>
-          <p>${settings?.businessName || siteConfig.name} · Generated on ${formatDateUK(new Date().toISOString().split("T")[0])}</p>
-        </div>
-        <div class="no-print" style="margin-top:30px;text-align:center;">
-          <button onclick="window.print()" style="padding:10px 30px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Print / Save as PDF</button>
-        </div>
-      </body>
-      </html>
-    `;
-
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(invoiceHTML);
-      printWindow.document.close();
+  const [downloading, setDownloading] = useState(false);
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const { downloadInvoicePdf } = await import("@/lib/invoice-pdf");
+      await downloadInvoicePdf(invoice, clientName, settings);
+      toast({ title: "PDF download started", description: "Check your browser downloads." });
+    } catch {
+      toast({ title: "Unable to download PDF", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -652,9 +570,9 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
                 <Pencil className="w-3 h-3 mr-1" />
                 Edit
               </Button>
-              <Button variant="outline" size="sm" onClick={handleDownload} data-testid="button-download-invoice">
+              <Button variant="outline" size="sm" onClick={handleDownload} disabled={downloading} data-testid="button-download-invoice">
                 <Download className="w-3 h-3 mr-1" />
-                Download PDF
+                {downloading ? "Downloading…" : "Download PDF"}
               </Button>
               {invoice.status !== "sent" && invoice.status !== "paid" && (
                 <Button
@@ -870,7 +788,7 @@ export default function Payments() {
               <PoundSterling className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold" data-testid="stat-monthly-revenue">{currency}{monthlyRevenue.toFixed(0)}</p>
+              <p className="text-2xl font-bold" data-testid="stat-monthly-revenue">{currency}{monthlyRevenue.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">Monthly Revenue</p>
             </div>
           </CardContent>
@@ -881,7 +799,7 @@ export default function Payments() {
               <Clock className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold" data-testid="stat-pending-invoices">{currency}{pendingTotal.toFixed(0)}</p>
+              <p className="text-2xl font-bold" data-testid="stat-pending-invoices">{currency}{pendingTotal.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">{pendingInvoices.length} Pending Invoices</p>
             </div>
           </CardContent>
@@ -914,15 +832,15 @@ export default function Payments() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Total Revenue</p>
-              <p className="text-2xl font-bold text-primary" data-testid="stat-scope-total">{currency}{scopeTotalRevenue.toFixed(0)}</p>
+              <p className="text-2xl font-bold text-primary" data-testid="stat-scope-total">{currency}{scopeTotalRevenue.toFixed(2)}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Monthly Billing</p>
-              <p className="text-2xl font-bold text-green-600" data-testid="stat-scope-monthly">{currency}{scopeMonthlyRevenue.toFixed(0)}</p>
+              <p className="text-2xl font-bold text-green-600" data-testid="stat-scope-monthly">{currency}{scopeMonthlyRevenue.toFixed(2)}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Block Bookings</p>
-              <p className="text-2xl font-bold text-blue-600" data-testid="stat-scope-block">{currency}{scopeBlockRevenue.toFixed(0)}</p>
+              <p className="text-2xl font-bold text-blue-600" data-testid="stat-scope-block">{currency}{scopeBlockRevenue.toFixed(2)}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Sessions</p>

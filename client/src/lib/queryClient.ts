@@ -17,6 +17,7 @@ export async function apiRequest(
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
+    cache: "no-store",
   });
 
   await throwIfResNotOk(res);
@@ -28,9 +29,11 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
+  async ({ queryKey, signal }) => {
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      cache: "no-store",
+      signal,
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
@@ -55,3 +58,17 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Use the confirmed server response immediately; cancel an older read so it
+// cannot overwrite the newly saved row. Reconcile with the server afterwards.
+export async function cacheSavedRecord<T extends { id: string }>(url: string, saved: T) {
+  const queryKey = [url];
+  await queryClient.cancelQueries({ queryKey });
+  queryClient.setQueryData<T[]>(queryKey, previous => {
+    const records = previous || [];
+    return records.some(record => record.id === saved.id)
+      ? records.map(record => record.id === saved.id ? saved : record)
+      : [...records, saved];
+  });
+  void queryClient.invalidateQueries({ queryKey });
+}

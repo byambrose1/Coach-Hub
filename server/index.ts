@@ -8,6 +8,10 @@ import { securityHeaders } from "./security-headers";
 
 const app = express();
 app.disable("x-powered-by");
+app.use("/api", (_req, res, next) => {
+  res.set("Cache-Control", "private, no-store");
+  next();
+});
 const httpServer = createServer(app);
 
 declare module "http" {

@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, cacheSavedRecord } from "@/lib/queryClient";
 import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save, Download, CalendarPlus, Send, Users2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { Client, Session, Package as PackageType, SessionNote, ClientForm } from "@shared/schema";
@@ -64,8 +64,8 @@ function NewClientDialog({ open, onOpenChange, onUpgradeRequired }: {
       }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+    onSuccess: async (saved) => {
+      await cacheSavedRecord("/api/clients", saved);
       onOpenChange(false);
       toast({ title: "Client added successfully" });
       trackActivationEvent("first_client_created");
@@ -254,8 +254,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
       const res = await apiRequest("PATCH", `/api/clients/${client.id}`, data);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+    onSuccess: async (saved) => {
+      await cacheSavedRecord("/api/clients", saved);
       setIsEditing(false);
       toast({ title: "Client updated successfully" });
     },
@@ -315,8 +315,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
       });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notes"] });
+    onSuccess: async (saved) => {
+      await cacheSavedRecord("/api/notes", saved);
       setNewNoteContent("");
       toast({ title: "Note added" });
     },
@@ -333,8 +333,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
       });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notes"] });
+    onSuccess: async (saved) => {
+      await cacheSavedRecord("/api/notes", saved);
       setEditingNoteId(null);
       setEditingNoteContent("");
       toast({ title: "Note updated" });
@@ -363,8 +363,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
       const res = await apiRequest("PATCH", `/api/packages/${id}`, { totalSessions, usedSessions });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+    onSuccess: async (saved) => {
+      await cacheSavedRecord("/api/packages", saved);
       setEditingPkgId(null);
       toast({ title: "Package updated" });
     },

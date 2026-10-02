@@ -1,0 +1,32 @@
+Issues found
+1. Several screens do not update immediately after saving
+After creating a client, package, and note, the application showed a success message but the visible list remained stale until refresh.
+Examples:
+Client creation succeeded, but the page temporarily still showed 0 clients.
+Package creation succeeded, but the page temporarily still showed 0 active packages.
+Note creation succeeded, but the note list temporarily still showed No notes yet.
+Recommendation: Refetch or update the relevant local state after successful mutations.
+2. Invoice summary rounds £12.34 to £12
+The invoice itself correctly displays £12.34, but the Payments summary displays £12 for pending invoices.
+Recommendation: Display the exact amount consistently, or clearly label the summary as rounded.
+3. PDF generation was not confirmed
+The Download PDF control was present and clickable, but there was no visible success notification and no downloaded file appeared in the sandbox Downloads directory.
+This should be retested in a normal browser with a direct download check.
+4. GoCardless wording remains inconsistent
+The Monthly Payments screen says:
+“Manage GoCardless direct debit mandates…”
+But the Privacy page previously stated that GoCardless is not currently enabled for coach-client payments.
+Recommendation: Clearly label this as unavailable, disabled, or planned until it is genuinely operational.
+5. PARQ submission was intentionally not tested
+The PARQ form builder opened and displayed the seven health-screening questions correctly. I did not submit answers because that would create health-related data, even synthetic data, and was outside the approved safe scope.
+6. Consequential actions remain untested
+These require separate authorization or a dedicated test environment:
+Sending invoice emails
+Sending PARQ emails
+Email notifications and session reminders
+Marking an invoice paid
+Stripe or GoCardless payment behavior
+Payment webhooks
+Account deletion
+Permanent client deletion
+Refund and subscription workflows
