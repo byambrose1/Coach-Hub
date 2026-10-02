@@ -27,3 +27,10 @@ export const users = pgTable("users", {
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// Keep application IDs stable when an existing coach changes sign-in provider.
+export const authIdentities = pgTable("auth_identities", {
+  identity: varchar("identity").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

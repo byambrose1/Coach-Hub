@@ -9,18 +9,17 @@ export function registerAuthRoutes(app: Express): void {
   // browser-console 401 errors on the marketing pages. The protected user route
   // below remains unchanged for authenticated product calls.
   app.get("/api/auth/status", async (req: any, res) => {
-    const user = req.user as any;
-    if (!req.isAuthenticated?.() || !user?.expires_at) {
-      return res.json(null);
-    }
-
-    try {
-      const account = await authStorage.getUser(user.claims.sub);
-      return res.json(account);
-    } catch (error) {
-      logError("Error fetching auth status", error);
-      return res.status(500).json({ message: "Failed to fetch auth status" });
-    }
+    res.set("Cache-Control", "no-store");
+    const anonymous: any = { status: () => anonymous, json: () => res.json(null) };
+    await isAuthenticated(req, anonymous, async () => {
+      try {
+        const account = await authStorage.getUser((req.user as any).claims.sub);
+        return res.json(account || null);
+      } catch (error) {
+        logError("Error fetching auth status", error);
+        return res.status(500).json({ message: "Failed to fetch auth status" });
+      }
+    });
   });
 
   // Get current authenticated user (includes impersonation status)

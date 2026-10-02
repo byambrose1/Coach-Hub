@@ -1,5 +1,6 @@
 import { getPaymentCapabilities as defaultGetPaymentCapabilities } from "./payments";
 import { publicPlansFromConfig } from "@shared/public-site";
+import { deleteSupabaseAccounts } from "./auth/identities";
 import type { Express } from "express";
 import rateLimit from "express-rate-limit";
 import { createServer, type Server } from "http";
@@ -1969,6 +1970,13 @@ export async function registerRoutes(
         }
       }
 
+      if (!dependencies.deleteAuthUser) {
+        try { await deleteSupabaseAccounts(userId); }
+        catch (error) {
+          logError("Unable to delete authentication provider account", error);
+          return res.status(502).json({ message: "Unable to remove your sign-in account. Your client data has been kept. Please retry or contact support." });
+        }
+      }
       await storage.deleteAccountData(userId);
       await deleteAuthUser(userId);
     } catch (err) {

@@ -30,6 +30,7 @@ import { PrivacyPage, TermsPage, SupportPage } from "@/pages/public";
 import { BlogListPage, BlogPostPage } from "@/pages/blog";
 import { trackActivationEvent } from "@/lib/activation";
 import { captureAttributionFromUrl } from "@/lib/attribution";
+import LoginPage from "@/pages/login";
 
 captureAttributionFromUrl();
 
@@ -42,7 +43,7 @@ function TermsModal() {
   });
   const [open, setOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
-  const isLegalPage = ["/terms", "/privacy", "/support"].includes(location);
+  const isLegalPage = ["/terms", "/privacy", "/support", "/login"].includes(location);
 
   useEffect(() => {
     if (isAuthenticated && settings && !settings.hasAcceptedTerms && !isLegalPage) {
@@ -159,6 +160,7 @@ function Router() {
 function PublicRouter() {
   return (
     <Switch>
+      <Route path="/login" component={LoginPage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/support" component={SupportPage} />
@@ -201,7 +203,7 @@ function AppContent() {
   const [location] = useLocation();
   const trackedSignup = useRef(false);
   const isPublicPage =
-    ["/privacy", "/terms", "/support", "/pricing"].includes(location) ||
+    ["/login", "/privacy", "/terms", "/support", "/pricing"].includes(location) ||
     location.startsWith("/blog");
 
   useEffect(() => {

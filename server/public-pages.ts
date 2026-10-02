@@ -9,7 +9,7 @@ const escape = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, chara
 const paragraphs = (values: string[]) => values.map(value => `<p>${escape(value)}</p>`).join("");
 const sections = (values: PublicSection[]) => values.map(section =>
   `<section><h2>${escape(section.heading)}</h2>${paragraphs(section.paragraphs)}</section>`).join("");
-const privatePath = /^\/(dashboard|settings|clients|schedule|payments|admin|platform-admin|feedback)(\/|$)/;
+const privatePath = /^\/(login|dashboard|settings|clients|schedule|payments|admin|platform-admin|feedback)(\/|$)/;
 
 export async function renderPublicDocument(template: string, requestPath: string, storage: PublicStorage) {
   const pathname = new URL(requestPath, publicSite.siteUrl).pathname.replace(/\/$/, "") || "/";

@@ -9,6 +9,7 @@ import connectPg from "connect-pg-simple";
 import { authStorage } from "./storage";
 import { logError } from "../../safe-logging";
 import { ProtectedOidcStrategy, authSessionKey, validateOidcCallback } from "./oidc-protection";
+import { authenticateSupabaseSession } from "../../auth/supabase-session";
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -44,7 +45,7 @@ export function getSession() {
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: false,
-    ttl: sessionTtl,
+    ttl: sessionTtl / 1000,
     tableName: "sessions",
   });
   return session({
@@ -96,11 +97,13 @@ export function createOidcVerifier(upsert = upsertUser): VerifyFunction {
   };
 }
 
-export async function setupAuth(app: Express) {
+export async function setupAuth(app: Express, routePrefix = "/api", successRedirect = "/") {
   app.set("trust proxy", 1);
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
+  passport.serializeUser((user: Express.User, cb) => cb(null, user));
+  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   let config: Awaited<ReturnType<typeof getOidcConfig>>;
   try {
@@ -117,9 +120,9 @@ export async function setupAuth(app: Express) {
         message: "Sign-in is temporarily unavailable. Please try again shortly.",
       });
     };
-    app.get("/api/login", unavailable);
-    app.get("/api/callback", unavailable);
-    app.get("/api/logout", unavailable);
+    app.get(`${routePrefix}/login`, unavailable);
+    app.get(`${routePrefix}/callback`, unavailable);
+    app.get(`${routePrefix}/logout`, unavailable);
     return;
   }
 
@@ -138,7 +141,7 @@ export async function setupAuth(app: Express) {
           sessionKey: authSessionKey(domain),
           config,
           scope: "openid email profile offline_access",
-          callbackURL: `https://${domain}/api/callback`,
+          callbackURL: `https://${domain}${routePrefix}/callback`,
         },
         verify
       );
@@ -147,10 +150,8 @@ export async function setupAuth(app: Express) {
     }
   };
 
-  passport.serializeUser((user: Express.User, cb) => cb(null, user));
-  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
-  app.get("/api/login", (req, res, next) => {
+  app.get(`${routePrefix}/login`, (req, res, next) => {
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
@@ -158,15 +159,15 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   });
 
-  app.get("/api/callback", validateOidcCallback(), (req, res, next) => {
+  app.get(`${routePrefix}/callback`, validateOidcCallback(), (req, res, next) => {
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/?signin=failed",
+      successReturnToOrRedirect: successRedirect,
+      failureRedirect: routePrefix === "/api" ? "/?signin=failed" : "/login?error=signin_failed",
     })(req, res, next);
   });
 
-  app.get("/api/logout", async (req, res) => {
+  app.get(`${routePrefix}/logout`, async (req, res) => {
     const refreshToken = (req.user as any)?.refresh_token;
     if (refreshToken && config.serverMetadata().revocation_endpoint) {
       try {
@@ -209,6 +210,7 @@ export function createIsAuthenticated(
 
   return async (req, res, next) => {
     const user = req.user as any;
+    if (user?.auth_provider === "supabase") return authenticateSupabaseSession(req, res, next);
 
     if (!req.isAuthenticated() || !user?.expires_at) {
       return res.status(401).json({ message: "Unauthorized" });
