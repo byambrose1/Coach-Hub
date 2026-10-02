@@ -905,13 +905,6 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {(formData.enableEmailNotifications || formData.enableSessionReminders) && (
-            <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-3">
-              <p className="text-xs text-amber-800 dark:text-amber-200">
-                Email delivery requires connecting an email service (like SendGrid). Notifications will be queued until a provider is configured.
-              </p>
-            </div>
-          )}
         </CardContent>
       </Card>
 

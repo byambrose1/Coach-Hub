@@ -128,7 +128,7 @@ export function ProductTour() {
           </div>
         </div>
         <div className="flex items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
-          <p className="hidden text-xs text-slate-500 sm:block">Made for independent coaches—and easier to follow for clients.</p>
+          <p className="hidden text-xs text-slate-500 sm:block">Made for independent coaches and easier to follow for clients.</p>
           <div className="ml-auto flex items-center gap-2">
             <button type="button" onClick={() => step(-1)} aria-label="Previous tour step" className="rounded-full p-2 text-slate-600 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"><ArrowLeft className="h-4 w-4" /></button>
             {active < slides.length - 1 ? <Button size="sm" onClick={() => step(1)} className="rounded-full bg-violet-700 px-4 font-bold hover:bg-violet-800">Next <ArrowRight className="ml-1.5 h-4 w-4" /></Button> : <Button size="sm" onClick={() => setOpen(false)} className="rounded-full bg-violet-700 px-4 font-bold hover:bg-violet-800">Done <X className="ml-1.5 h-4 w-4" /></Button>}
