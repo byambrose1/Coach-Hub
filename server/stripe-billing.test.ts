@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { afterEach, beforeEach, describe, test } from "node:test";
 import express, { type RequestHandler } from "express";
-import type Stripe from "stripe";
+import Stripe from "stripe";
 import { registerRoutes } from "./routes";
 import type { IStorage } from "./storage";
 
@@ -61,6 +61,7 @@ describe("hardened Stripe subscription billing", () => {
       checkoutCreateCalls: [] as any[],
       portalCreateCalls: [] as any[],
       event: null as any,
+      settingsWriteFails: false,
       nextCustomer: 1,
     };
     const locks = new Map<string, Promise<void>>();
@@ -104,6 +105,7 @@ describe("hardened Stripe subscription billing", () => {
         tier4Price: "7.99",
       }),
       upsertSettings: async (userId: string, values: any) => {
+        if (state.settingsWriteFails) throw new Error("Simulated settings write failure.");
         const updated = { ...(state.settings.get(userId) || { id: userId, userId }), ...values, id: userId };
         state.settings.set(userId, updated);
         return updated;
@@ -597,6 +599,126 @@ describe("hardened Stripe subscription billing", () => {
       subscriptionStatus: "active",
     });
     assert.equal(state.settings.get(USER_A).subscriptionPlan, "starter");
+  });
+
+  test("real Stripe signature verification rejects tampering, stale signatures, and wrong-mode events", async () => {
+    // This SDK client only performs local signing/verification, never API calls.
+    const verifier = new Stripe("sk_test_local_signature_fixture");
+    stripe.webhooks.constructEvent = (...args) => verifier.webhooks.constructEvent(...args);
+    state.subscriptions.set("sub_a", makeSubscription());
+    const event = {
+      id: "evt_signed_fixture",
+      object: "event",
+      livemode: false,
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          status: "complete",
+          mode: "subscription",
+          payment_status: "paid",
+          customer: "cus_a",
+          subscription: "sub_a",
+          metadata: { userId: USER_A, plan: "business" },
+        },
+      },
+    };
+    const body = JSON.stringify(event);
+    const sign = (payload: string, timestamp?: number) =>
+      verifier.webhooks.generateTestHeaderString({
+        payload,
+        secret: "whsec_billing_mock",
+        ...(timestamp !== undefined ? { timestamp } : {}),
+      });
+    const post = (payload: string, signature: string) => request("/api/webhooks/stripe", {
+      method: "POST",
+      headers: { "stripe-signature": signature },
+      body: payload,
+    });
+
+    const tampered = await post(`${body} `, sign(body));
+    assert.equal(tampered.status, 400);
+    assert.equal(state.settings.get(USER_A).subscriptionPlan, "free");
+
+    const expired = await post(body, sign(body, Math.floor(Date.now() / 1000) - 600));
+    assert.equal(expired.status, 400);
+    assert.equal(state.settings.get(USER_A).subscriptionPlan, "free");
+
+    const wrongModeBody = JSON.stringify({ ...event, livemode: true });
+    const wrongMode = await post(wrongModeBody, sign(wrongModeBody));
+    assert.equal(wrongMode.status, 400);
+    assert.equal(state.settings.get(USER_A).subscriptionPlan, "free");
+
+    const valid = await post(body, sign(body));
+    assert.equal(valid.status, 204);
+    assert.equal(state.settings.get(USER_A).subscriptionPlan, "starter");
+    assert.equal(state.settings.get(USER_A).subscriptionStatus, "active");
+  });
+
+  test("repeated and concurrent paid webhooks preserve the verified plan", async () => {
+    state.subscriptions.set("sub_a", makeSubscription());
+    const event = {
+      id: "evt_duplicate_checkout",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          status: "complete",
+          mode: "subscription",
+          payment_status: "paid",
+          customer: "cus_a",
+          subscription: "sub_a",
+          metadata: { userId: USER_A, plan: "business" },
+        },
+      },
+    };
+    const responses = await Promise.all([sendWebhook(event), sendWebhook(event), sendWebhook(event)]);
+    assert.deepEqual(responses.map(response => response.status), [204, 204, 204]);
+    const verified = { ...state.settings.get(USER_A) };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await sendWebhook({
+        id: "evt_duplicate_invoice",
+        type: "invoice.paid",
+        data: { object: { id: "in_a", customer: "cus_a", subscription: "sub_a" } },
+      });
+      assert.equal(response.status, 204);
+      assert.deepEqual(state.settings.get(USER_A), verified);
+    }
+    assert.equal(verified.subscriptionPlan, "starter");
+    assert.equal(verified.subscriptionStatus, "active");
+    assert.equal(state.settings.has(USER_B), false);
+    assert.equal(state.checkoutCreateCalls.length, 0);
+  });
+
+  test("webhook processing failures return 500 and recover on a later retry", async () => {
+    const event = {
+      id: "evt_retry_checkout",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          status: "complete",
+          mode: "subscription",
+          payment_status: "paid",
+          customer: "cus_a",
+          subscription: "sub_a",
+          metadata: { userId: USER_A },
+        },
+      },
+    };
+    const original = { ...state.settings.get(USER_A) };
+    const retrievalFailure = await sendWebhook(event);
+    assert.equal(retrievalFailure.status, 500);
+    assert.deepEqual(state.settings.get(USER_A), original);
+
+    state.subscriptions.set("sub_a", makeSubscription());
+    state.settingsWriteFails = true;
+    const storageFailure = await sendWebhook(event);
+    assert.equal(storageFailure.status, 500);
+    assert.deepEqual(state.settings.get(USER_A), original);
+
+    state.settingsWriteFails = false;
+    const retry = await sendWebhook(event);
+    assert.equal(retry.status, 204);
+    assert.equal(state.settings.get(USER_A).subscriptionPlan, "starter");
+    assert.equal(state.settings.get(USER_A).subscriptionStatus, "active");
   });
 
   test("webhook activation waits for paid Checkout and ignores metadata.plan", async () => {
