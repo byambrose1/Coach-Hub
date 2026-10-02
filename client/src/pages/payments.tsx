@@ -703,6 +703,9 @@ export default function Payments() {
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [revenueScope, setRevenueScope] = useState<"week" | "month">("month");
   const [mandateLinks, setMandateLinks] = useState<Record<string, string>>({});
+  const { data: paymentCapabilities } = useQuery<{ directDebitAvailable: boolean; message: string }>({
+    queryKey: ["/api/payments/status"],
+  });
   const [generatingMandateFor, setGeneratingMandateFor] = useState<string | null>(null);
 
   const { data: clients = [], isLoading: clientsLoading } = useQuery<Client[]>({
@@ -1119,7 +1122,7 @@ export default function Payments() {
           <div className="flex items-start justify-between gap-2 flex-wrap">
             <div>
               <p className="font-medium">Monthly Payment Clients</p>
-              <p className="text-sm text-muted-foreground">Manage GoCardless direct debit mandates for clients on monthly billing.</p>
+              <p className="text-sm text-muted-foreground" role="status" data-testid="direct-debit-availability">{paymentCapabilities?.message || "Checking payment availability..."}</p>
             </div>
             <Badge variant="outline" className="flex items-center gap-1">
               <Users className="w-3 h-3" />
@@ -1131,7 +1134,7 @@ export default function Payments() {
               <CardContent className="py-12 text-center text-muted-foreground">
                 <CreditCard className="w-10 h-10 mx-auto mb-3 opacity-30" />
                 <p className="font-medium mb-1">No monthly billing clients</p>
-                <p className="text-sm">Create a package with monthly billing to manage direct debit mandates here.</p>
+                <p className="text-sm">Monthly billing packages let you track payments collected through your own arrangements.</p>
               </CardContent>
             </Card>
           ) : (
@@ -1195,7 +1198,7 @@ export default function Payments() {
                             <Button
                               size="sm"
                               onClick={() => generateMandateLink(client!)}
-                              disabled={generatingMandateFor === client!.id}
+                              disabled={generatingMandateFor === client!.id || paymentCapabilities?.directDebitAvailable !== true}
                               data-testid={`button-generate-mandate-${client!.id}`}
                             >
                               {generatingMandateFor === client!.id ? (

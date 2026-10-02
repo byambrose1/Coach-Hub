@@ -1,6 +1,6 @@
-import { users, type User, type UpsertUser } from "@shared/models/auth";
+import { users, sessions, type User, type UpsertUser } from "@shared/models/auth";
 import { db } from "../../db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 // Interface for auth storage operations
 // (IMPORTANT) These user operations are mandatory for Replit Auth.
@@ -32,7 +32,11 @@ class AuthStorage implements IAuthStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
-    await db.delete(users).where(eq(users.id, id));
+    await db.transaction(async tx => {
+      // Revoke every browser/device session, not only the current cookie.
+      await tx.delete(sessions).where(sql`${sessions.sess} -> 'passport' -> 'user' -> 'claims' ->> 'sub' = ${id}`);
+      await tx.delete(users).where(eq(users.id, id));
+    });
   }
 }
 

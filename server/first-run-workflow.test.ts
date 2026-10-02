@@ -182,6 +182,7 @@ before(async () => {
         "private-provider-detail: GoCardless credential gc_secret_123 was rejected",
       );
     },
+    getPaymentCapabilities: () => ({ directDebitAvailable: true, message: "Simulated configured provider" }),
     sendParqEmail: async () => {
       throw new Error(
         "private-provider-detail: Brevo request for client@example.test was rejected",

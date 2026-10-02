@@ -289,14 +289,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteAccountData(userId: string): Promise<void> {
-    await db.delete(invoices).where(eq(invoices.userId, userId));
-    await db.delete(sessionNotes).where(eq(sessionNotes.userId, userId));
-    await db.delete(clientForms).where(eq(clientForms.userId, userId));
-    await db.delete(packages).where(eq(packages.userId, userId));
-    await db.delete(trainingSessions).where(eq(trainingSessions.userId, userId));
-    await db.delete(referrals).where(eq(referrals.userId, userId));
-    await db.delete(clients).where(eq(clients.userId, userId));
-    await db.delete(settings).where(eq(settings.id, userId));
+    await db.transaction(async tx => {
+      await tx.delete(invoices).where(eq(invoices.userId, userId));
+      await tx.delete(sessionNotes).where(eq(sessionNotes.userId, userId));
+      await tx.delete(clientForms).where(eq(clientForms.userId, userId));
+      await tx.delete(packages).where(eq(packages.userId, userId));
+      await tx.delete(trainingSessions).where(eq(trainingSessions.userId, userId));
+      await tx.delete(referrals).where(eq(referrals.userId, userId));
+      await tx.delete(clients).where(eq(clients.userId, userId));
+      await tx.delete(settings).where(eq(settings.id, userId));
+    });
   }
 
   // Platform admin

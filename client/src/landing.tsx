@@ -7,7 +7,8 @@ import {
   ArrowRight, CalendarDays, CheckCircle2, ClipboardCheck, CreditCard,
   Menu, ShieldCheck, Sparkles, TrendingUp, Users, X, Zap,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { publicMetadata } from "@shared/public-site";
 import { BrandMark } from "@/components/brand-mark";
 import { WaitlistDialog } from "@/components/waitlist-dialog";
 import { ProductShowcase, ProductTour } from "@/components/product-tour";
@@ -16,7 +17,7 @@ import { getPublicSiteUrl, OWNER_INPUT_REQUIRED, pricingTiers, siteConfig } from
 const features = [
   { icon: Users, title: "Know every client at a glance", description: "Keep profiles, contact details, notes, packages, and session history together instead of scattered across documents." },
   { icon: CalendarDays, title: "Make the week easier to run", description: "Book sessions, manage your calendar, and keep availability visible without rebuilding a spreadsheet each week." },
-  { icon: CreditCard, title: "Invoice and collect payments clearly", description: "Create invoices, see outstanding balances, and set up GoCardless direct debit workflows when your account is configured." },
+  { icon: CreditCard, title: "Invoice and track payments clearly", description: "Create invoices, see outstanding balances, and record payments collected through your own payment arrangements. Direct-debit setup is not currently available." },
   { icon: ClipboardCheck, title: "Collect PARQ forms in the workflow", description: "Create, store, and send PARQ forms from the client record, with the information your coaching process needs." },
   { icon: Zap, title: "Keep routine messages moving", description: "Use booking, cancellation, invoice, PARQ, and low-session email workflows without manually writing the same message every time." },
   { icon: TrendingUp, title: "See the business, not just the bookings", description: "Track revenue, packages, and invoices from a dashboard built around the decisions solo coaches make." },
@@ -27,11 +28,11 @@ const faqItems = [
   ["What is included in the Free plan?", "The Free plan supports up to five client records with scheduling, PARQ forms, basic invoicing, and client data export. It does not require a card to start."],
   ["How do client limits work?", "Each plan has a maximum number of client records. When you reach the limit, Practably shows an upgrade prompt before another client is added. A downgrade is blocked until the client count fits the target plan."],
   ["Do my clients need a Practably login?", "No. Coaches use Practably to manage their own workflow. Clients can receive emails and PARQ forms without a Practably dashboard login."],
-  ["How do payments and GoCardless work?", "Practably can create a GoCardless direct-debit setup link when your account has GoCardless configured. GoCardless handles the payment mandate flow. Check your GoCardless account for its terms and fees."],
+  ["How do payments and GoCardless work?", "Practably supports invoicing and payment records. GoCardless direct-debit setup and collection are not currently available. Collect client payments using your own payment arrangements."],
   ["How are PARQ and health details handled?", "PARQ responses are stored against the relevant client record so a coach can manage their workflow. Practably is software, not medical advice; collect and use health information only where appropriate for your practice."],
-  ["Can I export or delete data?", "You can export an individual client record from that client's profile. Account deletion is available from Settings. The account retention and backup process is owner review required before launch."],
-  ["What happens if I cancel or downgrade?", "The app prevents a downgrade if your current client count exceeds the new plan limit. Billing, access, and retention details after cancellation are owner review required before public launch."],
-  ["Are VAT or payment-provider fees included?", `Prices are shown monthly. VAT treatment and separate payment-provider fees are ${OWNER_INPUT_REQUIRED}; check the completed pricing and payment terms before subscribing.`],
+  ["Can I export or delete data?", `You can export an individual client record from that client's profile. ${siteConfig.retentionPolicy}`],
+  ["What happens if I cancel or downgrade?", "Normal cancellation stops renewal at the end of your paid period. Direct downgrades are blocked above the new client limit; if a billing change limits your account, existing records are kept and adding clients is restricted. A first payment may qualify for the 24-hour refund guarantee in Settings."],
+  ["Are VAT or payment-provider fees included?", `Prices are shown monthly. ${siteConfig.vatTreatment} ${siteConfig.paymentProviderFees}`],
   ["How do I contact support?", `Support contact: ${siteConfig.supportEmail}. Do not send health responses, passwords, or payment credentials in a support message.`],
 ];
 
@@ -46,6 +47,7 @@ function setMeta(name: string, content: string, attribute: "name" | "property" =
 }
 
 export default function Landing() {
+  const [location] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { data: configuredTiers } = useQuery<Array<{ name: string; label: string; max: number; price: string }>>({
     queryKey: ["/api/subscription/tiers"],
@@ -68,20 +70,24 @@ export default function Landing() {
 
   useEffect(() => {
     const siteUrl = getPublicSiteUrl();
-    document.title = "Practably | Business Software for Independent Coaches";
-    setMeta("description", siteConfig.description);
-    setMeta("og:title", "Practably | Business Software for Independent Coaches", "property");
-    setMeta("og:description", siteConfig.description, "property");
+    const page = publicMetadata[location] || publicMetadata["/"];
+    const description = location === "/pricing"
+      ? displayedPricingTiers.map(tier => `${tier.name}: ${tier.price}, ${tier.clients}.`).join(" ")
+      : page.description;
+    document.title = page.title;
+    setMeta("description", description);
+    setMeta("og:title", page.title, "property");
+    setMeta("og:description", description, "property");
     setMeta("og:type", "website", "property");
     setMeta("og:image", `${siteUrl}/practably-social.svg`, "property");
     setMeta("twitter:card", "summary");
-    setMeta("twitter:title", "Practably | Business Software for Independent Coaches");
-    setMeta("twitter:description", siteConfig.description);
+    setMeta("twitter:title", page.title);
+    setMeta("twitter:description", description);
     setMeta("twitter:image", `${siteUrl}/practably-social.svg`);
     let canonical = document.head.querySelector("link[rel=canonical]") as HTMLLinkElement | null;
     if (!canonical) { canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.appendChild(canonical); }
-    canonical.href = siteUrl;
-  }, []);
+    canonical.href = `${siteUrl}${location === "/pricing" ? "/pricing" : "/"}`;
+  }, [location, configuredTiers]);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-white text-slate-900">
@@ -120,13 +126,13 @@ export default function Landing() {
 
         <section id="features" className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20"><div className="mx-auto max-w-2xl text-center"><p className="text-sm font-bold uppercase tracking-[0.16em] text-violet-700">Designed for day-to-day coaching</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">Less tool switching. More time with clients.</h2><p className="mt-4 text-lg text-slate-600">Practably brings the tasks that make a solo coaching business feel fragmented into one calm, focused dashboard.</p></div><div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{features.map((feature) => <article key={feature.title} className="rounded-2xl border border-slate-200 bg-white p-6 transition hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-lg"><div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-violet-100 to-orange-100 text-violet-700"><feature.icon className="h-5 w-5" aria-hidden="true" /></div><h3 className="mt-5 text-lg font-bold text-slate-950">{feature.title}</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{feature.description}</p></article>)}</div></section>
 
-        <section className="bg-slate-950 text-white"><div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 sm:px-6 sm:py-20 lg:grid-cols-[.9fr_1.1fr] lg:items-center"><div><p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-300">Why coaches switch</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">A business hub built for the gap between spreadsheets and enterprise software.</h2><p className="mt-5 max-w-xl text-lg leading-relaxed text-slate-300">Practably is for coaches who need client, booking, form, invoice, and direct-debit workflows to work together, but do not need a huge platform with a huge learning curve.</p></div><ul className="grid gap-3 sm:grid-cols-2">{["One client record, not multiple versions", "A faster start with a five-client free plan", "PARQ collection beside coaching work", "GoCardless direct-debit setup when configured", "Invoices and revenue in the same place", "Clear limits that fit a solo practice"].map((item) => <li key={item} className="flex gap-3 rounded-xl border border-white/10 bg-white/5 p-4 text-sm font-medium text-slate-100"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-orange-300" aria-hidden="true" />{item}</li>)}</ul></div></section>
+        <section className="bg-slate-950 text-white"><div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 sm:px-6 sm:py-20 lg:grid-cols-[.9fr_1.1fr] lg:items-center"><div><p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-300">Why coaches switch</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">A business hub built for the gap between spreadsheets and enterprise software.</h2><p className="mt-5 max-w-xl text-lg leading-relaxed text-slate-300">Practably brings client, booking, form, invoice and payment records together without a huge learning curve. Direct-debit setup and collection are not currently available.</p></div><ul className="grid gap-3 sm:grid-cols-2">{["One client record, not multiple versions", "A faster start with a five-client free plan", "PARQ collection beside coaching work", "Track payments collected using your own arrangements", "Invoices and revenue in the same place", "Clear limits that fit a solo practice"].map((item) => <li key={item} className="flex gap-3 rounded-xl border border-white/10 bg-white/5 p-4 text-sm font-medium text-slate-100"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-orange-300" aria-hidden="true" />{item}</li>)}</ul></div></section>
 
         <section className="border-b border-slate-200 bg-gradient-to-br from-violet-50 via-white to-orange-50"><div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20"><div className="mx-auto max-w-3xl text-center"><p className="text-sm font-bold uppercase tracking-[0.16em] text-violet-700">Built around coach workflows</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">A practical workspace for the work behind every session.</h2><p className="mt-4 text-lg text-slate-600">Practably keeps the coach workflow front and centre: client records, scheduling, PARQ forms, invoices, packages, and payment setup. No customer logos or performance claims. Just the product capabilities you can review.</p></div></div></section>
 
         <section id="pricing" className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20"><div className="mx-auto max-w-3xl text-center"><p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-600">Simple limits, clear starting point</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">Choose the client limit that fits today.</h2><p className="mt-4 text-lg text-slate-600">Start with up to five clients for free. Plans are shown monthly; paid-plan checkout links are configured by the account owner.</p></div><div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{displayedPricingTiers.map((tier) => <article key={tier.name} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><h3 className="text-lg font-bold text-slate-950">{tier.name}</h3><div className="mt-3 flex items-baseline gap-1"><span className="text-4xl font-extrabold tracking-tight">{tier.price}</span><span className="text-sm font-medium text-slate-500">{tier.period}</span></div><p className="mt-2 text-sm font-bold text-violet-700">{tier.clients}</p><p className="mt-3 min-h-12 text-sm leading-relaxed text-slate-600">{tier.description}</p><ul className="mt-5 flex-1 space-y-2.5">{tier.features.map((feature) => <li key={feature} className="flex gap-2 text-sm text-slate-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />{feature}</li>)}</ul><WaitlistDialog trigger={<Button variant={tier.name === "Free" ? "default" : "outline"} className={`mt-7 w-full rounded-full font-bold ${tier.name === "Free" ? "bg-violet-600 hover:bg-violet-700" : ""}`}>Join the waitlist</Button>} /></article>)}</div></section>
 
-        <section aria-labelledby="security-heading" className="border-y border-slate-200 bg-slate-50"><div className="mx-auto max-w-6xl px-5 py-16 sm:px-6"><div className="grid gap-8 md:grid-cols-[.75fr_1.25fr]"><div><p className="text-sm font-bold uppercase tracking-[0.16em] text-emerald-700">Security and privacy</p><h2 id="security-heading" className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950">Specific product controls, not broad promises.</h2><p className="mt-4 text-slate-600">Practably does not claim a compliance certification. These are the concrete product capabilities currently available.</p></div><ul className="grid gap-3 sm:grid-cols-2">{[["Signed-in access", "Product API routes for client, session, invoice, form, and settings data require an authenticated coach."], ["Client records", "Client details, sessions, notes, forms, packages, and invoices are scoped to the coach account."], ["Export and deletion", "An individual client record can be exported from the client profile, and account deletion is available from Settings."], ["Payment handling", "GoCardless direct-debit setup is initiated through GoCardless when the account has been configured."]].map(([title, description]) => <li key={title} className="rounded-xl border border-slate-200 bg-white p-4"><ShieldCheck className="h-5 w-5 text-emerald-600" aria-hidden="true" /><h3 className="mt-3 font-bold text-slate-950">{title}</h3><p className="mt-1 text-sm leading-relaxed text-slate-600">{description}</p></li>)}</ul></div></div></section>
+        <section aria-labelledby="security-heading" className="border-y border-slate-200 bg-slate-50"><div className="mx-auto max-w-6xl px-5 py-16 sm:px-6"><div className="grid gap-8 md:grid-cols-[.75fr_1.25fr]"><div><p className="text-sm font-bold uppercase tracking-[0.16em] text-emerald-700">Security and privacy</p><h2 id="security-heading" className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Specific product controls, not broad promises.</h2><p className="mt-4 text-slate-600">Practably does not claim a compliance certification. Use fictional client and health information while pre-launch privacy checks remain open.</p></div><ul className="grid gap-3 sm:grid-cols-2">{[["Signed-in access", "Product API routes for client, session, invoice, form, and settings data require an authenticated coach."], ["Client records", "Client details, sessions, notes, forms, packages, and invoices are scoped to the coach account."], ["Export and deletion", "An individual client record can be exported from the client profile, and account deletion is available from Settings."], ["Payment handling", "Create invoices and record payments collected using your own arrangements. Direct-debit setup and collection are not currently available."]].map(([title, description]) => <li key={title} className="rounded-xl border border-slate-200 bg-white p-4"><ShieldCheck className="h-5 w-5 text-emerald-600" aria-hidden="true" /><h3 className="mt-3 font-bold text-slate-950">{title}</h3><p className="mt-1 text-sm text-slate-600">{description}</p></li>)}</ul></div></div></section>
 
         <section id="faq" className="mx-auto max-w-4xl px-5 py-16 sm:px-6 sm:py-20"><div className="text-center"><p className="text-sm font-bold uppercase tracking-[0.16em] text-violet-700">FAQ</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">Questions coaches ask before they start.</h2></div><Accordion type="single" collapsible className="mt-10 rounded-2xl border border-slate-200 bg-white px-5 sm:px-6">{faqItems.map(([question, answer], index) => <AccordionItem key={question} value={`faq-${index}`}><AccordionTrigger className="text-left text-base font-bold text-slate-900 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">{question}</AccordionTrigger><AccordionContent className="pr-8 text-sm leading-relaxed text-slate-600">{answer}</AccordionContent></AccordionItem>)}</Accordion></section>
 

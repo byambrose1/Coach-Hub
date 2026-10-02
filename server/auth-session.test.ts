@@ -1,9 +1,62 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { NextFunction, Request, Response } from "express";
-import { createIsAuthenticated } from "./replit_integrations/auth/replitAuth";
+import { createIsAuthenticated, createOidcVerifier } from "./replit_integrations/auth/replitAuth";
+import { authStorage } from "./replit_integrations/auth/storage";
+import { db } from "./db";
+import { getTableName } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 const now = 1_800_000_000;
+
+test("auth-user deletion targets all sessions for that subject before deleting the user", async () => {
+  const original = db.transaction;
+  const operations: any[] = [];
+  (db as any).transaction = async (callback: any) => callback({
+    delete: (table: any) => ({ where: async (predicate: any) => {
+      operations.push({ table: getTableName(table), query: new PgDialect().sqlToQuery(predicate) });
+    } }),
+  });
+  try {
+    await authStorage.deleteUser("fixture-coach");
+    assert.deepEqual(operations.map(operation => operation.table), ["sessions", "users"]);
+    assert.match(operations[0].query.sql, /'passport'.*'user'.*'claims'.*'sub'/);
+    assert.deepEqual(operations[0].query.params, ["fixture-coach"]);
+    assert.deepEqual(operations[1].query.params, ["fixture-coach"]);
+  } finally {
+    db.transaction = original;
+  }
+});
+
+test("a renewed session is saved before the next request and preserves the coach identity", async () => {
+  const user: any = { claims: { sub: "fixture-coach" }, expires_at: now - 1, refresh_token: "fixture-refresh" };
+  let snapshot: any;
+  const req: any = {
+    user, isAuthenticated: () => true,
+    session: { passport: { user }, save: (callback: (error?: Error) => void) => {
+      snapshot = JSON.parse(JSON.stringify(req.session.passport.user));
+      callback();
+    } },
+  };
+  const refresh = async () => ({ access_token: "fixture-access", refresh_token: "rotated-fixture", claims: () => ({ sub: "fixture-coach", exp: now + 3600 }) });
+  const { response } = responseRecorder();
+  let passed = false;
+  await createIsAuthenticated({ now: () => now, refresh })(req, response, () => { passed = true; });
+  assert.equal(passed, true);
+  assert.equal(snapshot.claims.sub, "fixture-coach");
+  assert.equal(snapshot.expires_at, now + 3600);
+  assert.equal(snapshot.refresh_token, "rotated-fixture");
+  req.user = snapshot;
+  await createIsAuthenticated({ now: () => now + 30, refresh: async () => { throw new Error("No second refresh expected"); } })(req, response, () => {});
+});
+
+test("account creation errors cannot expose provider/database details or reject outside Passport", async () => {
+  const tokens: any = { access_token: "fixture", claims: () => ({ sub: "fixture-coach", email: "fixture@example.com", exp: now + 3600 }) };
+  let receivedError: any;
+  const verify = createOidcVerifier(async () => { throw new Error("private database details and duplicate account email"); });
+  await verify(tokens, (error: any) => { receivedError = error; });
+  assert.equal(receivedError.message, "Unable to complete sign-in. Please retry or contact support.");
+});
 
 function responseRecorder() {
   const result = { status: 200, body: undefined as unknown };

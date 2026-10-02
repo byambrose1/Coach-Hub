@@ -1,3 +1,5 @@
+import { getPaymentCapabilities as defaultGetPaymentCapabilities } from "./payments";
+import { publicPlansFromConfig } from "@shared/public-site";
 import type { Express } from "express";
 import rateLimit from "express-rate-limit";
 import { createServer, type Server } from "http";
@@ -188,6 +190,7 @@ export async function registerRoutes(
     sendBroadcastEmail?: typeof defaultSendBroadcastEmail;
     sendFeedbackEmail?: typeof defaultSendFeedbackEmail;
     deleteAuthUser?: typeof authStorage.deleteUser;
+    getPaymentCapabilities?: typeof defaultGetPaymentCapabilities;
   } = {},
 ): Promise<Server> {
   const storage = dependencies.storage ?? defaultStorage;
@@ -195,6 +198,7 @@ export async function registerRoutes(
   const getBillingStripeClient = () => dependencies.stripeClient ?? getStripeClient();
   const lockBillingUser = dependencies.withBillingCheckoutLock ?? withBillingCheckoutLock;
   const createMandateLink = dependencies.createMandateLink ?? defaultCreateMandateLink;
+  const getPaymentCapabilities = dependencies.getPaymentCapabilities ?? defaultGetPaymentCapabilities;
   const deleteAuthUser = dependencies.deleteAuthUser ?? authStorage.deleteUser.bind(authStorage);
   const sendBookingNotificationEmail =
     dependencies.sendBookingNotificationEmail ?? defaultSendBookingNotificationEmail;
@@ -376,12 +380,18 @@ export async function registerRoutes(
   app.use("/api/invoices", isAuthenticated);
 
   // --- GoCardless & Payments ---
+  app.get("/api/payments/status", isAuthenticated, (_req, res) => {
+    res.json(getPaymentCapabilities());
+  });
   app.post("/api/payments/create-mandate-link", isAuthenticated, async (req, res) => {
     try {
       const { clientId } = req.body;
       const client = await storage.getClient(getUserId(req), clientId);
       if (!client) return res.status(404).json({ message: "Client not found" });
       if (!client.email) return res.status(400).json({ message: "Client has no email" });
+      if (!getPaymentCapabilities().directDebitAvailable) {
+        return res.status(503).json({ message: getPaymentCapabilities().message });
+      }
       const link = await createMandateLink(clientId, client.name, client.email);
       res.json({ link });
     } catch (err) {
@@ -1352,14 +1362,10 @@ export async function registerRoutes(
   app.get("/api/subscription/tiers", async (_req, res) => {
     try {
       const config = await storage.getPlatformConfig();
-      res.json([
-        { name: "free", label: "Free", max: config.tier1MaxClients ?? 5, price: config.tier1Price ?? "0" },
-        { name: "starter", label: "Starter", max: config.tier2MaxClients ?? 10, price: config.tier2Price ?? "1.99" },
-        { name: "professional", label: "Professional", max: config.tier3MaxClients ?? 20, price: config.tier3Price ?? "4.99" },
-        { name: "business", label: "Business", max: config.tier4MaxClients ?? 50, price: config.tier4Price ?? "7.99" },
-      ]);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.json(publicPlansFromConfig(config));
+    } catch (err) {
+      logError("Unable to load public pricing", err);
+      res.status(503).json({ message: "Pricing is temporarily unavailable. Please try again shortly." });
     }
   });
 
@@ -1944,17 +1950,22 @@ export async function registerRoutes(
     }
 
     const userId = getRealUserId(req);
-    let stripeCancelFailed = false;
-
     try {
       const currentSettings = await storage.getSettings(userId);
       if (currentSettings?.stripeSubscriptionId) {
         try {
           validateStripeModeForBilling();
-          await getBillingStripeClient().subscriptions.cancel(currentSettings.stripeSubscriptionId);
+          const subscription = await getBillingStripeClient().subscriptions.retrieve(currentSettings.stripeSubscriptionId);
+          if (subscription.metadata.userId !== userId || subscription.customer !== currentSettings.stripeCustomerId) {
+            return res.status(403).json({ message: "This billing account is not connected to your account. Contact support before deleting." });
+          }
+          if (subscription.status !== "canceled") {
+            const cancelled = await getBillingStripeClient().subscriptions.cancel(currentSettings.stripeSubscriptionId, { invoice_now: false, prorate: false });
+            if (cancelled.status !== "canceled") throw new Error("Subscription cancellation is not confirmed");
+          }
         } catch (err) {
-          stripeCancelFailed = true;
           logError("Failed to cancel Stripe subscription during account deletion", err);
+          return res.status(502).json({ message: "Subscription cancellation could not be confirmed. Your account and client data have been kept. Please retry deletion or contact support." });
         }
       }
 
@@ -1967,7 +1978,7 @@ export async function registerRoutes(
 
     req.logout(() => {
       req.session.destroy(() => {
-        res.status(200).json({ success: true, stripeCancelFailed });
+        res.status(200).json({ success: true, stripeCancelFailed: false });
       });
     });
   });

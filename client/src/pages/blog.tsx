@@ -85,15 +85,24 @@ export function BlogPostPage() {
   });
 
   useEffect(() => {
+    if (isError) {
+      setMeta("robots", "noindex,nofollow");
+      document.title = "Post not found | Practably";
+      return;
+    }
     if (!post) return;
     const siteUrl = getPublicSiteUrl();
     const title = post.seoTitle || `${post.title} | ${siteConfig.name}`;
     const description = post.seoDescription || post.excerpt || siteConfig.description;
     document.title = title;
     setMeta("description", description);
+    setMeta("robots", "index,follow");
+    setMeta("twitter:title", title);
+    setMeta("twitter:description", description);
     setMeta("og:title", title, "property");
     setMeta("og:description", description, "property");
     setMeta("og:type", "article", "property");
+    setMeta("og:url", `${siteUrl}/blog/${post.slug}`, "property");
     let canonical = document.head.querySelector("link[rel=canonical]") as HTMLLinkElement | null;
     if (!canonical) { canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.appendChild(canonical); }
     canonical.href = `${siteUrl}/blog/${post.slug}`;
@@ -108,7 +117,7 @@ export function BlogPostPage() {
       author: { "@type": "Organization", name: post.authorName || siteConfig.name },
       publisher: { "@type": "Organization", name: siteConfig.name },
     });
-  }, [post]);
+  }, [post, isError]);
 
   if (isLoading) {
     return (

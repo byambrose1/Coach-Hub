@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/app-sidebar";
 import { useAuth } from "@/hooks/use-auth";
+import { PublicSeo } from "@/components/public-seo";
 import { Loader2, ShieldCheck, AlertTriangle, X } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
@@ -73,13 +74,12 @@ function TermsModal() {
         </DialogHeader>
         <div className="p-4 border rounded-md text-sm space-y-3">
           <p>
-            Review the current{" "}
+            Please review the current{" "}
             <a href="/terms" target="_blank" rel="noreferrer" className="text-primary underline">Practably Terms</a>
             {" "}and{" "}
             <a href="/privacy" target="_blank" rel="noreferrer" className="text-primary underline">Privacy information</a>
             {" "}before continuing.
           </p>
-          <p className="text-muted-foreground">The legal operator details and final terms are clearly marked for owner review before public launch.</p>
         </div>
         <div className="flex items-center space-x-2 py-4">
           <Checkbox id="terms" checked={agreed} onCheckedChange={(v) => setAgreed(!!v)} />
@@ -185,6 +185,9 @@ function AuthenticatedApp() {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
           </header>
           <main className="flex-1 overflow-auto">
+            <aside className="border-b bg-amber-50 p-3 text-xs text-amber-950" data-testid="private-beta-data-notice">
+              Private beta: use fictional client and health information while pre-launch privacy checks remain open. <a href="/privacy" className="underline">Privacy details</a>
+            </aside>
             <Router />
           </main>
         </div>
@@ -231,6 +234,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <PublicSeo />
         <AppContent />
         <TermsModal />
         <Toaster />

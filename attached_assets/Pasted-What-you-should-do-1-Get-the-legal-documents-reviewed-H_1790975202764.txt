@@ -1,0 +1,69 @@
+What you should do
+1. Get the legal documents reviewed
+Have a solicitor familiar with UK SaaS, GDPR, and health data review:
+Privacy Notice
+Terms of Use
+Subscription and cancellation terms
+Refund policy
+Client-data responsibilities
+PARQ/health-data handling
+Data deletion and export
+Liability and service availability
+Governing law and company details
+The current pages explicitly say they should be reviewed by a solicitor before public launch, so that wording should not remain on a polished public release.
+2. Resolve the health-data and GDPR position
+Because the product can store PARQ and health-form responses, clarify:
+Who is the data controller and who is the processor
+What lawful basis applies to each type of data
+How special-category health data is handled
+How long data is retained
+What happens when an account is deleted
+Where data is hosted
+Which subprocessors are used
+Whether data leaves the UK/EEA and what safeguards apply
+Whether you need a Data Processing Agreement for coach customers
+How data breaches are reported and handled
+You should also ask the solicitor whether a DPIA or other formal assessment is appropriate.
+3. Confirm your vendors and subprocessors
+Your current Privacy page names services such as:
+Replit Auth
+PostgreSQL
+Brevo
+Stripe
+Confirm the actual provider, location, role, and current DPA/processing terms for each. Do not state that regions or agreements are “not yet confirmed” once you launch publicly.
+4. Make the product copy match reality
+Review statements about:
+GoCardless
+Direct debit
+Stripe billing
+Client payments
+Invoices
+PARQ forms
+Email notifications
+Data export and deletion
+If a feature is not enabled, say “planned,” “available when configured,” or remove the claim. The marketing page, FAQ, Terms, Privacy Notice, and dashboard should all tell the same story.
+5. Decide whether you are still in beta
+If you are genuinely running a private beta, you can keep the modal, but change it to clearly say something like:
+“Practably is currently in private beta. Please review the current beta Terms and Privacy Notice before using the service.”
+If you are launching publicly:
+Replace the beta Terms and Privacy Notice with final versions.
+Remove “owner review before public launch.”
+Remove or rewrite the beta warning.
+Update the acceptance modal with the final effective date.
+Keep records of the version each user accepted.
+Provide a way to notify users when the Terms materially change.
+6. Test the acceptance flow
+After the legal copy is finalized, verify that:
+Users cannot access protected features without accepting the current Terms.
+The acceptance is timestamped and associated with the correct document version.
+Users can read both Terms and Privacy information before accepting.
+Existing users are prompted again when the legal version changes.
+Declining or closing the modal behaves clearly.
+Acceptance does not accidentally imply consent to marketing or health-data processing beyond what the Privacy Notice explains.
+Practical launch decision
+You have two sensible options:
+Private beta now
+Keep the product private, retain the warning, use test or invited users only, and clearly label the service as beta.
+Public launch later
+Do not launch until the legal documents, health-data handling, vendor agreements, and product claims are reviewed and finalized.
+The immediate next step is to give your solicitor the current Terms, Privacy Notice, product feature list, data-flow/vendor list, and screenshots of the acceptance modal.

@@ -4,8 +4,10 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { createApiRequestLogger, logError } from "./safe-logging";
+import { securityHeaders } from "./security-headers";
 
 const app = express();
+app.disable("x-powered-by");
 const httpServer = createServer(app);
 
 declare module "http" {
@@ -24,31 +26,7 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-// Conservative baseline headers. The CSP intentionally allows the existing
-// Replit auth redirect, Google Fonts, Vite HMR, Brevo/GoCardless redirects,
-// and same-origin API calls used by the application.
-app.use((_req, res, next) => {
-  const isDevelopment = process.env.NODE_ENV !== "production";
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  res.setHeader(
-    "Content-Security-Policy",
-    [
-      "default-src 'self'",
-      "base-uri 'self'",
-      "object-src 'none'",
-      "frame-ancestors 'self' https://replit.com https://*.replit.com https://*.replit.dev",
-      "form-action 'self' https:",
-      `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com data:",
-      "img-src 'self' data: blob: https:",
-      "connect-src 'self' https: wss:",
-    ].join("; "),
-  );
-  next();
-});
+app.use(securityHeaders());
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -95,6 +73,7 @@ app.use(
   await seedDatabase();
   await seedBlogPosts();
   await registerRoutes(httpServer, app);
+  app.use("/api", (_req, res) => res.status(404).json({ message: "Endpoint not found." }));
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

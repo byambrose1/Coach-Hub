@@ -1,0 +1,123 @@
+P0 — Resolve before public launch: privacy/compliance is openly incomplete
+
+Evidence observed:
+
+•
+The live Privacy page says: “have a solicitor review it before relying on it for a public launch.”
+
+•
+The live Terms page contains the same beta warning.
+
+•
+The Privacy page says Practably stores “PARQ or other health-form responses” and that exact data-centre regions and formal DPAs with each subprocessor have not yet been confirmed.
+
+•
+Listed processors include Replit Auth, PostgreSQL, Brevo, and Stripe.
+
+Why it matters: PARQ responses can contain special-category health data. A public launch should not rely on a knowingly incomplete privacy notice or unconfirmed processor/transfer arrangements.
+
+Recommended action: Before launch, have the privacy notice, terms, controller/processor roles, retention/deletion wording, international-transfer mechanism, subprocessor list, breach process, and customer data-processing terms reviewed and completed. Confirm the actual hosting and email/payment processor regions and maintain current DPAs/processor terms. This is a legal/compliance workstream, not just a copy edit.
+
+P1 — Complete a real end-to-end auth test and verify CSRF/state protection
+
+Observed: /api/login returns a 302 to Replit OIDC with:
+
+•
+response_type=code
+
+•
+code_challenge_method=S256
+
+•
+a per-request PKCE challenge
+
+•
+HTTPS callback at /api/callback
+
+•
+scope=openid email profile offline_access
+
+The browser reached a “Sign up for Practably” Replit authorization screen. The login session cookie observed from Practably was HttpOnly; Secure; SameSite=Lax.
+
+Concern: The authorization URL did not visibly include an OAuth state parameter. PKCE is good protection against code interception, but state validation is still normally expected for login CSRF/mix-up protection. The backend may be binding the transaction through its server-side session/Replit interaction cookie, but that must be confirmed from implementation/tests.
+
+Recommended test matrix:
+
+•
+New-user sign-up and returning-user sign-in.
+
+•
+Successful callback and redirect to the intended app page.
+
+•
+Denied consent, provider error, malformed/expired code, and missing-session callback.
+
+•
+Logout, session expiry, parallel tabs, back-button replay, and refresh-token/session renewal.
+
+•
+Account-linking behavior if a user tries different providers or email addresses.
+
+•
+Confirm the callback rejects an auth response created for a different browser session or transaction.
+
+•
+Confirm offline_access is necessary and that refresh tokens are stored and revoked safely.
+
+P1 — Align product claims with enabled payment functionality
+
+The homepage promotes “payment workflows,” direct-debit setup, and GoCardless-related capability. The Privacy page currently says the GoCardless integration “exists in the product but is not currently enabled for coach-client payments.”
+
+Recommended action: Make the marketing, FAQ, pricing, onboarding, and in-app controls consistently state what is live today versus planned/configurable. Do not imply that customer direct-debit collection is available if it is not enabled.
+
+P1 — Verify billing and refund behavior before accepting paid users
+
+The Terms page describes Stripe subscription billing, monthly paid plans, a 24-hour first-payment refund guarantee, cancellation from a Billing Portal, and immediate account deletion. These are consequential workflows, but they were not exercised because no test account or payment action was authorized.
+
+Recommended action: Run a sandbox test of checkout, webhook retries/out-of-order events, failed payment, cancellation, downgrade over the client limit, the 24-hour refund path, invoice/receipt emails, and deletion/export. Confirm that deleting the account also revokes sessions and removes queued emails/webhooks and backups according to the documented policy.
+
+P2 — Improve security-header hardening and reduce information disclosure
+
+Positive controls observed:
+
+•
+Valid Let's Encrypt certificate for www.practably.co.uk; observed expiry: 25 December 2026.
+
+•
+HSTS: max-age=63072000; includeSubDomains.
+
+•
+CSP includes default-src 'self', object-src 'none', and a restrictive frame-ancestors policy.
+
+•
+X-Content-Type-Options: nosniff and a restrictive Permissions-Policy were present.
+
+•
+The login session cookie was HttpOnly; Secure; SameSite=Lax.
+
+Hardening items:
+
+•
+The response exposes X-Powered-By: Express; remove it if not needed.
+
+•
+The CSP allows 'unsafe-inline' for scripts. Move inline scripts to nonces/hashes or external files where practical, then tighten the policy.
+
+•
+A GAESA cookie was observed on public responses without explicit Secure, HttpOnly, or SameSite attributes. It may be an infrastructure cookie, but its owner and purpose should be confirmed; add appropriate attributes or remove it.
+
+•
+X-Frame-Options was not observed on the Practably response. The CSP frame-ancestors policy is the modern control and was present, but adding DENY/SAMEORIGIN where compatible provides older-browser defense-in-depth.
+
+These are hardening items rather than evidence of an exploitable vulnerability in this review.
+
+P2 — Improve SEO/indexability for SPA routes
+
+The raw HTTP response for the homepage and every sitemap URL is the same small SPA shell with the same static title, while the meaningful content is rendered client-side. The browser renders the routes correctly, but crawlers or social previewers that do not fully execute JavaScript may see weak/duplicated metadata and little page content.
+
+Recommended action: Add route-specific server-rendered or prerendered HTML metadata/content for /pricing, /privacy, /terms, /support, /blog, and blog articles. Ensure each route has a unique title, description, canonical URL, Open Graph/Twitter metadata, and suitable status behavior. The social SVG asset itself returned 200.
+
+P3 — Small copy/launch-polish issue
+
+The Support page says: “Messages sent after 8pm GMT are answered the next morning..” (double full stop ). Correct this before launch. Also decide whether “Private beta” and “Join the waitlist” should remain prominent if the product is being publicly launched.
+

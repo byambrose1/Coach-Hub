@@ -1,5 +1,5 @@
 import * as client from "openid-client";
-import { Strategy, type VerifyFunction } from "openid-client/passport";
+import { type VerifyFunction } from "openid-client/passport";
 
 import passport from "passport";
 import session from "express-session";
@@ -8,6 +8,7 @@ import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { authStorage } from "./storage";
 import { logError } from "../../safe-logging";
+import { ProtectedOidcStrategy, authSessionKey, validateOidcCallback } from "./oidc-protection";
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -80,6 +81,21 @@ async function upsertUser(claims: any) {
   });
 }
 
+export function createOidcVerifier(upsert = upsertUser): VerifyFunction {
+  return async (tokens, verified) => {
+    try {
+      const user = {};
+      updateUserSession(user, tokens);
+      // Identity is the verified OIDC subject, never a matching email address.
+      await upsert(tokens.claims());
+      verified(null, user);
+    } catch (error) {
+      logError("Unable to create or update authenticated account", error);
+      verified(new Error("Unable to complete sign-in. Please retry or contact support."));
+    }
+  };
+}
+
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use(getSession());
@@ -107,15 +123,7 @@ export async function setupAuth(app: Express) {
     return;
   }
 
-  const verify: VerifyFunction = async (
-    tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
-    verified: passport.AuthenticateCallback
-  ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
-  };
+  const verify = createOidcVerifier();
 
   // Keep track of registered strategies
   const registeredStrategies = new Set<string>();
@@ -124,9 +132,10 @@ export async function setupAuth(app: Express) {
   const ensureStrategy = (domain: string) => {
     const strategyName = `replitauth:${domain}`;
     if (!registeredStrategies.has(strategyName)) {
-      const strategy = new Strategy(
+      const strategy = new ProtectedOidcStrategy(
         {
           name: strategyName,
+          sessionKey: authSessionKey(domain),
           config,
           scope: "openid email profile offline_access",
           callbackURL: `https://${domain}/api/callback`,
@@ -149,22 +158,33 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   });
 
-  app.get("/api/callback", (req, res, next) => {
+  app.get("/api/callback", validateOidcCallback(), (req, res, next) => {
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
       successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+      failureRedirect: "/?signin=failed",
     })(req, res, next);
   });
 
-  app.get("/api/logout", (req, res) => {
-    req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
+  app.get("/api/logout", async (req, res) => {
+    const refreshToken = (req.user as any)?.refresh_token;
+    if (refreshToken && config.serverMetadata().revocation_endpoint) {
+      try {
+        await client.tokenRevocation(config, refreshToken, { token_type_hint: "refresh_token" });
+      } catch (error) {
+        logError("Provider token revocation failed during logout", error);
+      }
+    }
+    req.logout((error) => {
+      if (error) return res.status(500).json({ message: "Unable to sign out. Please try again." });
+      req.session.destroy((destroyError) => {
+        if (destroyError) return res.status(500).json({ message: "Unable to clear your session. Please try again." });
+        res.clearCookie("connect.sid", { httpOnly: true, secure: true, sameSite: "lax", path: "/" });
+        res.redirect(client.buildEndSessionUrl(config, {
           client_id: process.env.REPL_ID!,
           post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
+        }).href);
+      });
     });
   });
 }
@@ -206,6 +226,13 @@ export function createIsAuthenticated(
     try {
       const tokenResponse = await refresh(refreshToken);
       updateUserSession(user, tokenResponse);
+      if (req.session) {
+        const passportSession = (req.session as any).passport;
+        if (passportSession) passportSession.user = user;
+        await new Promise<void>((resolve, reject) => {
+          req.session.save(error => error ? reject(error) : resolve());
+        });
+      }
       return next();
     } catch {
       return res.status(401).json({ message: "Unauthorized" });

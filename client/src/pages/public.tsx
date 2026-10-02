@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/brand-mark";
 import { WaitlistDialog } from "@/components/waitlist-dialog";
 import { siteConfig, OWNER_INPUT_REQUIRED } from "@/config/site";
+import { Fragment } from "react";
+import { publicSite, privacySections, termsSections } from "@shared/public-site";
 
 export function PublicHeader() {
   return (
@@ -76,32 +78,10 @@ export function PrivacyPage() {
   return (
     <LegalLayout title="Privacy" eyebrow="Privacy information">
       <div className="not-prose mb-8 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm text-orange-950">
-        <strong>Beta notice.</strong> {siteConfig.name} is in private beta. This page describes how the product actually works today; have a
-        solicitor review it before relying on it for a public launch.
+        <strong>Beta notice.</strong> {publicSite.betaNotice}
       </div>
       <p><strong>Effective date:</strong> {siteConfig.effectiveDate}</p>
-      <h2>What data {siteConfig.name} handles</h2>
-      <p>Depending on the features you use, {siteConfig.name} stores coach account details, business and contact details, client names and contact details, bookings, notes, invoices, packages, and PARQ or other health-form responses that you choose to collect.</p>
-      <h2>Why data is used</h2>
-      <p>Data is used to provide the dashboard, organise coaching work, send requested emails, create invoices, and keep the service secure. Do not enter information you do not need for your coaching workflow.</p>
-      <h2>Payments</h2>
-      <p>{siteConfig.paymentProviderFees}</p>
-      <h2>Health and PARQ information</h2>
-      <p>PARQ responses can be sensitive health information. {siteConfig.name} provides storage and workflow tools; it does not assess medical suitability, provide medical advice, or replace your professional responsibilities. Only collect and share this information where you have an appropriate lawful basis and permission to do so.</p>
-      <h2>Processors</h2>
-      <p>{siteConfig.subprocessors} We have not yet confirmed exact data-centre regions or formal data processing agreements with each
-      subprocessor beyond their own standard terms - ask us if this matters for your use case.</p>
-      <h2>Retention, export, and deletion</h2>
-      <p>Coaches can export an individual client record from the client profile. {siteConfig.retentionPolicy} We do not currently
-      commit to a specific database backup schedule, so please keep your own copies of anything critical.</p>
-      <h2>Your choices and rights</h2>
-      <p>Requests about access, correction, export, deletion, or other data rights should be sent to {siteConfig.supportEmail}.</p>
-      <h2>Cookies and security</h2>
-      <p>{siteConfig.name} uses session cookies needed for authentication only - no third-party analytics or advertising cookies are set.
-      API routes are restricted to authenticated users, and PARQ or other health-form responses are never included in the product-usage
-      telemetry we log.</p>
-      <h2>Contact</h2>
-      <p>Privacy contact: {siteConfig.supportEmail}. Responsible operator: {siteConfig.legalOperator}. Contact address: {siteConfig.contactAddress}.</p>
+      {privacySections.map(section => <Fragment key={section.heading}><h2>{section.heading}</h2>{section.paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>)}</Fragment>)}
     </LegalLayout>
   );
 }
@@ -110,29 +90,11 @@ export function TermsPage() {
   return (
     <LegalLayout title="Terms" eyebrow="Terms of use">
       <div className="not-prose mb-8 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm text-orange-950">
-        <strong>Beta notice.</strong> {siteConfig.name} is in private beta. These terms describe how the product actually works today; have a
-        solicitor review them before relying on them for a public launch.
+        <strong>Beta notice.</strong> {publicSite.betaNotice}
       </div>
       <p><strong>Operator:</strong> {siteConfig.legalOperator}<br /><strong>Contact:</strong> {siteConfig.supportEmail}<br /><strong>Governing law:</strong> {siteConfig.governingLaw}</p>
-      <h2>Using {siteConfig.name}</h2>
-      <p>{siteConfig.name} provides software tools for independent fitness coaches to manage client records, scheduling, forms, invoices, and payment workflows. You are responsible for your account, the accuracy of information you enter, and how you use client data.</p>
-      <h2>Acceptable use</h2>
-      <p>Use the service lawfully, respect client privacy, keep your sign-in details secure, and do not interfere with the service or use it to provide medical, legal, or financial advice.</p>
-      <h2>Subscriptions and billing</h2>
-      <p>The Free plan is available for up to five clients. Paid plans are billed monthly. {siteConfig.vatTreatment} {siteConfig.paymentProviderFees} Plan access is subject to the limits shown in the application.</p>
-      <h2>24-hour first-payment refund guarantee</h2>
-      <p>{siteConfig.refundTerms}</p>
-      <h2>Cancellation and data</h2>
-      <p>{siteConfig.cancellationTerms} If you're downgraded or your account is limited because you have more clients than a lower plan
-      allows, your existing data is kept - you just can't add new clients until you're back within the limit or upgrade again. Requesting
-      account deletion is different: {siteConfig.retentionPolicy}</p>
-      <h2>Intellectual property and liability</h2>
-      <p>{siteConfig.name} and its interfaces are operated by {siteConfig.legalOperator}. The service is provided "as is" during this beta
-      period without warranty of any kind, and {siteConfig.legalOperator}'s liability is limited to the amount you've paid us in the three
-      months before a claim - nothing here limits liability that can't be limited by law (for example, for fraud or death or personal injury
-      caused by negligence).</p>
-      <h2>Contact</h2>
-      <p>Questions about these terms: {siteConfig.supportEmail}. Contact address: {siteConfig.contactAddress}.</p>
+      <p><strong>Effective date:</strong> {publicSite.effectiveDate}</p>
+      {termsSections.map(section => <Fragment key={section.heading}><h2>{section.heading}</h2>{section.paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>)}</Fragment>)}
     </LegalLayout>
   );
 }
@@ -158,7 +120,7 @@ export function SupportPage() {
         </div>
       </div>
       <h2>What support covers</h2>
-      <p>We can help with account access, dashboard workflows, bookings, invoices, and payment setup. Expected response time: {siteConfig.paidPlanSupportResponse}.</p>
+      <p>We can help with account access, dashboard workflows, bookings, invoices, and payment records. Expected response time: {siteConfig.paidPlanSupportResponse}</p>
       <p className="not-prose mt-8 rounded-xl bg-slate-100 p-4 text-sm text-slate-600">{siteConfig.name} provides software tools. It does not provide legal, medical, or financial advice.</p>
     </LegalLayout>
   );

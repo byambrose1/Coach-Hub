@@ -1,5 +1,12 @@
 import { createRequire } from "module";
 import { logError } from "./safe-logging";
+import { publicSite } from "@shared/public-site";
+
+export function getPaymentCapabilities() {
+  // The existing redirect-flow scaffold does not complete or verify mandates
+  // or schedule collections. Do not advertise a live payment capability.
+  return { directDebitAvailable: false, message: publicSite.directDebitNotice };
+}
 
 let requireFn: any;
 try {

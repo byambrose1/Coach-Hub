@@ -5,3 +5,5 @@
 - [Subscription provider choice](subscription-provider-choice.md) — owner chose the existing live Stripe account; do not replace it when another billing integration appears.
 - [Subscription refund policy](subscription-refund-policy.md) — owner approved a 24-hour first-payment refund guarantee with immediate cancellation and retained client data.
 - [Browser testing capabilities](browser-testing-capabilities.md) — the documented testing helper may be unavailable; isolated Chromium checks must block financial side effects.
+- [Launch assurance gates](launch-assurance-gates.md) — distinguish code fixes from legal/provider evidence; retain beta precautions until health-data arrangements are verified.
+- [Authentication provider choice](authentication-provider-choice.md) — owner selected existing Supabase Auth; preserve the current database and existing account ownership.
