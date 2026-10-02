@@ -34,7 +34,9 @@ const modeCopy: Record<AuthMode, { title: string; description: string; submit: s
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
-  const [mode, setMode] = useState<AuthMode>("login");
+  const [mode, setMode] = useState<AuthMode>(() =>
+    new URLSearchParams(window.location.search).get("mode") === "signup" ? "signup" : "login",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");

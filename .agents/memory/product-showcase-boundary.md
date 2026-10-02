@@ -13,3 +13,9 @@ The public showcase should be visible on the homepage, with multiple workflow sl
 **Why:** The owner clarified that a narrow dashboard-only preview does not communicate the breadth of the product.
 
 **How to apply:** Keep the preview itself wide rather than reserving a large adjacent explanation column. Preserve public access and fictional sample boundaries when extending the showcase.
+
+Keep both Sign in and Sign up available when pausing public waitlist invitations.
+
+**Why:** The owner asked to drop the waitlist buttons for now, then explicitly clarified that sign-in and sign-up buttons still need to be there. Pausing the waitlist is not a request to remove account access or delete existing waitlist entries.
+
+**How to apply:** Preserve direct account-access actions in future homepage changes; do not restore waitlist invitations without the owner requesting them.
