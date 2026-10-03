@@ -8,11 +8,11 @@ Use the owner's existing Supabase project for the requested replacement of Repli
 
 **How to apply:** Scope the migration to authentication. Preserve existing coach identities, tenant ownership and Stripe links; do not move the application database without a separate explicit request. Existing accounts must be linked through a verified ownership path, not automatically merged by a matching email address.
 
-The owner intends to use GitHub sign-in in Supabase.
+GitHub sign-in is not a requirement for the intended customers.
 
-**Why:** On 2026-10-02 the owner explicitly clarified that the GitHub link was Supabase sign-in, not the app's code repository.
+**Why:** On 2026-10-03 the owner clarified that the intended users would not need GitHub sign-in, superseding the earlier GitHub selection.
 
-**How to apply:** Its OAuth credentials belong in Supabase; do not request a GitHub client secret for the application or interpret this setup as a repository connection. Verify the project's actual provider settings: linking a dashboard account to GitHub does not establish that project-level GitHub sign-in is enabled.
+**How to apply:** Confirm which customer-friendly sign-in providers the owner wants before changing provider support. Keep the existing Supabase project keys: they are independent of social-provider credentials. Preserve email sign-in and existing account ownership.
 
 Auth-provider migrations need real SDK-construction/configuration probes as well as mocked token tests.
 
