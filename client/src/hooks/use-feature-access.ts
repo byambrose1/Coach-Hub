@@ -8,6 +8,6 @@ export function useFeatureAccess() {
     settings: query.data,
     isLoading: query.isLoading,
     isError: query.isError,
-    hasFeature: (feature: FeatureName) => hasFeature(query.data, feature),
+    hasFeature: (feature: FeatureName) => !query.isError && hasFeature(query.data, feature),
   };
 }

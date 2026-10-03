@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import type { Invoice, Settings } from "@shared/schema";
 import { getPaymentMethods } from "@shared/payment-methods";
+import { getPlan } from "@shared/subscription-features";
 
 export function invoicePdfFilename(invoiceNumber: string) {
   return `Invoice-${invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "download"}.pdf`;
@@ -12,6 +13,29 @@ export function createInvoicePdf(invoice: Invoice, clientName: string, settings?
   const currency = settings?.currency || "£";
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   let y = 24;
+  if (getPlan(settings) === "free") {
+    // The same open-bowl P and orange terminal as the site's vector brand mark.
+    const x = 20, top = 12, scale = 0.12;
+    const point = (a: number, b: number) => [x + a * scale, top + b * scale];
+    doc.setDrawColor(76, 29, 149);
+    doc.setLineWidth(16 * scale);
+    doc.setLineCap("round");
+    doc.setLineJoin("round");
+    doc.path([
+      { op: "m", c: point(30, 86) },
+      { op: "l", c: point(30, 14) },
+      { op: "l", c: point(58, 14) },
+      { op: "c", c: [...point(76, 14), ...point(87, 25), ...point(87, 41)] },
+      { op: "c", c: [...point(87, 55), ...point(78, 64), ...point(63, 66)] },
+    ]).stroke();
+    doc.setFillColor(249, 115, 22);
+    doc.circle(x + 63 * scale, top + 66 * scale, 10 * scale, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(35, 35, 35);
+    doc.text("Practably", 35, 21);
+    y = 39;
+  }
   const date = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? value.split("-").reverse().join("/") : value;
   const text = (value: string, size = 11, bold = false) => {
@@ -31,7 +55,7 @@ export function createInvoicePdf(invoice: Invoice, clientName: string, settings?
   text(`Invoice number: ${invoice.invoiceNumber}`, 12, true);
   text(`Status: ${invoice.status || "pending"}`);
   y += 6;
-  text(settings?.businessName || "Practably", 16, true);
+  text(settings?.businessName || settings?.trainerName || "Coach", 16, true);
   for (const value of [settings?.trainerName, settings?.trainerEmail, settings?.trainerPhone, settings?.businessAddress]) {
     if (value) text(value);
   }

@@ -509,7 +509,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose, allowInvo
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="sent" disabled={!allowInvoiceManagement}>Sent</SelectItem>
                     <SelectItem value="paid">Paid</SelectItem>
                     <SelectItem value="overdue">Overdue</SelectItem>
                   </SelectContent>
@@ -872,9 +872,9 @@ export default function Payments() {
           </div>
           {canBusinessReports && <div className="mt-5 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t pt-4">
-              <div><p className="text-xs text-muted-foreground">Paid block revenue</p><p className="text-lg font-semibold">{currency}{(report?.blockRevenue || 0).toFixed(2)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Paid non-monthly revenue</p><p className="text-lg font-semibold">{currency}{(report?.blockRevenue || 0).toFixed(2)}</p></div>
               <div><p className="text-xs text-muted-foreground">Paid monthly revenue</p><p className="text-lg font-semibold">{currency}{(report?.monthlyRevenue || 0).toFixed(2)}</p></div>
-              <div><p className="text-xs text-muted-foreground">Paid invoices without package</p><p className="text-lg font-semibold">{report?.unallocatedPaidCount ?? 0}</p></div>
+              <div><p className="text-xs text-muted-foreground">Paid invoices missing a payment date</p><p className="text-lg font-semibold">{report?.unallocatedPaidCount ?? 0}</p></div>
             </div>
             <div className="overflow-x-auto border-t pt-4">
               <h3 className="mb-2 text-sm font-semibold">Paid revenue by client</h3>

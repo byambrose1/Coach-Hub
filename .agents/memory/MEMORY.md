@@ -7,3 +7,4 @@
 - [Browser testing capabilities](browser-testing-capabilities.md) — the documented testing helper may be unavailable; isolated Chromium checks must block financial side effects.
 - [Launch assurance gates](launch-assurance-gates.md) — distinguish code fixes from legal/provider evidence; retain beta precautions until health-data arrangements are verified.
 - [Authentication provider choice](authentication-provider-choice.md) — owner selected existing Supabase Auth; preserve the current database and existing account ownership.
+- [Subscription feature policy](subscription-feature-policy.md) — real tier restrictions; privacy stays universal; Free invoices carry Practably branding.

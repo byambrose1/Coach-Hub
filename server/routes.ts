@@ -1,7 +1,9 @@
 import { getPaymentCapabilities as defaultGetPaymentCapabilities } from "./payments";
 import { publicPlansFromConfig } from "@shared/public-site";
+import { featureMinimumPlan, featureLabels, hasFeature, type FeatureName } from "@shared/subscription-features";
+import { revenueReport } from "./revenue-report";
 import { deleteSupabaseAccounts } from "./auth/identities";
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import rateLimit from "express-rate-limit";
 import { createServer, type Server } from "http";
 import { storage as defaultStorage, type IStorage } from "./storage";
@@ -211,6 +213,19 @@ export async function registerRoutes(
     dependencies.sendBroadcastEmail ?? defaultSendBroadcastEmail;
   const sendFeedbackEmail =
     dependencies.sendFeedbackEmail ?? defaultSendFeedbackEmail;
+  async function requireFeature(res: Response, userId: string, feature: FeatureName): Promise<boolean> {
+    try {
+      if (hasFeature(await storage.getSettings(userId), feature)) return true;
+      const requiredPlan = featureMinimumPlan[feature];
+      res.status(403).json({
+        code: "PLAN_UPGRADE_REQUIRED", feature, requiredPlan,
+        message: `${featureLabels[feature]} requires the ${requiredPlan[0].toUpperCase() + requiredPlan.slice(1)} plan or above.`,
+      });
+    } catch {
+      res.status(503).json({ code: "PLAN_STATUS_UNAVAILABLE", message: "Your plan could not be checked. Please try again." });
+    }
+    return false;
+  }
   app.get("/robots.txt", (req, res) => {
     const siteUrl = getPublicSiteUrl(req);
     res.type("text/plain").send([
@@ -1158,6 +1173,7 @@ export async function registerRoutes(
   app.post("/api/emails/broadcast", isAuthenticated, broadcastEmailLimiter, async (req, res) => {
     try {
       const userId = getUserId(req);
+      if (!await requireFeature(res, userId, "broadcastEmails")) return;
       const { subject, message, recipientFilter } = req.body;
       if (!subject?.trim()) return res.status(400).json({ message: "Subject is required" });
       if (!message?.trim()) return res.status(400).json({ message: "Message is required" });
@@ -1600,7 +1616,7 @@ export async function registerRoutes(
     try {
       const client = await storage.getClient(userId, session.clientId);
       const s = await storage.getSettings(userId);
-      if (client?.email) {
+      if (client?.email && s?.enableEmailNotifications && hasFeature(s, "emailNotifications")) {
         await sendBookingNotificationEmail({
           clientName: client.name,
           clientEmail: client.email,
@@ -1666,7 +1682,7 @@ export async function registerRoutes(
     try {
       const client = await storage.getClient(userId, session.clientId);
       const s = await storage.getSettings(userId);
-      if (client?.email && existing) {
+      if (client?.email && existing && s?.enableEmailNotifications && hasFeature(s, "emailNotifications")) {
         const emailData = {
           clientName: client.name,
           clientEmail: client.email,
@@ -1715,6 +1731,8 @@ export async function registerRoutes(
 
   app.post("/api/packages", async (req, res) => {
     const userId = getUserId(req);
+    if ((req.body.billingType === "monthly" || req.body.monthlyRate || req.body.nextBillingDate) &&
+        !await requireFeature(res, userId, "paymentTracking")) return;
     const parsed = insertPackageSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const pkg = await storage.createPackage(userId, parsed.data);
@@ -1723,6 +1741,8 @@ export async function registerRoutes(
 
   app.patch("/api/packages/:id", async (req, res) => {
     const userId = getUserId(req);
+    if ((req.body.billingType === "monthly" || req.body.monthlyRate || req.body.nextBillingDate) &&
+        !await requireFeature(res, userId, "paymentTracking")) return;
     const pkg = await storage.updatePackage(userId, req.params.id, withoutOwnershipFields(req.body));
     if (!pkg) return res.status(404).json({ message: "Package not found" });
     if (req.body.billingType === "monthly" && !req.body.nextBillingDate && !pkg.nextBillingDate) {
@@ -1738,6 +1758,7 @@ export async function registerRoutes(
   app.post("/api/packages/:id/notify-low-sessions", isAuthenticated, async (req, res) => {
     try {
       const userId = getUserId(req);
+      if (!await requireFeature(res, userId, "emailNotifications")) return;
       const pkg = await storage.getPackage(userId, getRouteParam(req.params.id));
       if (!pkg) return res.status(404).json({ message: "Package not found" });
       const client = await storage.getClient(userId, pkg.clientId);
@@ -1822,6 +1843,18 @@ export async function registerRoutes(
     delete settingsInput.subscriptionStatus;
     const parsed = insertSettingsSchema.partial().safeParse(settingsInput);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    let existing;
+    try { existing = await storage.getSettings(userId); }
+    catch { return res.status(503).json({ message: "Your current settings could not be checked. Please try again." }); }
+    const businessChanged = (["businessName", "businessAddress"] as const).some(key =>
+      Object.hasOwn(parsed.data, key) && (parsed.data[key] || "") !== (existing?.[key] || ""),
+    );
+    if (businessChanged && !await requireFeature(res, userId, "customBusinessDetails")) return;
+    if (parsed.data.enableEmailNotifications === true && existing?.enableEmailNotifications !== true &&
+        !await requireFeature(res, userId, "emailNotifications")) return;
+    if (parsed.data.enableSessionReminders === true && existing?.enableSessionReminders !== true) {
+      return res.status(503).json({ code: "REMINDERS_UNAVAILABLE", message: "Scheduled session reminders are not available yet." });
+    }
     const s = await storage.upsertSettings(userId, parsed.data);
     res.json(s);
   });
@@ -1882,6 +1915,59 @@ export async function registerRoutes(
     res.json(ref);
   });
 
+  // Reports are a paid operation; fetching one's own invoices for a PDF or
+  // export stays available on Free and is not a reporting entitlement.
+  app.get("/api/revenue", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    if (!await requireFeature(res, userId, "revenueTracking")) return;
+    const { from: requestedFrom, to: requestedTo, clientId, period = "month" } = req.query;
+    const advancedRequest = requestedFrom !== undefined || requestedTo !== undefined || clientId !== undefined;
+    if (advancedRequest && !await requireFeature(res, userId, "advancedRevenue")) return;
+    if (!["week", "month"].includes(String(period)) ||
+        (clientId !== undefined && typeof clientId !== "string")) {
+      return res.status(400).json({ message: "Invalid revenue filters" });
+    }
+    const validDate = (value: unknown): value is string => {
+      if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const date = new Date(`${value}T00:00:00Z`);
+      return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+    };
+    const now = new Date();
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+    if (period === "week") {
+      start.setTime(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      start.setUTCDate(start.getUTCDate() - (start.getUTCDay() + 6) % 7);
+      end.setTime(start.getTime());
+      end.setUTCDate(end.getUTCDate() + 6);
+    }
+    let from = start.toISOString().slice(0, 10), to = end.toISOString().slice(0, 10);
+    if (requestedFrom !== undefined || requestedTo !== undefined) {
+      if (!validDate(requestedFrom) || !validDate(requestedTo) || requestedFrom > requestedTo) {
+        return res.status(400).json({ message: "Supply a valid start and end date, in date order." });
+      }
+      from = requestedFrom; to = requestedTo;
+    }
+    try {
+      const [current, invoices, packages, clients] = await Promise.all([
+        storage.getSettings(userId), storage.getInvoices(userId),
+        storage.getPackages(userId), storage.getClients(userId),
+      ]);
+      // Recheck after reads so a concurrent downgrade cannot grant a report.
+      if (!hasFeature(current, "revenueTracking") ||
+          (advancedRequest && !hasFeature(current, "advancedRevenue"))) {
+        return res.status(403).json({ code: "PLAN_UPGRADE_REQUIRED", message: "Your plan changed. Please refresh." });
+      }
+      if (clientId && !clients.some(client => client.id === clientId)) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      res.json(revenueReport(invoices, packages, clients, from, to,
+        hasFeature(current, "advancedRevenue"), clientId as string | undefined));
+    } catch {
+      res.status(503).json({ message: "Revenue could not be calculated. Please retry or check the invoice amounts." });
+    }
+  });
+
   // --- Invoices ---
   app.get("/api/invoices", async (req, res) => {
     const userId = getUserId(req);
@@ -1891,6 +1977,13 @@ export async function registerRoutes(
 
   app.post("/api/invoices", async (req, res) => {
     const userId = getUserId(req);
+    if (!["pending", "paid", "sent", "overdue"].includes(req.body.status || "pending")) {
+      return res.status(400).json({ message: "Invalid invoice status" });
+    }
+    if ((req.body.status === "sent" || req.body.sentDate) &&
+        !await requireFeature(res, userId, "invoiceManagement")) return;
+    if ((["paid", "overdue"].includes(req.body.status) || req.body.paymentMethod || req.body.paidDate) &&
+        !await requireFeature(res, userId, "paymentTracking")) return;
     const parsed = insertInvoiceSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const inv = await storage.createInvoice(userId, parsed.data);
@@ -1898,7 +1991,17 @@ export async function registerRoutes(
   });
 
   app.patch("/api/invoices/:id", async (req, res) => {
-    const inv = await storage.updateInvoice(getUserId(req), req.params.id, withoutOwnershipFields(req.body));
+    const userId = getUserId(req);
+    const existing = await storage.getInvoice(userId, req.params.id);
+    if (!existing) return res.status(404).json({ message: "Invoice not found" });
+    const details = ["invoiceNumber", "amount", "dueDate", "notes", "clientId", "packageId", "sentDate"];
+    const feature = details.some(key => Object.hasOwn(req.body, key)) || req.body.status === "sent"
+      ? "invoiceManagement" : "paymentTracking";
+    if (!await requireFeature(res, userId, feature)) return;
+    if (req.body.status !== undefined && !["pending", "paid", "sent", "overdue"].includes(req.body.status)) {
+      return res.status(400).json({ message: "Invalid invoice status" });
+    }
+    const inv = await storage.updateInvoice(userId, req.params.id, withoutOwnershipFields(req.body));
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
     res.json(inv);
   });
@@ -1908,6 +2011,7 @@ export async function registerRoutes(
       const userId = getUserId(req);
       const inv = await storage.getInvoice(userId, req.params.id);
       if (!inv) return res.status(404).json({ message: "Invoice not found" });
+      if (!await requireFeature(res, userId, "invoiceManagement")) return;
       const client = await storage.getClient(userId, inv.clientId);
       if (!client) return res.status(404).json({ message: "Client not found" });
       if (!client.email) return res.status(400).json({ message: "Client has no email address" });

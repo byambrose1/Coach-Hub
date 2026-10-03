@@ -316,6 +316,8 @@ test("a coach cannot read another coach's session, package, note, form, or invoi
 });
 
 test("a coach cannot read or overwrite another coach's settings", async () => {
+  store.state.settings.set(COACH_A, { id: COACH_A, userId: COACH_A, subscriptionPlan: "business" });
+  store.state.settings.set(COACH_B, { id: COACH_B, userId: COACH_B, subscriptionPlan: "business" });
   await request("/api/settings", {
     method: "PUT",
     as: COACH_A,

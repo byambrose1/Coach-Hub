@@ -478,6 +478,9 @@ test("payment provider failures return a stable response without provider detail
 });
 
 test("email provider failures return stable responses without provider details", async () => {
+  // These are provider-failure tests, so the fixture must have permission to
+  // reach the provider; Free-plan denials are tested separately.
+  state.settings = { ...state.settings, subscriptionPlan: "professional" };
   const client = state.clients[0];
   const pkg = withId(state.packages, coachId, {
     clientId: client.id,
@@ -580,6 +583,7 @@ test("rejects record IDs owned by a different authenticated coach", async () => 
 });
 
 test("does not allow update bodies to transfer records to another coach", async () => {
+  state.settings = { ...state.settings, subscriptionPlan: "professional" };
   const targetCoachId = "ownership-target-coach";
   const ownedPackage = { id: "owned-package", userId: coachId, clientId: state.clients[0].id, name: "Owned package" };
   const ownedNote = { id: "owned-note", userId: coachId, clientId: state.clients[0].id, content: "Owned note" };

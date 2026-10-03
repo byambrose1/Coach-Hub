@@ -29,7 +29,7 @@ export const pricingTiers = [
     period: "forever",
     clients: "Up to 5 clients",
     description: "A focused starting point for independent coaches.",
-    features: ["5 client records", "Session scheduling", "PARQ forms", "Basic invoicing", "Client data export"],
+    features: ["5 client records", "Session scheduling", "PARQ forms", "Basic invoicing with Practably logo", "Client data export"],
   },
   {
     name: "Starter",

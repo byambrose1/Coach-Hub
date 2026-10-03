@@ -57,6 +57,12 @@ async function fulfill(event) {
   else if (method === "GET" && url.pathname === "/api/settings") data = settings;
   else if (method === "GET" && url.pathname === "/api/payments/status") data = { directDebitAvailable: false, message: "Direct debit setup and collection are not available. Use your own payment arrangements." };
   else if (method === "GET" && url.pathname === "/api/invoices") data = [invoice];
+  else if (method === "GET" && url.pathname === "/api/revenue") {
+    assert.notEqual(settings.subscriptionPlan, "free", "Free must not request a paid report");
+    data = { from: "2026-10-01", to: "2026-10-31", totalRevenue: 0,
+      pendingTotal: 12.34, pendingCount: 1, monthlyBilling: 0, blockRevenue: 0,
+      monthlyRevenue: 0, unallocatedPaidCount: 0, byClient: [] };
+  }
   else if (resources[url.pathname]) {
     if (method === "GET") {
       data = [...resources[url.pathname]];
@@ -117,7 +123,7 @@ async function navigate(route, width = 1280) {
   await click(selector("button-submit-package"));
   await waitFor(exists("card-package-fixture-package"), "Saved package appears without refresh");
   await waitFor(`!document.querySelector('[role="dialog"]')`, "Package dialog closes");
-  assert.equal(await evaluate(`document.querySelector(${JSON.stringify(selector("stat-pending-invoices"))}).textContent`), "£12.34");
+  assert.equal(await evaluate(exists("stat-pending-invoices")), false, "Free revenue is locked");
   await click(selector("tab-invoices"));
   await waitFor(exists("card-invoice-fixture-invoice"), "Invoice list");
   await click(selector("card-invoice-fixture-invoice"));
@@ -127,20 +133,35 @@ async function navigate(route, width = 1280) {
   const bytes = fs.readFileSync(path.join(downloads, "Invoice-INV-1234.pdf"));
   assert.equal(bytes.subarray(0, 5).toString(), "%PDF-");
   assert.ok(bytes.toString("latin1").includes("12.34"));
+  assert.ok(bytes.toString("latin1").includes("(Practably)"), "Free PDF includes the logo wordmark");
+  settings.subscriptionPlan = "business";
   await navigate("/payments", 390);
+  await waitFor(exists("stat-pending-invoices"), "Business revenue");
+  await waitFor(`document.querySelector(${JSON.stringify(selector("stat-pending-invoices"))}).textContent === "£12.34"`, "Exact paid-plan summary");
   await waitFor(exists("tab-monthly"), "Mobile payments page");
   await click(selector("tab-monthly"));
   await waitFor(exists("direct-debit-availability"), "Unavailable direct debit");
-  assert.ok(await evaluate(`document.querySelector(${JSON.stringify(selector("direct-debit-availability"))}).textContent.includes("not available")`));
+  assert.ok(await evaluate(`document.querySelector(${JSON.stringify(selector("direct-debit-availability"))}).textContent.includes("setup is unavailable")`));
   assert.ok(await evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"), "Mobile page fits");
   assert.deepEqual(writes, ["/api/clients", "/api/notes", "/api/packages"]);
   assert.deepEqual(unexpected, []);
   const screenshot = await cdp("Page.captureScreenshot", { format: "jpeg", quality: 85 });
   fs.writeFileSync(path.join(profile, "mobile-payments.jpg"), Buffer.from(screenshot.data, "base64"));
   console.log(`Fixture screenshot: ${path.join(profile, "mobile-payments.jpg")}`);
-  console.log("Browser checks passed: client/note/package saves without refresh, £12.34 summary, actual PDF file download, mobile direct-debit wording.");
+  console.log("Browser checks passed: Free saves/basic PDF with Practably logo, locked Free revenue, Business £12.34 summary, mobile direct-debit wording.");
   console.log("All API requests were intercepted; no live records, emails, payments or deletions occurred.");
-})().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(() => {
+})().catch(async error => {
+  console.error(error.stack);
+  if (socket?.readyState === WebSocket.OPEN) {
+    const image = await cdp("Page.captureScreenshot", { format: "jpeg", quality: 85 }).catch(() => null);
+    if (image) {
+      const failureImage = path.join(profile, "failure.jpg");
+      fs.writeFileSync(failureImage, Buffer.from(image.data, "base64"));
+      console.error(`Fixture screenshot: ${failureImage}`);
+    }
+  }
+  process.exitCode = 1;
+}).finally(() => {
   socket?.close(); chrome.kill("SIGTERM");
   for (const call of pending.values()) clearTimeout(call.timer);
 });
