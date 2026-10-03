@@ -16,7 +16,7 @@ export const siteConfig = {
   cancellationTerms: "You can cancel or downgrade a paid plan at any time from the Billing Portal in Settings. Access to your current plan's features continues until the end of the billing period you've already paid for; we don't issue partial refunds for the remainder of a billing period.",
   paidPlanSupportResponse: "We aim to reply within 4 hours. Messages sent after 8pm GMT are answered the next morning.",
   retentionPolicy: "Requesting account deletion in Settings immediately and permanently deletes your account and all client data - this cannot be undone, so export anything you need first.",
-  subprocessors: "Replit Auth, PostgreSQL, Brevo, and Stripe are used to run Practably itself. GoCardless integration exists in the product but is not currently enabled for coach-client payments.",
+  subprocessors: "Replit Auth, PostgreSQL, Brevo, and Stripe are used to run Practably itself.",
 };
 
 export const pricingTiers = [

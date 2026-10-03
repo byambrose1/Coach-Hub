@@ -75,10 +75,6 @@ function LegalLayout({ title, eyebrow, children }: { title: string; eyebrow: str
 export function PrivacyPage() {
   return (
     <LegalLayout title="Privacy" eyebrow="Privacy information">
-      <div className="not-prose mb-8 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm text-orange-950">
-        <strong>Beta notice.</strong> {siteConfig.name} is in beta. This page describes how the product actually works today; have a
-        solicitor review it before relying on it for a public launch.
-      </div>
       <p><strong>Effective date:</strong> {siteConfig.effectiveDate}</p>
       <h2>What data {siteConfig.name} handles</h2>
       <p>Depending on the features you use, {siteConfig.name} stores coach account details, business and contact details, client names and contact details, bookings, notes, invoices, packages, and PARQ or other health-form responses that you choose to collect.</p>
@@ -109,10 +105,6 @@ export function PrivacyPage() {
 export function TermsPage() {
   return (
     <LegalLayout title="Terms" eyebrow="Terms of use">
-      <div className="not-prose mb-8 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm text-orange-950">
-        <strong>Beta notice.</strong> {siteConfig.name} is in beta. These terms describe how the product actually works today; have a
-        solicitor review them before relying on them for a public launch.
-      </div>
       <p><strong>Operator:</strong> {siteConfig.legalOperator}<br /><strong>Contact:</strong> {siteConfig.supportEmail}<br /><strong>Governing law:</strong> {siteConfig.governingLaw}</p>
       <h2>Using {siteConfig.name}</h2>
       <p>{siteConfig.name} provides software tools for independent fitness coaches to manage client records, scheduling, forms, invoices, and payment workflows. You are responsible for your account, the accuracy of information you enter, and how you use client data.</p>

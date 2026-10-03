@@ -249,7 +249,7 @@ export default function PlatformAdmin() {
                   </div>
                   <div className="sm:col-span-2">
                     <Label className="text-xs text-muted-foreground invisible">Link</Label>
-                    <p className="text-xs text-muted-foreground mt-0.5">Payment link (Stripe, GoCardless, etc.)</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Payment link (e.g. Stripe checkout)</p>
                     <Input
                       value={(currentConfig as any)[linkField] ?? ""}
                       onChange={e => updateDraft(linkField as keyof PlatformConfig, e.target.value)}
@@ -339,7 +339,7 @@ export default function PlatformAdmin() {
             {[
               { label: "Auth Provider", value: "Replit Auth (OIDC)", url: "https://replit.com", status: "operational" },
               { label: "Email Provider", value: "Brevo (transactional)", url: "https://app.brevo.com", status: "operational" },
-              { label: "Payment Provider", value: "GoCardless (direct debit)", url: "https://manage.gocardless.com", status: "operational" },
+              { label: "Subscription Billing", value: "Stripe", url: "https://dashboard.stripe.com", status: "operational" },
               { label: "Database", value: "PostgreSQL / Drizzle ORM", url: null, status: "operational" },
             ].map(item => (
               <div key={item.label} className="flex items-center justify-between">

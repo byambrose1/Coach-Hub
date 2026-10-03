@@ -524,9 +524,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                   <Badge variant="secondary" className="text-xs">{currentClient.sessionType || "1:1"}</Badge>
                   <Badge variant={currentClient.status === "active" ? "default" : "secondary"} className="text-xs">{currentClient.status}</Badge>
                   {clientPackages.some(p => p.billingType === "monthly") && (
-                    <Badge variant={currentClient.gocardlessMandateStatus === "active" ? "default" : "secondary"} className="text-xs">
-                      Direct Debit: {currentClient.gocardlessMandateStatus === "active" ? "active" : "inactive"}
-                    </Badge>
+                    <Badge variant="secondary" className="text-xs">Monthly billing</Badge>
                   )}
                   {clientPackages.length > 0 && !clientPackages.some(p => p.billingType === "monthly") && (
                     <Badge variant="secondary" className="text-xs">Block booking</Badge>

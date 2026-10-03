@@ -177,11 +177,6 @@ before(async () => {
     storage,
     isAuthenticated: authenticate,
     sendBookingNotificationEmail: async () => {},
-    createMandateLink: async () => {
-      throw new Error(
-        "private-provider-detail: GoCardless credential gc_secret_123 was rejected",
-      );
-    },
     sendParqEmail: async () => {
       throw new Error(
         "private-provider-detail: Brevo request for client@example.test was rejected",
@@ -462,20 +457,6 @@ test("marking a session as no-show keeps it deducted from the client's package",
   assert.equal(pkg.usedSessions, 3);
 });
 
-test("payment provider failures return a stable response without provider details", async () => {
-  const client = state.clients[0];
-  const result = await request("/api/payments/create-mandate-link", {
-    method: "POST",
-    body: JSON.stringify({ clientId: client.id }),
-  });
-  assert.equal(result.response.status, 502);
-  assert.deepEqual(result.body, {
-    code: "PAYMENT_PROVIDER_ERROR",
-    message: "Unable to create the payment link. Please try again.",
-  });
-  assert.doesNotMatch(JSON.stringify(result.body), /GoCardless|gc_secret|private-provider-detail/i);
-});
-
 test("email provider failures return stable responses without provider details", async () => {
   const client = state.clients[0];
   const pkg = withId(state.packages, coachId, {
@@ -538,7 +519,6 @@ test("rejects record IDs owned by a different authenticated coach", async () => 
     [`/api/clients/${foreignClient.id}`, { method: "DELETE" }],
     [`/api/clients/${foreignClient.id}/export`, undefined],
     ["/api/parq/send-email", { method: "POST", body: JSON.stringify({ clientId: foreignClient.id }) }],
-    ["/api/payments/create-mandate-link", { method: "POST", body: JSON.stringify({ clientId: foreignClient.id }) }],
     [`/api/sessions/${foreignSession.id}`, undefined],
     [`/api/sessions/${foreignSession.id}`, { method: "PATCH", body: JSON.stringify({ status: "cancelled" }) }],
     [`/api/sessions/${foreignSession.id}`, { method: "DELETE" }],

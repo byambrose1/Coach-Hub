@@ -16,7 +16,6 @@ import {
   sendWaitlistConfirmationEmail,
   sendWaitlistNotificationEmail,
 } from "./email";
-import { createMandateLink as defaultCreateMandateLink } from "./payments";
 import type { RequestHandler } from "express";
 import { logError } from "./safe-logging";
 import {
@@ -152,7 +151,6 @@ export async function registerRoutes(
   dependencies: {
     storage?: IStorage;
     isAuthenticated?: RequestHandler;
-    createMandateLink?: typeof defaultCreateMandateLink;
     sendBookingNotificationEmail?: typeof defaultSendBookingNotificationEmail;
     sendInvoiceEmail?: typeof defaultSendInvoiceEmail;
     sendParqEmail?: typeof defaultSendParqEmail;
@@ -164,7 +162,6 @@ export async function registerRoutes(
 ): Promise<Server> {
   const storage = dependencies.storage ?? defaultStorage;
   const isAuthenticated = dependencies.isAuthenticated ?? defaultIsAuthenticated;
-  const createMandateLink = dependencies.createMandateLink ?? defaultCreateMandateLink;
   const deleteAuthUser = dependencies.deleteAuthUser ?? authStorage.deleteUser.bind(authStorage);
   const sendBookingNotificationEmail =
     dependencies.sendBookingNotificationEmail ?? defaultSendBookingNotificationEmail;
@@ -344,27 +341,6 @@ export async function registerRoutes(
   app.use("/api/forms", isAuthenticated);
   app.use("/api/referrals", isAuthenticated);
   app.use("/api/invoices", isAuthenticated);
-
-  // --- GoCardless & Payments ---
-  app.post("/api/payments/create-mandate-link", isAuthenticated, async (req, res) => {
-    try {
-      const { clientId } = req.body;
-      const client = await storage.getClient(getUserId(req), clientId);
-      if (!client) return res.status(404).json({ message: "Client not found" });
-      if (!client.email) return res.status(400).json({ message: "Client has no email" });
-      const link = await createMandateLink(clientId, client.name, client.email);
-      res.json({ link });
-    } catch (err) {
-      logError("Failed to create payment mandate link", err);
-      res.status(502).json(PAYMENT_PROVIDER_ERROR);
-    }
-  });
-
-  app.post("/api/webhooks/gocardless", async (req, res) => {
-    const eventCount = Array.isArray(req.body?.events) ? req.body.events.length : 0;
-    console.log(`[gocardless-webhook] received events=${eventCount}`);
-    res.status(204).send();
-  });
 
   app.post("/api/webhooks/stripe", async (req, res) => {
     const signature = req.header("stripe-signature");

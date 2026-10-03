@@ -25,7 +25,7 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 
 // Conservative baseline headers. The CSP intentionally allows the existing
-// Replit auth redirect, Google Fonts, Vite HMR, Brevo/GoCardless redirects,
+// Replit auth redirect, Google Fonts, Vite HMR, Brevo redirects,
 // and same-origin API calls used by the application.
 app.use((_req, res, next) => {
   const isDevelopment = process.env.NODE_ENV !== "production";

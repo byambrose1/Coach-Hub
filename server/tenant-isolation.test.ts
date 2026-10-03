@@ -198,9 +198,6 @@ before(async () => {
     storage: store.storage,
     isAuthenticated: authenticate,
     sendBookingNotificationEmail: async () => {},
-    createMandateLink: async () => {
-      throw new Error("not used in this suite");
-    },
     sendParqEmail: async () => {
       throw new Error("not used in this suite");
     },

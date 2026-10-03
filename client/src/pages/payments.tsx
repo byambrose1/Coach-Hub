@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Package, CreditCard, AlertTriangle, FileText, Clock, CheckCircle, Pencil, Download, Send, PoundSterling, TrendingUp, Users, Copy, Calendar, RefreshCw } from "lucide-react";
+import { Plus, Package, CreditCard, AlertTriangle, FileText, Clock, CheckCircle, Pencil, Download, Send, PoundSterling, TrendingUp, Users, Calendar } from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import type { Client, Package as PackageType, Settings, Invoice, Session } from "@shared/schema";
 import { paymentMethodsHtml } from "@shared/payment-methods";
@@ -702,8 +702,6 @@ export default function Payments() {
   const [editingPkg, setEditingPkg] = useState<PackageType | null>(null);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [revenueScope, setRevenueScope] = useState<"week" | "month">("month");
-  const [mandateLinks, setMandateLinks] = useState<Record<string, string>>({});
-  const [generatingMandateFor, setGeneratingMandateFor] = useState<string | null>(null);
 
   const { data: clients = [], isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -730,29 +728,6 @@ export default function Payments() {
   });
 
   const currency = settings?.currency || "£";
-
-  const generateMandateLink = async (client: Client) => {
-    if (!client.email) {
-      toast({ title: "Client has no email address", variant: "destructive" });
-      return;
-    }
-    setGeneratingMandateFor(client.id);
-    try {
-      const res = await apiRequest("POST", "/api/payments/create-mandate-link", { clientId: client.id });
-      const data = await res.json();
-      if (data.link) {
-        setMandateLinks(prev => ({ ...prev, [client.id]: data.link }));
-        toast({ title: "Payment link generated" });
-        trackActivationEvent("first_payment_initiated");
-      } else {
-        throw new Error(data.message || "No link returned");
-      }
-    } catch (err: any) {
-      toast({ title: "Failed to generate link", description: err.message, variant: "destructive" });
-    } finally {
-      setGeneratingMandateFor(null);
-    }
-  };
 
   const markPaidMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -1123,7 +1098,7 @@ export default function Payments() {
           <div className="flex items-start justify-between gap-2 flex-wrap">
             <div>
               <p className="font-medium">Monthly Payment Clients</p>
-              <p className="text-sm text-muted-foreground">Manage GoCardless direct debit mandates for clients on monthly billing.</p>
+              <p className="text-sm text-muted-foreground">Clients on monthly billing packages and when they're next due.</p>
             </div>
             <Badge variant="outline" className="flex items-center gap-1">
               <Users className="w-3 h-3" />
@@ -1135,86 +1110,35 @@ export default function Payments() {
               <CardContent className="py-12 text-center text-muted-foreground">
                 <CreditCard className="w-10 h-10 mx-auto mb-3 opacity-30" />
                 <p className="font-medium mb-1">No monthly billing clients</p>
-                <p className="text-sm">Create a package with monthly billing to manage direct debit mandates here.</p>
+                <p className="text-sm">Create a package with monthly billing to see them here.</p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-3">
               {monthlyClients.map(({ pkg, client }) => {
-                const link = mandateLinks[client!.id];
                 return (
                   <Card key={pkg.id} data-testid={`card-monthly-client-${client!.id}`}>
                     <CardContent className="p-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <Users className="w-5 h-5 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium" data-testid={`text-monthly-client-name-${client!.id}`}>{client!.name}</p>
-                            <p className="text-sm text-muted-foreground">{pkg.name}</p>
-                            <div className="flex flex-wrap gap-2 mt-1">
-                              {pkg.monthlyRate && (
-                                <Badge variant="secondary" className="text-xs" data-testid={`badge-monthly-rate-${pkg.id}`}>
-                                  {currency}{pkg.monthlyRate}/month
-                                </Badge>
-                              )}
-                              {pkg.nextBillingDate && (
-                                <Badge variant="outline" className="text-xs flex items-center gap-1" data-testid={`badge-next-billing-${pkg.id}`}>
-                                  <Calendar className="w-3 h-3" />
-                                  Next billing: {formatDateUK(pkg.nextBillingDate)}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Users className="w-5 h-5 text-primary" />
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                          {link ? (
-                            <div className="flex items-center gap-2">
-                              <div className="max-w-[180px] truncate text-xs text-muted-foreground border rounded px-2 py-1"
-                                data-testid={`text-mandate-link-${client!.id}`}>
-                                {link}
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(link);
-                                }}
-                                data-testid={`button-copy-link-${client!.id}`}
-                              >
-                                <Copy className="w-3 h-3 mr-1" />
-                                Copy
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setMandateLinks(prev => { const n = { ...prev }; delete n[client!.id]; return n; })}
-                                data-testid={`button-refresh-link-${client!.id}`}
-                              >
-                                <RefreshCw className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => generateMandateLink(client!)}
-                              disabled={generatingMandateFor === client!.id}
-                              data-testid={`button-generate-mandate-${client!.id}`}
-                            >
-                              {generatingMandateFor === client!.id ? (
-                                <>
-                                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                                  Generating...
-                                </>
-                              ) : (
-                                <>
-                                  <CreditCard className="w-3 h-3 mr-1" />
-                                  Set Up Direct Debit
-                                </>
-                              )}
-                            </Button>
-                          )}
+                        <div>
+                          <p className="font-medium" data-testid={`text-monthly-client-name-${client!.id}`}>{client!.name}</p>
+                          <p className="text-sm text-muted-foreground">{pkg.name}</p>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {pkg.monthlyRate && (
+                              <Badge variant="secondary" className="text-xs" data-testid={`badge-monthly-rate-${pkg.id}`}>
+                                {currency}{pkg.monthlyRate}/month
+                              </Badge>
+                            )}
+                            {pkg.nextBillingDate && (
+                              <Badge variant="outline" className="text-xs flex items-center gap-1" data-testid={`badge-next-billing-${pkg.id}`}>
+                                <Calendar className="w-3 h-3" />
+                                Next billing: {formatDateUK(pkg.nextBillingDate)}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </CardContent>

@@ -79,7 +79,6 @@ function TermsModal() {
             <a href="/privacy" target="_blank" rel="noreferrer" className="text-primary underline">Privacy information</a>
             {" "}before continuing.
           </p>
-          <p className="text-muted-foreground">The legal operator details and final terms are clearly marked for owner review before public launch.</p>
         </div>
         <div className="flex items-center space-x-2 py-4">
           <Checkbox id="terms" checked={agreed} onCheckedChange={(v) => setAgreed(!!v)} />
