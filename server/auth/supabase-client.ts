@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClientOptions } from "@supabase/supabase-js";
 import type { Request } from "express";
 import WebSocket from "ws";
+import type { AuthProviders } from "@shared/auth-providers";
 
 // ws is SDK-compatible at runtime; its overloaded Node typings differ from
 // the SDK's minimal constructor interface. Node 20 has no native WebSocket.
@@ -51,12 +52,16 @@ export function supabaseAdmin() {
   });
 }
 
-export async function getAuthProviders(fetcher = fetch) {
+export async function getAuthProviders(fetcher = fetch): Promise<AuthProviders> {
   const response = await fetcher(`${supabaseOrigin()}/auth/v1/settings`, {
     headers: { apikey: process.env.SUPABASE_PUBLISHABLE_KEY! },
   });
   if (!response.ok) throw new Error("Authentication availability cannot be checked");
   const settings = await response.json();
   if (!settings.external || typeof settings.external !== "object") throw new Error("Invalid authentication settings");
-  return { github: settings.external.github === true, email: settings.external.email === true };
+  return {
+    google: settings.external.google === true,
+    apple: settings.external.apple === true,
+    email: settings.external.email === true,
+  };
 }

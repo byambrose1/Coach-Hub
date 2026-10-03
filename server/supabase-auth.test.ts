@@ -4,7 +4,9 @@ import { getTableName } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { db } from "./db";
 import { resolveCoach, AccountLinkError } from "./auth/identities";
-import { AUTH_TTL, equalToken, validTransaction } from "./auth/supabase";
+import { AUTH_TTL, callbackUrl, equalToken, validTransaction } from "./auth/supabase";
+import { socialSignInHandler } from "./auth/social-sign-in";
+import { socialAuthProviders } from "@shared/auth-providers";
 import { createSupabaseAuthentication } from "./auth/supabase-session";
 import { supabaseClient, supabaseAdmin, getAuthProviders } from "./auth/supabase-client";
 
@@ -20,13 +22,78 @@ test("the installed SDK constructs both clients on Node without a native WebSock
   assert.equal(typeof supabaseAdmin().auth.admin.deleteUser, "function");
 });
 
-test("login availability follows actual provider settings rather than assuming GitHub is enabled", async () => {
-  const available: any = async () => Response.json({ external: { github: false, email: true } });
-  assert.deepEqual(await getAuthProviders(available), { github: false, email: true });
-  const enabled: any = async () => Response.json({ external: { github: true, email: true } });
-  assert.equal((await getAuthProviders(enabled)).github, true);
+test("login availability follows Google/Apple settings and never advertises GitHub", async () => {
+  const available: any = async () => Response.json({ external: { github: true, email: true } });
+  assert.deepEqual(await getAuthProviders(available), { google: false, apple: false, email: true });
+  const enabled: any = async () => Response.json({ external: { google: true, apple: true, email: true } });
+  assert.deepEqual(await getAuthProviders(enabled), { google: true, apple: true, email: true });
+  const malformed: any = async () => Response.json({ external: { google: "true", apple: 1, email: true } });
+  assert.deepEqual(await getAuthProviders(malformed), { google: false, apple: false, email: true });
   const failed: any = async () => new Response("", { status: 503 });
   await assert.rejects(getAuthProviders(failed));
+});
+
+test("only Google and Apple can start social OAuth with an HTTPS, state-bound callback", async () => {
+  assert.deepEqual(socialAuthProviders, ["google", "apple"]);
+  for (const provider of socialAuthProviders) {
+    const events: string[] = [];
+    const req: any = { hostname: "www.practably.co.uk", session: {} };
+    let redirect = "";
+    const res: any = { redirect: (url: string) => { events.push("redirect"); redirect = url; } };
+    const handler = socialSignInHandler(provider, {
+      providers: async () => ({ google: true, apple: true, email: true }),
+      begin: async () => { events.push("begin"); return "fixture-state"; },
+      callback: callbackUrl,
+      client: () => ({ auth: { signInWithOAuth: async (options: any) => {
+        assert.equal(options.provider, provider);
+        assert.equal(options.options.redirectTo, "https://www.practably.co.uk/api/auth/supabase/callback?state=fixture-state");
+        assert.equal(options.options.skipBrowserRedirect, true);
+        events.push("oauth");
+        return { data: { url: "https://fixture.supabase.co/auth/v1/authorize" }, error: null };
+      } } } as any),
+      save: async () => { events.push("save"); },
+      onError: () => assert.fail("Successful fixture must not fail"),
+    });
+    await handler(req, res, () => {});
+    assert.equal(redirect, "https://fixture.supabase.co/auth/v1/authorize");
+    assert.deepEqual(events, ["begin", "oauth", "save", "redirect"]);
+  }
+  assert.throws(() => callbackUrl({ hostname: "untrusted.example" } as any, "state"));
+  assert.throws(() => socialSignInHandler("github" as any, {} as any));
+});
+
+test("disabled social providers cannot start OAuth; provider errors discard pending sign-in state", async () => {
+  for (const scenario of ["disabled", "unavailable", "oauthFailure", "saveFailure"] as const) {
+    let oauthCalled = false, began = false, redirect = "", errors = 0;
+    const req: any = { session: {} };
+    const handler = socialSignInHandler("google", {
+      providers: async () => {
+        if (scenario === "unavailable") throw new Error("Fixture availability failure");
+        return { google: scenario !== "disabled", apple: false, email: true };
+      },
+      begin: async () => {
+        began = true;
+        req.session.supabaseTransaction = { state: "fixture-state" };
+        req.session.supabasePkce = { verifier: "fixture-verifier" };
+        return "fixture-state";
+      },
+      callback: () => "https://www.practably.co.uk/api/auth/supabase/callback?state=fixture-state",
+      client: () => ({ auth: { signInWithOAuth: async () => {
+        oauthCalled = true;
+        return { data: { url: "https://fixture.supabase.co/auth/v1/authorize" },
+          error: scenario === "oauthFailure" ? new Error("Fixture OAuth failure") : null };
+      } } } as any),
+      save: async () => { if (scenario === "saveFailure") throw new Error("Fixture save failure"); },
+      onError: () => { errors++; },
+    });
+    await handler(req, { redirect: (url: string) => { redirect = url; } } as any, () => {});
+    assert.equal(redirect, "/login?error=provider_unavailable");
+    assert.equal(oauthCalled, scenario === "oauthFailure" || scenario === "saveFailure");
+    assert.equal(began, oauthCalled);
+    assert.equal(req.session.supabaseTransaction, undefined);
+    assert.equal(req.session.supabasePkce, undefined);
+    assert.equal(errors, scenario === "disabled" ? 0 : 1);
+  }
 });
 
 test("callbacks require a matching, unexpired transaction; malformed and reused state fails", () => {

@@ -9,6 +9,8 @@ import { supabaseClient, supabaseConfigured, getAuthProviders } from "./supabase
 import { ensureIdentityTable, resolveCoach, AccountLinkError } from "./identities";
 import { sessionUser } from "./supabase-session";
 import { publicSite } from "@shared/public-site";
+import { socialAuthProviders } from "@shared/auth-providers";
+import { socialSignInHandler } from "./social-sign-in";
 
 export const AUTH_TTL = 10 * 60 * 1000;
 export function equalToken(left: unknown, right: unknown) {
@@ -39,7 +41,7 @@ async function transaction(req: Request, res: Response) {
   return state;
 }
 
-function callbackUrl(req: Request, state: string) {
+export function callbackUrl(req: Request, state: string) {
   // Fixed local path; never accept an arbitrary return URL from the browser.
   const allowed = new Set([
     new URL(publicSite.siteUrl).hostname,
@@ -73,19 +75,22 @@ export async function setupAuthentication(app: Express) {
   await setupLegacyAuth(app, "/api/auth/legacy", "/login?legacy=connected");
   const limiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: "draft-7", legacyHeaders: false,
     message: { message: "Too many sign-in attempts. Please try again later." } });
-  app.use("/api/auth/github", limiter);
+  for (const provider of socialAuthProviders) app.use(`/api/auth/${provider}`, limiter);
   app.use("/api/auth/email", limiter);
   app.get("/api/login", (_req, res) => res.redirect("/login"));
   let providers: Awaited<ReturnType<typeof getAuthProviders>> | undefined;
   let providersCheckedAt = 0;
+  async function availableProviders() {
+    if (!providers || Date.now() - providersCheckedAt > 30_000) {
+      providers = await getAuthProviders();
+      providersCheckedAt = Date.now();
+    }
+    return providers;
+  }
   app.get("/api/auth/providers", async (_req, res) => {
     res.set("Cache-Control", "no-store");
     try {
-      if (!providers || Date.now() - providersCheckedAt > 30_000) {
-        providers = await getAuthProviders();
-        providersCheckedAt = Date.now();
-      }
-      res.json(providers);
+      res.json(await availableProviders());
     } catch (error) {
       logError("Unable to check sign-in availability", error);
       res.status(503).json({ message: "Sign-in is temporarily unavailable. Please try again shortly." });
@@ -97,21 +102,13 @@ export async function setupAuthentication(app: Express) {
     await save(req);
     res.json({ token: (req.session as any).authCsrf });
   });
-  app.get("/api/auth/github", async (req, res) => {
-    try {
-      const state = await transaction(req, res);
-      const client = supabaseClient(req);
-      const { data, error } = await client.auth.signInWithOAuth({
-        provider: "github", options: { redirectTo: callbackUrl(req, state), skipBrowserRedirect: true },
-      });
-      if (error || !data.url) throw new Error("Provider unavailable");
-      await save(req);
-      res.redirect(data.url);
-    } catch (error) {
-      logError("Unable to start Supabase sign-in", error);
-      res.redirect("/login?error=provider_unavailable");
-    }
-  });
+  for (const provider of socialAuthProviders) {
+    app.get(`/api/auth/${provider}`, socialSignInHandler(provider, {
+      providers: availableProviders, begin: transaction, client: supabaseClient,
+      callback: callbackUrl, save,
+      onError: error => logError("Unable to start Supabase sign-in", error),
+    }));
+  }
   app.post("/api/auth/email", async (req, res) => {
     if (!equalToken(req.get("X-CSRF-Token"), (req.session as any).authCsrf)) {
       return res.status(403).json({ message: "Please reload the sign-in page and try again." });

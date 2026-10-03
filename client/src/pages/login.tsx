@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, Check, CircleAlert, Github, KeyRound, LoaderCircle, Mail, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, CircleAlert, KeyRound, LoaderCircle, Mail, ShieldCheck } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
+import { SocialSignIn } from "@/components/social-sign-in";
+import type { AuthProviders } from "@shared/auth-providers";
 
 type AuthMode = "login" | "signup" | "magic";
 type AuthResponse = { redirect?: string; message?: string };
@@ -41,7 +43,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [providers, setProviders] = useState<{ github: boolean; email: boolean } | null>(null);
+  const [providers, setProviders] = useState<AuthProviders | null>(null);
+  const [checkingProviders, setCheckingProviders] = useState(true);
   useEffect(() => {
     let active = true;
     fetch("/api/auth/providers", { credentials: "include", cache: "no-store" })
@@ -50,7 +53,8 @@ export default function LoginPage() {
         const data = await response.json();
         if (active) setProviders(data);
       })
-      .catch(() => { if (active) setError("Sign-in is temporarily unavailable. Please reload and try again."); });
+      .catch(() => { if (active) setError("Sign-in is temporarily unavailable. Please reload and try again."); })
+      .finally(() => { if (active) setCheckingProviders(false); });
     return () => { active = false; };
   }, []);
   const [submitting, setSubmitting] = useState(false);
@@ -236,14 +240,7 @@ export default function LoginPage() {
             <div className="my-5 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9a93a5]">
               <span className="h-px flex-1 bg-[#ece7f1]" />Or continue with<span className="h-px flex-1 bg-[#ece7f1]" />
             </div>
-            {providers?.github ? <a
-              href="/api/auth/github"
-              className="flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-[#ded7e8] bg-white text-sm font-semibold text-[#30283b] transition hover:border-violet-300 hover:bg-violet-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-            >
-              <Github className="h-[17px] w-[17px]" aria-hidden="true" /> Continue with GitHub
-            </a> : <button type="button" disabled className="flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-[#ded7e8] bg-slate-50 text-sm font-semibold text-slate-400">
-              <Github className="h-[17px] w-[17px]" aria-hidden="true" />{providers ? "GitHub sign-in unavailable" : "Checking sign-in options…"}
-            </button>}
+            <SocialSignIn providers={providers} loading={checkingProviders} />
             <p className="mt-4 text-center text-xs leading-5 text-[#837b90]">
               Please review our{" "}
               <Link href="/terms" className="font-semibold text-violet-800 underline decoration-violet-300 underline-offset-2 hover:text-violet-950">Terms</Link>
