@@ -17,6 +17,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Session, Client, Package } from "@shared/schema";
 import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import { trackActivationEvent } from "@/lib/activation";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { UpgradeNotice } from "@/components/upgrade-notice";
 
 function QuickBookDialog({ open, onOpenChange, clients }: {
   open: boolean;
@@ -240,8 +242,11 @@ function SessionRow({ session, clientName }: { session: Session; clientName: str
 
 function NotifyButton({ packageId }: { packageId: string }) {
   const { toast } = useToast();
+  const featureAccess = useFeatureAccess();
+  const canNotify = featureAccess.hasFeature("emailNotifications");
   const mutation = useMutation({
     mutationFn: async () => {
+      if (!canNotify) throw new Error("Low-session email notifications require Starter.");
       const res = await apiRequest("POST", `/api/packages/${packageId}/notify-low-sessions`, {});
       if (!res.ok) {
         const data = await res.json();
@@ -252,6 +257,7 @@ function NotifyButton({ packageId }: { packageId: string }) {
     onError: (err: Error) => toast({ title: "Could not send notification", description: err.message, variant: "destructive" }),
   });
 
+  if (!canNotify) return <UpgradeNotice feature="emailNotifications" compact />;
   return (
     <Button
       size="sm"

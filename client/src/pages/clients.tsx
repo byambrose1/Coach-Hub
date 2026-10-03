@@ -19,6 +19,8 @@ import { format, parseISO } from "date-fns";
 import type { Client, Session, Package as PackageType, SessionNote, ClientForm } from "@shared/schema";
 import { UpgradePopup } from "@/components/upgrade-popup";
 import { trackActivationEvent } from "@/lib/activation";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { UpgradeNotice } from "@/components/upgrade-notice";
 
 function formatDateUK(dateStr: string): string {
   try {
@@ -1124,6 +1126,8 @@ function BroadcastEmailDialog({ open, onOpenChange, clients }: {
   clients: Client[];
 }) {
   const { toast } = useToast();
+  const featureAccess = useFeatureAccess();
+  const canBroadcast = featureAccess.hasFeature("broadcastEmails");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [recipientFilter, setRecipientFilter] = useState<"all" | "active">("active");
@@ -1136,6 +1140,7 @@ function BroadcastEmailDialog({ open, onOpenChange, clients }: {
 
   const broadcastMutation = useMutation({
     mutationFn: async () => {
+      if (!canBroadcast) throw new Error("Broadcast email requires the Professional plan.");
       const res = await apiRequest("POST", "/api/emails/broadcast", { subject, message, recipientFilter });
       return res.json();
     },
@@ -1166,6 +1171,7 @@ function BroadcastEmailDialog({ open, onOpenChange, clients }: {
           </DialogDescription>
         </DialogHeader>
 
+        {!canBroadcast ? <UpgradeNotice feature="broadcastEmails" /> : <>
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Recipients</Label>
@@ -1213,7 +1219,7 @@ function BroadcastEmailDialog({ open, onOpenChange, clients }: {
         <div className="flex gap-2 mt-2">
           <Button
             className="flex-1"
-            disabled={!subject.trim() || !message.trim() || eligibleCount === 0 || broadcastMutation.isPending}
+            disabled={!subject.trim() || !message.trim() || eligibleCount === 0 || broadcastMutation.isPending || !canBroadcast}
             onClick={() => broadcastMutation.mutate()}
             data-testid="button-send-broadcast"
           >
@@ -1224,12 +1230,15 @@ function BroadcastEmailDialog({ open, onOpenChange, clients }: {
             Cancel
           </Button>
         </div>
+        </>}
       </DialogContent>
     </Dialog>
   );
 }
 
 export default function Clients() {
+  const featureAccess = useFeatureAccess();
+  const canBroadcast = featureAccess.hasFeature("broadcastEmails");
   const [newClientOpen, setNewClientOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -1275,10 +1284,10 @@ export default function Clients() {
           <p className="text-sm text-muted-foreground">{clients.length} total clients</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setBroadcastOpen(true)} data-testid="button-send-announcement">
+          {canBroadcast ? <Button variant="outline" onClick={() => setBroadcastOpen(true)} data-testid="button-send-announcement">
             <Send className="w-4 h-4 mr-1" />
             Send Announcement
-          </Button>
+          </Button> : <UpgradeNotice feature="broadcastEmails" compact />}
           <Button onClick={() => setNewClientOpen(true)} data-testid="button-add-client">
             <Plus className="w-4 h-4 mr-1" />
             Add Client

@@ -28,6 +28,8 @@ import { Save, User, FileText, CreditCard, Bell, Shield, Trash2, Mail, Phone, Ma
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Settings } from "@shared/schema";
 import { siteConfig } from "@/config/site";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { UpgradeNotice } from "@/components/upgrade-notice";
 
 interface Tier {
   name: string;
@@ -418,6 +420,9 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
 
 export default function SettingsPage() {
   const { toast } = useToast();
+  const featureAccess = useFeatureAccess();
+  const canEditBusinessDetails = featureAccess.hasFeature("customBusinessDetails");
+  const canEditNotifications = featureAccess.hasFeature("emailNotifications");
 
   const { data: settings, isLoading } = useQuery<Settings>({
     queryKey: ["/api/settings"],
@@ -492,7 +497,13 @@ export default function SettingsPage() {
   const mutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const payload = Object.fromEntries(
-        Object.entries(data).filter(([field]) => !SERVER_MANAGED_SETTINGS_FIELDS.has(field)),
+        Object.entries(data).filter(([field]) =>
+          !SERVER_MANAGED_SETTINGS_FIELDS.has(field)
+          && field !== "enableSessionReminders"
+          && field !== "reminderHoursBefore"
+          && (canEditBusinessDetails || (field !== "businessName" && field !== "businessAddress"))
+          && (canEditNotifications || field !== "enableEmailNotifications"),
+        ),
       );
       const res = await apiRequest("PUT", "/api/settings", payload);
       return res.json();
@@ -566,12 +577,12 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-2">
               <Label>Business Name</Label>
-              <Input
+              {canEditBusinessDetails ? <Input
                 placeholder="e.g. FitCoach Pro"
                 value={formData.businessName}
                 onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
                 data-testid="input-business-name"
-              />
+              /> : <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-testid="text-business-name-readonly">{formData.businessName || "Not set"}</p>}
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -597,13 +608,14 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-2">
             <Label className="flex items-center gap-1"><MapPin className="w-3 h-3" /> Business Address</Label>
-            <Input
+            {canEditBusinessDetails ? <Input
               placeholder="123 Fitness St, City, State"
               value={formData.businessAddress}
               onChange={(e) => setFormData({ ...formData, businessAddress: e.target.value })}
               data-testid="input-business-address"
-            />
+            /> : <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-testid="text-business-address-readonly">{formData.businessAddress || "Not set"}</p>}
           </div>
+          {!canEditBusinessDetails && <UpgradeNotice feature="customBusinessDetails" compact />}
         </CardContent>
       </Card>
 
@@ -883,40 +895,27 @@ export default function SettingsPage() {
               <Label>Email Notifications</Label>
               <p className="text-xs text-muted-foreground mt-0.5">Receive email alerts for bookings, cancellations, and low sessions</p>
             </div>
-            <Switch
+            {canEditNotifications ? <Switch
               checked={formData.enableEmailNotifications}
               onCheckedChange={(v) => setFormData({ ...formData, enableEmailNotifications: v })}
               data-testid="switch-email-notifications"
-            />
+            /> : <span className="text-sm text-muted-foreground">{formData.enableEmailNotifications ? "On" : "Off"}</span>}
           </div>
+          {!canEditNotifications && <UpgradeNotice feature="emailNotifications" compact />}
 
           <div className="flex items-center justify-between gap-4">
             <div>
               <Label>Session Reminders</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">Send reminder notifications before scheduled sessions</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Scheduled session reminders are not available yet.</p>
             </div>
             <Switch
               checked={formData.enableSessionReminders}
-              onCheckedChange={(v) => setFormData({ ...formData, enableSessionReminders: v })}
+              disabled
+              aria-label="Scheduled session reminders unavailable"
               data-testid="switch-session-reminders"
             />
           </div>
-
-          {formData.enableSessionReminders && (
-            <div className="space-y-2 pl-4 border-l-2">
-              <Label>Reminder Lead Time (hours)</Label>
-              <Input
-                type="number"
-                min={1}
-                max={72}
-                value={formData.reminderHoursBefore}
-                onChange={(e) => setFormData({ ...formData, reminderHoursBefore: parseInt(e.target.value) || 24 })}
-                className="max-w-[120px]"
-                data-testid="input-reminder-hours"
-              />
-              <p className="text-xs text-muted-foreground">How many hours before a session to send the reminder.</p>
-            </div>
-          )}
+          <p className="text-xs text-muted-foreground">Your saved reminder preference is preserved; Practably does not currently send scheduled session reminders.</p>
 
         </CardContent>
       </Card>
@@ -979,6 +978,13 @@ export default function SettingsPage() {
       </Card>
 
       <SubscriptionSection settings={settings} />
+      {featureAccess.hasFeature("customBusinessDetails") && <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Business support</CardTitle><CardDescription>Priority support is a staffed response target, not an automated resolution guarantee.</CardDescription></CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          <p>4-hour response target. Messages sent after 8pm GMT are handled the following morning.</p>
+          <a className="mt-3 inline-flex font-medium text-primary hover:underline" href={`mailto:${siteConfig.supportEmail}?subject=${encodeURIComponent("Practably Business support request")}`}>Email priority support: {siteConfig.supportEmail}</a>
+        </CardContent>
+      </Card>}
 
       <Card className="border-destructive/50">
         <CardHeader className="pb-3">

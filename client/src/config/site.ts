@@ -45,7 +45,7 @@ export const pricingTiers = [
     period: "/ month",
     clients: "Up to 20 clients",
     description: "For coaches building a consistent coaching business.",
-    features: ["20 client records", "Everything in Starter", "Broadcast client emails", "Full invoice management", "Privacy controls for client records"],
+    features: ["20 client records", "Everything in Starter", "Broadcast client emails", "Full invoice management"],
   },
   {
     name: "Business",
@@ -53,7 +53,7 @@ export const pricingTiers = [
     period: "/ month",
     clients: "Up to 50 clients",
     description: "For larger rosters that still want a coach-sized tool.",
-    features: ["50 client records", "Everything in Professional", "Advanced revenue views", "Custom business details", "Priority support: response within 4 hours"],
+    features: ["50 client records", "Everything in Professional", "Date and client revenue reports", "Custom business details", "Priority support: 4-hour response target"],
   },
 ];
 

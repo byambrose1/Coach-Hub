@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient, cacheSavedRecord } from "@/lib/queryClient";
-import { Plus, Package, CreditCard, AlertTriangle, FileText, Clock, CheckCircle, Pencil, Download, Send, PoundSterling, TrendingUp, Users, Copy, Calendar, RefreshCw } from "lucide-react";
-import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
-import type { Client, Package as PackageType, Settings, Invoice, Session } from "@shared/schema";
+import { Plus, Package, CreditCard, AlertTriangle, FileText, Clock, CheckCircle, Pencil, Download, Send, PoundSterling, TrendingUp, Users, Calendar } from "lucide-react";
+import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
+import type { Client, Package as PackageType, Settings, Invoice } from "@shared/schema";
 import { trackActivationEvent } from "@/lib/activation";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { UpgradeNotice } from "@/components/upgrade-notice";
 
 function formatDateUK(dateStr: string): string {
   try {
@@ -26,11 +28,12 @@ function formatDateUK(dateStr: string): string {
   }
 }
 
-function NewPackageDialog({ open, onOpenChange, clients, currency }: {
+function NewPackageDialog({ open, onOpenChange, clients, currency, allowMonthly }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clients: Client[];
   currency: string;
+  allowMonthly: boolean;
 }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
@@ -47,7 +50,8 @@ function NewPackageDialog({ open, onOpenChange, clients, currency }: {
 
   const mutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const res = await apiRequest("POST", "/api/packages", data);
+      const payload = allowMonthly ? data : { ...data, billingType: "block", monthlyRate: "", nextBillingDate: "" };
+      const res = await apiRequest("POST", "/api/packages", payload);
       return res.json();
     },
     onSuccess: async (saved) => {
@@ -60,6 +64,8 @@ function NewPackageDialog({ open, onOpenChange, clients, currency }: {
       toast({ title: "Error creating package", description: err.message, variant: "destructive" });
     },
   });
+
+  const selectedBillingType = allowMonthly ? formData.billingType : "block";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -94,15 +100,16 @@ function NewPackageDialog({ open, onOpenChange, clients, currency }: {
           </div>
           <div className="space-y-2">
             <Label>Billing Type</Label>
-            <Select value={formData.billingType} onValueChange={(v) => setFormData({ ...formData, billingType: v })}>
+            <Select value={allowMonthly ? formData.billingType : "block"} onValueChange={(v) => setFormData({ ...formData, billingType: v })}>
               <SelectTrigger data-testid="select-billing-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="block">Block</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
+                {allowMonthly && <SelectItem value="monthly">Monthly</SelectItem>}
               </SelectContent>
             </Select>
+            {!allowMonthly && <UpgradeNotice feature="paymentTracking" compact />}
           </div>
           <div className="space-y-2">
             <Label>Total Sessions</Label>
@@ -114,7 +121,7 @@ function NewPackageDialog({ open, onOpenChange, clients, currency }: {
               data-testid="input-total-sessions"
             />
           </div>
-          {formData.billingType === "block" ? (
+          {selectedBillingType === "block" ? (
             <div className="space-y-2">
               <Label>Price</Label>
               <Input
@@ -155,11 +162,12 @@ function NewPackageDialog({ open, onOpenChange, clients, currency }: {
   );
 }
 
-function NewInvoiceDialog({ open, onOpenChange, clients, currency }: {
+function NewInvoiceDialog({ open, onOpenChange, clients, currency, allowPaymentTracking }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clients: Client[];
   currency: string;
+  allowPaymentTracking: boolean;
 }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
@@ -174,7 +182,17 @@ function NewInvoiceDialog({ open, onOpenChange, clients, currency }: {
 
   const mutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const res = await apiRequest("POST", "/api/invoices", data);
+      const payload = allowPaymentTracking
+        ? data
+        : {
+            clientId: data.clientId,
+            invoiceNumber: data.invoiceNumber,
+            amount: data.amount,
+            dueDate: data.dueDate,
+            notes: data.notes,
+            status: "pending",
+          };
+      const res = await apiRequest("POST", "/api/invoices", payload);
       return res.json();
     },
     onSuccess: async (saved) => {
@@ -249,7 +267,7 @@ function NewInvoiceDialog({ open, onOpenChange, clients, currency }: {
                 data-testid="input-invoice-due-date"
               />
             </div>
-            <div className="space-y-2">
+            {allowPaymentTracking && <div className="space-y-2">
               <Label>Payment Method</Label>
               <Select value={formData.paymentMethod} onValueChange={(v) => setFormData({ ...formData, paymentMethod: v })}>
                 <SelectTrigger data-testid="select-payment-method">
@@ -264,7 +282,7 @@ function NewInvoiceDialog({ open, onOpenChange, clients, currency }: {
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </div>}
           </div>
           <div className="space-y-2">
             <Label>Notes</Label>
@@ -366,14 +384,18 @@ function EditSessionsDialog({ open, onOpenChange, pkg }: {
   );
 }
 
-function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
+function InvoiceDetailDialog({ invoice, clientName, settings, onClose, allowInvoiceManagement, allowPaymentTracking }: {
   invoice: Invoice;
   clientName: string;
   settings: Settings | undefined;
   onClose: () => void;
+  allowInvoiceManagement: boolean;
+  allowPaymentTracking: boolean;
 }) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState(invoice.status || "pending");
+  const [paymentMethod, setPaymentMethod] = useState(invoice.paymentMethod || "");
   const currency = settings?.currency || "£";
   const [editData, setEditData] = useState({
     invoiceNumber: invoice.invoiceNumber,
@@ -386,7 +408,9 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
 
   const updateMutation = useMutation({
     mutationFn: async (data: typeof editData) => {
-      const res = await apiRequest("PATCH", `/api/invoices/${invoice.id}`, data);
+      if (!allowInvoiceManagement) throw new Error("Invoice editing requires the Professional plan.");
+      const payload = allowPaymentTracking ? data : { ...data, status: invoice.status || "pending", paymentMethod: invoice.paymentMethod || "" };
+      const res = await apiRequest("PATCH", `/api/invoices/${invoice.id}`, payload);
       return res.json();
     },
     onSuccess: () => {
@@ -401,6 +425,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
 
   const sendMutation = useMutation({
     mutationFn: async () => {
+      if (!allowInvoiceManagement) throw new Error("Sending invoices requires the Professional plan.");
       const res = await apiRequest("POST", `/api/invoices/${invoice.id}/send`);
       return res.json();
     },
@@ -436,7 +461,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
             {isEditing ? "Edit Invoice" : `Invoice ${invoice.invoiceNumber}`}
           </DialogTitle>
           <DialogDescription>
-            {clientName} · <InvoiceStatusBadge status={invoice.status || "pending"} />
+            {clientName} · <InvoiceStatusBadge status={currentStatus} />
           </DialogDescription>
         </DialogHeader>
 
@@ -491,7 +516,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
+            {allowPaymentTracking && <div className="space-y-2">
               <Label>Payment Method</Label>
               <Select value={editData.paymentMethod} onValueChange={(v) => setEditData({ ...editData, paymentMethod: v })}>
                 <SelectTrigger data-testid="select-edit-payment-method">
@@ -506,7 +531,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </div>}
             <div className="space-y-2">
               <Label>Notes</Label>
               <Textarea
@@ -537,7 +562,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
               </div>
             </div>
 
-            {invoice.paymentMethod && (
+              {invoice.paymentMethod && (
               <div>
                 <p className="text-xs text-muted-foreground">Payment Method</p>
                 <p className="text-sm capitalize">{invoice.paymentMethod}</p>
@@ -566,15 +591,15 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
             )}
 
             <div className="flex flex-wrap gap-2 pt-2 border-t">
-              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} data-testid="button-edit-invoice">
+              {allowInvoiceManagement ? <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} data-testid="button-edit-invoice">
                 <Pencil className="w-3 h-3 mr-1" />
                 Edit
-              </Button>
+              </Button> : <UpgradeNotice feature="invoiceManagement" compact />}
               <Button variant="outline" size="sm" onClick={handleDownload} disabled={downloading} data-testid="button-download-invoice">
                 <Download className="w-3 h-3 mr-1" />
                 {downloading ? "Downloading…" : "Download PDF"}
               </Button>
-              {invoice.status !== "sent" && invoice.status !== "paid" && (
+              {allowInvoiceManagement && currentStatus !== "sent" && currentStatus !== "paid" && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -586,18 +611,65 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
                   {sendMutation.isPending ? "Sending..." : "Send"}
                 </Button>
               )}
-              {invoice.status !== "paid" && (
+              {!allowInvoiceManagement && currentStatus !== "sent" && currentStatus !== "paid" && <UpgradeNotice feature="invoiceManagement" compact />}
+              {allowPaymentTracking && (
+                <Select value={currentStatus} onValueChange={(status) => {
+                  if (!allowPaymentTracking) return;
+                  const data = status === "paid"
+                    ? { status, paidDate: new Date().toISOString().split("T")[0] }
+                    : { status };
+                  apiRequest("PATCH", `/api/invoices/${invoice.id}`, data).then(() => {
+                    setCurrentStatus(status);
+                    queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+                    toast({ title: "Invoice status updated" });
+                  }).catch((err: Error) => toast({ title: "Could not update invoice status", description: err.message, variant: "destructive" }));
+                }}>
+                  <SelectTrigger className="h-8 w-36" aria-label="Invoice status"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              {allowPaymentTracking && (
+                <Select value={paymentMethod || "none"} onValueChange={(v) => {
+                  if (!allowPaymentTracking) return;
+                  const value = v === "none" ? "" : v;
+                  apiRequest("PATCH", `/api/invoices/${invoice.id}`, { paymentMethod: value }).then(() => {
+                    setPaymentMethod(value);
+                    queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+                    toast({ title: "Payment method updated" });
+                  }).catch((err: Error) => toast({ title: "Could not update payment method", description: err.message, variant: "destructive" }));
+                }}>
+                  <SelectTrigger className="h-8 w-40" aria-label="Record payment method"><SelectValue placeholder="Payment method" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No method recorded</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card_machine">Card machine</SelectItem>
+                    <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                    <SelectItem value="paypal">PayPal</SelectItem>
+                    <SelectItem value="stripe">Stripe</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              {!allowPaymentTracking && currentStatus !== "paid" && <UpgradeNotice feature="paymentTracking" compact />}
+              {allowPaymentTracking && currentStatus !== "paid" && (
                 <Button
                   variant="default"
                   size="sm"
                   onClick={() => {
+                    if (!allowPaymentTracking) return;
                     apiRequest("PATCH", `/api/invoices/${invoice.id}`, {
                       status: "paid",
                       paidDate: new Date().toISOString().split("T")[0],
                     }).then(() => {
+                      setCurrentStatus("paid");
                       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
                       toast({ title: "Invoice marked as paid" });
-                    });
+                    }).catch((err: Error) => toast({ title: "Could not mark invoice as paid", description: err.message, variant: "destructive" }));
                   }}
                   data-testid="button-detail-mark-paid"
                 >
@@ -614,17 +686,20 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
 }
 
 export default function Payments() {
-  const { toast } = useToast();
+  const featureAccess = useFeatureAccess();
+  const canTrackPayments = featureAccess.hasFeature("paymentTracking");
+  const canViewRevenue = featureAccess.hasFeature("revenueTracking");
+  const canInvoiceManagement = featureAccess.hasFeature("invoiceManagement");
+  const canBusinessReports = featureAccess.hasFeature("advancedRevenue");
+  const canMonthlyPackages = canTrackPayments;
   const [newPackageOpen, setNewPackageOpen] = useState(false);
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [editingPkg, setEditingPkg] = useState<PackageType | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [revenueScope, setRevenueScope] = useState<"week" | "month">("month");
-  const [mandateLinks, setMandateLinks] = useState<Record<string, string>>({});
-  const { data: paymentCapabilities } = useQuery<{ directDebitAvailable: boolean; message: string }>({
-    queryKey: ["/api/payments/status"],
-  });
-  const [generatingMandateFor, setGeneratingMandateFor] = useState<string | null>(null);
+  const [reportFrom, setReportFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
+  const [reportTo, setReportTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
+  const [reportClientId, setReportClientId] = useState("all");
 
   const { data: clients = [], isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -638,50 +713,38 @@ export default function Payments() {
     queryKey: ["/api/invoices"],
   });
 
-  const { data: sessions = [] } = useQuery<Session[]>({
-    queryKey: ["/api/sessions"],
-  });
-
   const { data: settings } = useQuery<Settings>({
     queryKey: ["/api/settings"],
   });
 
   const currency = settings?.currency || "£";
 
-  const generateMandateLink = async (client: Client) => {
-    if (!client.email) {
-      toast({ title: "Client has no email address", variant: "destructive" });
-      return;
-    }
-    setGeneratingMandateFor(client.id);
-    try {
-      const res = await apiRequest("POST", "/api/payments/create-mandate-link", { clientId: client.id });
-      const data = await res.json();
-      if (data.link) {
-        setMandateLinks(prev => ({ ...prev, [client.id]: data.link }));
-        toast({ title: "Payment link generated" });
-        trackActivationEvent("first_payment_initiated");
-      } else {
-        throw new Error(data.message || "No link returned");
-      }
-    } catch (err: any) {
-      toast({ title: "Failed to generate link", description: err.message, variant: "destructive" });
-    } finally {
-      setGeneratingMandateFor(null);
-    }
+  type RevenueReport = {
+    from: string;
+    to: string;
+    totalRevenue: number;
+    pendingTotal: number;
+    pendingCount: number;
+    monthlyBilling: number;
+    blockRevenue: number;
+    monthlyRevenue: number;
+    unallocatedPaidCount: number;
+    byClient?: { clientId: string; clientName: string; invoiceCount: number; paidTotal: number }[];
   };
-
-  const markPaidMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await apiRequest("PATCH", `/api/invoices/${id}`, {
-        status: "paid",
-        paidDate: new Date().toISOString().split("T")[0],
-      });
-      return res.json();
+  const revenueParams = new URLSearchParams({ period: revenueScope });
+  const validReportRange = !!reportFrom && !!reportTo && reportFrom <= reportTo;
+  if (canBusinessReports && validReportRange) {
+    revenueParams.set("from", reportFrom);
+    revenueParams.set("to", reportTo);
+    if (reportClientId !== "all") revenueParams.set("clientId", reportClientId);
+  }
+  const revenueQuery = useQuery<RevenueReport>({
+    queryKey: ["/api/revenue", revenueScope, canBusinessReports ? reportFrom : "", canBusinessReports ? reportTo : "", canBusinessReports ? reportClientId : ""],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/revenue?${revenueParams.toString()}`);
+      return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-    },
+    enabled: canViewRevenue && !!settings && (!canBusinessReports || validReportRange),
   });
 
   const isLoading = clientsLoading || packagesLoading || invoicesLoading;
@@ -690,58 +753,10 @@ export default function Payments() {
   const activePackages = packages.filter((p) => p.status === "active");
   const lowPackages = activePackages.filter((p) => p.billingType !== "monthly" && (p.totalSessions - (p.usedSessions || 0)) <= 2);
   
-  const calculateRevenue = () => {
-    const monthlyRevenue = activePackages
-      .filter((p) => p.billingType === "monthly" && p.monthlyRate)
-      .reduce((sum, p) => sum + (parseFloat(p.monthlyRate!.replace(/[^0-9.]/g, "")) || 0), 0);
-    
-    const pendingInvoices = invoices.filter((inv) => inv.status === "pending" || inv.status === "sent" || inv.status === "overdue");
-    const pendingTotal = pendingInvoices.reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
-    
-    return { monthlyRevenue, pendingInvoices, pendingTotal };
-  };
-
-  const { monthlyRevenue, pendingInvoices, pendingTotal } = calculateRevenue();
-
-  // Revenue scope calculations
-  const now = new Date();
-  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-  const monthStart = startOfMonth(now);
-  const monthEnd = endOfMonth(now);
-  const weekStartStr = format(weekStart, "yyyy-MM-dd");
-  const weekEndStr = format(weekEnd, "yyyy-MM-dd");
-  const monthStartStr = format(monthStart, "yyyy-MM-dd");
-  const monthEndStr = format(monthEnd, "yyyy-MM-dd");
-
-  const scopeStart = revenueScope === "week" ? weekStartStr : monthStartStr;
-  const scopeEnd = revenueScope === "week" ? weekEndStr : monthEndStr;
-
-  const paidInvoicesInScope = invoices.filter(inv =>
-    inv.status === "paid" && inv.paidDate && inv.paidDate >= scopeStart && inv.paidDate <= scopeEnd
-  );
-
-  const clientPkgMap = new Map(packages.map(p => [p.clientId, p]));
-
-  const scopeMonthlyRevenue = paidInvoicesInScope
-    .filter(inv => {
-      const pkg = clientPkgMap.get(inv.clientId);
-      return pkg?.billingType === "monthly";
-    })
-    .reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
-
-  const scopeBlockRevenue = paidInvoicesInScope
-    .filter(inv => {
-      const pkg = clientPkgMap.get(inv.clientId);
-      return !pkg || pkg.billingType === "block";
-    })
-    .reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
-
-  const scopeTotalRevenue = paidInvoicesInScope.reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
-
-  const sessionsInScope = sessions.filter(s =>
-    s.date >= scopeStart && s.date <= scopeEnd && s.status !== "cancelled"
-  );
+  const report = revenueQuery.data;
+  const pendingTotal = report?.pendingTotal ?? 0;
+  const pendingCount = report?.pendingCount ?? 0;
+  const monthlyRevenue = report?.monthlyBilling ?? 0;
 
   const monthlyClients = packages
     .filter(p => p.billingType === "monthly" && p.status === "active")
@@ -770,7 +785,7 @@ export default function Payments() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 ${canViewRevenue ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-4`}>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
@@ -782,14 +797,15 @@ export default function Payments() {
             </div>
           </CardContent>
         </Card>
+        {canViewRevenue ? <>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
               <PoundSterling className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold" data-testid="stat-monthly-revenue">{currency}{monthlyRevenue.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground">Monthly Revenue</p>
+              <p className="text-2xl font-bold" data-testid="stat-monthly-revenue">{revenueQuery.isLoading ? "—" : `${currency}${monthlyRevenue.toFixed(2)}`}</p>
+              <p className="text-xs text-muted-foreground">Projected Monthly Billing</p>
             </div>
           </CardContent>
         </Card>
@@ -799,22 +815,22 @@ export default function Payments() {
               <Clock className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold" data-testid="stat-pending-invoices">{currency}{pendingTotal.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground">{pendingInvoices.length} Pending Invoices</p>
+              <p className="text-2xl font-bold" data-testid="stat-pending-invoices">{revenueQuery.isLoading ? "—" : `${currency}${pendingTotal.toFixed(2)}`}</p>
+              <p className="text-xs text-muted-foreground">{pendingCount} pending invoices</p>
             </div>
           </CardContent>
         </Card>
+        </> : <Card><CardContent className="p-4"><p className="text-sm font-medium">Payment tracking</p><p className="mt-1 text-xs text-muted-foreground">Record payments and follow outstanding invoices in Starter.</p></CardContent></Card>}
       </div>
 
-      {/* Revenue Overview */}
-      <Card>
+      {canViewRevenue ? <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle className="text-base flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" />
               Revenue Overview
             </CardTitle>
-            <div className="flex border rounded-lg overflow-hidden">
+            {!canBusinessReports && <div className="flex border rounded-lg overflow-hidden">
               <button
                 className={`px-3 py-1 text-sm font-medium transition-colors ${revenueScope === "week" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
                 onClick={() => setRevenueScope("week")}
@@ -825,30 +841,52 @@ export default function Payments() {
                 onClick={() => setRevenueScope("month")}
                 data-testid="button-scope-month"
               >This Month</button>
-            </div>
+            </div>}
           </div>
         </CardHeader>
         <CardContent>
+          {canBusinessReports && <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1"><Label htmlFor="report-from">From</Label><Input id="report-from" type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} data-testid="input-revenue-from" /></div>
+            <div className="space-y-1"><Label htmlFor="report-to">To</Label><Input id="report-to" type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} data-testid="input-revenue-to" /></div>
+            <div className="space-y-1"><Label htmlFor="report-client">Client</Label><Select value={reportClientId} onValueChange={setReportClientId}><SelectTrigger id="report-client" data-testid="select-revenue-client"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All clients</SelectItem>{clients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>)}</SelectContent></Select></div>
+          </div>}
+          {canBusinessReports && !validReportRange && <p className="mb-3 text-sm text-destructive" role="alert">Choose a valid date range with the start date on or before the end date.</p>}
+          {revenueQuery.isError ? <div role="alert" className="space-y-2 rounded-md border border-destructive/30 p-4 text-sm"><p>Revenue report could not be loaded.</p><Button variant="outline" size="sm" onClick={() => revenueQuery.refetch()}>Retry</Button></div> : revenueQuery.isLoading ? <div className="grid grid-cols-2 md:grid-cols-4 gap-4"><Skeleton className="h-20" /><Skeleton className="h-20" /><Skeleton className="h-20" /><Skeleton className="h-20" /></div> : <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Total Revenue</p>
-              <p className="text-2xl font-bold text-primary" data-testid="stat-scope-total">{currency}{scopeTotalRevenue.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-primary" data-testid="stat-scope-total">{currency}{(report?.totalRevenue || 0).toFixed(2)}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Monthly Billing</p>
-              <p className="text-2xl font-bold text-green-600" data-testid="stat-scope-monthly">{currency}{scopeMonthlyRevenue.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">Projected Monthly Billing</p>
+              <p className="text-2xl font-bold text-green-600" data-testid="stat-scope-monthly">{currency}{(report?.monthlyBilling || 0).toFixed(2)}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Block Bookings</p>
-              <p className="text-2xl font-bold text-blue-600" data-testid="stat-scope-block">{currency}{scopeBlockRevenue.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">Pending</p>
+              <p className="text-2xl font-bold" data-testid="stat-scope-pending">{currency}{(report?.pendingTotal || 0).toFixed(2)}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Sessions</p>
-              <p className="text-2xl font-bold" data-testid="stat-scope-sessions">{sessionsInScope.length}</p>
+              <p className="text-xs text-muted-foreground">Pending invoices</p>
+              <p className="text-2xl font-bold" data-testid="stat-paid-invoices">{report?.pendingCount ?? 0}</p>
             </div>
           </div>
+          {canBusinessReports && <div className="mt-5 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t pt-4">
+              <div><p className="text-xs text-muted-foreground">Paid block revenue</p><p className="text-lg font-semibold">{currency}{(report?.blockRevenue || 0).toFixed(2)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Paid monthly revenue</p><p className="text-lg font-semibold">{currency}{(report?.monthlyRevenue || 0).toFixed(2)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Paid invoices without package</p><p className="text-lg font-semibold">{report?.unallocatedPaidCount ?? 0}</p></div>
+            </div>
+            <div className="overflow-x-auto border-t pt-4">
+              <h3 className="mb-2 text-sm font-semibold">Paid revenue by client</h3>
+              {!report?.byClient?.length ? <p className="py-4 text-sm text-muted-foreground">No paid invoices in this report period.</p> : <table className="w-full text-sm">
+                <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 pr-4">Client</th><th className="py-2 pr-4">Paid invoices</th><th className="py-2 text-right">Paid revenue</th></tr></thead>
+                <tbody>{report.byClient.map((row) => <tr key={row.clientId} className="border-b last:border-0"><td className="py-2 pr-4">{row.clientName}</td><td className="py-2 pr-4">{row.invoiceCount}</td><td className="py-2 text-right">{currency}{row.paidTotal.toFixed(2)}</td></tr>)}</tbody>
+              </table>}
+            </div>
+          </div>}
+          </>}
         </CardContent>
-      </Card>
+      </Card> : <UpgradeNotice feature="revenueTracking" />}
 
       <Tabs defaultValue="packages">
         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1037,10 +1075,11 @@ export default function Payments() {
         </TabsContent>
 
         <TabsContent value="monthly" className="space-y-4 mt-4">
+          {!canMonthlyPackages ? <UpgradeNotice feature="paymentTracking" /> : <>
           <div className="flex items-start justify-between gap-2 flex-wrap">
             <div>
               <p className="font-medium">Monthly Payment Clients</p>
-              <p className="text-sm text-muted-foreground" role="status" data-testid="direct-debit-availability">{paymentCapabilities?.message || "Checking payment availability..."}</p>
+              <p className="text-sm text-muted-foreground" role="status" data-testid="direct-debit-availability">GoCardless monthly payment setup is unavailable. You can still record monthly package rates and payments manually.</p>
             </div>
             <Badge variant="outline" className="flex items-center gap-1">
               <Users className="w-3 h-3" />
@@ -1058,7 +1097,6 @@ export default function Payments() {
           ) : (
             <div className="space-y-3">
               {monthlyClients.map(({ pkg, client }) => {
-                const link = mandateLinks[client!.id];
                 return (
                   <Card key={pkg.id} data-testid={`card-monthly-client-${client!.id}`}>
                     <CardContent className="p-4">
@@ -1085,54 +1123,7 @@ export default function Payments() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                          {link ? (
-                            <div className="flex items-center gap-2">
-                              <div className="max-w-[180px] truncate text-xs text-muted-foreground border rounded px-2 py-1"
-                                data-testid={`text-mandate-link-${client!.id}`}>
-                                {link}
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(link);
-                                }}
-                                data-testid={`button-copy-link-${client!.id}`}
-                              >
-                                <Copy className="w-3 h-3 mr-1" />
-                                Copy
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setMandateLinks(prev => { const n = { ...prev }; delete n[client!.id]; return n; })}
-                                data-testid={`button-refresh-link-${client!.id}`}
-                              >
-                                <RefreshCw className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => generateMandateLink(client!)}
-                              disabled={generatingMandateFor === client!.id || paymentCapabilities?.directDebitAvailable !== true}
-                              data-testid={`button-generate-mandate-${client!.id}`}
-                            >
-                              {generatingMandateFor === client!.id ? (
-                                <>
-                                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                                  Generating...
-                                </>
-                              ) : (
-                                <>
-                                  <CreditCard className="w-3 h-3 mr-1" />
-                                  Set Up Direct Debit
-                                </>
-                              )}
-                            </Button>
-                          )}
-                        </div>
+                        <Badge variant="outline">Manual tracking</Badge>
                       </div>
                     </CardContent>
                   </Card>
@@ -1140,11 +1131,12 @@ export default function Payments() {
               })}
             </div>
           )}
+          </>}
         </TabsContent>
       </Tabs>
 
-      <NewPackageDialog open={newPackageOpen} onOpenChange={setNewPackageOpen} clients={clients} currency={currency} />
-      <NewInvoiceDialog open={newInvoiceOpen} onOpenChange={setNewInvoiceOpen} clients={clients} currency={currency} />
+      <NewPackageDialog open={newPackageOpen} onOpenChange={setNewPackageOpen} clients={clients} currency={currency} allowMonthly={canMonthlyPackages} />
+      <NewInvoiceDialog open={newInvoiceOpen} onOpenChange={setNewInvoiceOpen} clients={clients} currency={currency} allowPaymentTracking={canTrackPayments} />
       {editingPkg && (
         <EditSessionsDialog
           open={!!editingPkg}
@@ -1158,6 +1150,8 @@ export default function Payments() {
           clientName={clientMap.get(viewingInvoice.clientId) || "Unknown"}
           settings={settings}
           onClose={() => setViewingInvoice(null)}
+          allowInvoiceManagement={canInvoiceManagement}
+          allowPaymentTracking={canTrackPayments}
         />
       )}
     </div>
