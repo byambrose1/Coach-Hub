@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, ChevronLeft, ChevronRight, Clock, MapPin, X, Check, Ban, Trash2 } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Clock, MapPin, X, Check, Ban, Trash2, FileText } from "lucide-react";
+import { Link } from "wouter";
 import {
   format,
   startOfMonth,
@@ -30,7 +31,8 @@ import {
   subDays,
   eachDayOfInterval,
 } from "date-fns";
-import type { Session, Client, Settings } from "@shared/schema";
+import type { Session, Client, Settings, Invoice } from "@shared/schema";
+import { isOverdue } from "@/lib/invoice-status";
 
 type CalView = "month" | "week" | "day";
 
@@ -216,10 +218,11 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate, presel
   );
 }
 
-function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, updateStatus, cancellationNoticeHours }: {
+function DayDetailDialog({ date, sessions, clientMap, invoices, onClose, onAddSession, updateStatus, cancellationNoticeHours }: {
   date: Date;
   sessions: Session[];
   clientMap: Map<string, string>;
+  invoices: Invoice[];
   onClose: () => void;
   onAddSession: (date: string) => void;
   updateStatus: (args: { id: string; status: string; deductSession?: boolean }) => void;
@@ -264,6 +267,8 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
 
   const cancelledSessions = sessions
     .filter((s) => s.date === dateStr && s.status === "cancelled");
+
+  const dueInvoices = invoices.filter((inv) => inv.dueDate === dateStr && inv.status !== "paid");
 
   return (
     <Dialog open={true} onOpenChange={() => onClose()}>
@@ -374,6 +379,28 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
                   {s.startTime} - {clientMap.get(s.clientId) || "Unknown"}
                 </div>
               ))}
+            </div>
+          )}
+
+          {dueInvoices.length > 0 && (
+            <div className="pt-2 border-t">
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <FileText className="w-3 h-3" /> Payments due
+              </p>
+              {dueInvoices.map((inv) => {
+                const overdue = isOverdue(inv);
+                return (
+                  <Link key={inv.id} href="/payments">
+                    <div
+                      className={`flex items-center justify-between gap-2 py-1.5 px-2 rounded-md text-xs ${overdue ? "bg-destructive/10 text-destructive" : "bg-amber-500/10 text-amber-700"}`}
+                      data-testid={`due-invoice-${inv.id}`}
+                    >
+                      <span>{clientMap.get(inv.clientId) || "Unknown"} · {inv.invoiceNumber}</span>
+                      <span className="font-medium">{overdue ? "Overdue" : "Due"}</span>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
@@ -599,6 +626,10 @@ export default function Schedule() {
     queryKey: ["/api/clients"],
   });
 
+  const { data: invoices = [] } = useQuery<Invoice[]>({
+    queryKey: ["/api/invoices"],
+  });
+
   const { data: settings } = useQuery<Settings>({
     queryKey: ["/api/settings"],
   });
@@ -802,6 +833,8 @@ export default function Schedule() {
                 const isBlocked = blockedSessions.length > 0;
                 const inCurrentMonth = isSameMonth(calDay, currentMonth);
                 const today = isToday(calDay);
+                const dueInvoicesForDay = invoices.filter((inv) => inv.dueDate === dateStr && inv.status !== "paid");
+                const hasOverdueInvoice = dueInvoicesForDay.some((inv) => isOverdue(inv));
 
                 return (
                   <div
@@ -820,9 +853,14 @@ export default function Schedule() {
                       >
                         {format(calDay, "d")}
                       </span>
-                      {daySessions.length > 0 && (
-                        <span className="text-[10px] text-muted-foreground">{daySessions.length}</span>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {dueInvoicesForDay.length > 0 && (
+                          <FileText className={`w-3 h-3 ${hasOverdueInvoice ? "text-destructive" : "text-amber-600"}`} data-testid={`due-indicator-${dateStr}`} />
+                        )}
+                        {daySessions.length > 0 && (
+                          <span className="text-[10px] text-muted-foreground">{daySessions.length}</span>
+                        )}
+                      </div>
                     </div>
 
                     {isBlocked && (
@@ -1034,6 +1072,7 @@ export default function Schedule() {
           date={detailDate}
           sessions={sessions}
           clientMap={clientMap}
+          invoices={invoices}
           onClose={() => setDetailDate(null)}
           onAddSession={handleNewSession}
           updateStatus={(args) => updateStatus.mutate(args)}

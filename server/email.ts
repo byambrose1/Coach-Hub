@@ -95,6 +95,78 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
   }
 }
 
+interface OverdueReminderEmailData {
+  clientName: string;
+  clientEmail: string;
+  invoiceNumber: string;
+  amount: string;
+  amountPaid?: string;
+  currency: string;
+  dueDate: string;
+  daysOverdue: number;
+  trainerName: string;
+  businessName: string;
+  businessAddress?: string;
+  trainerEmail?: string;
+  paymentMethods?: Settings;
+}
+
+export async function sendOverdueReminderEmail(data: OverdueReminderEmailData): Promise<void> {
+  const { clientName, clientEmail, invoiceNumber, amount, amountPaid, currency, dueDate, daysOverdue, trainerName, businessName, businessAddress, trainerEmail, paymentMethods } = data;
+  const { senderName, senderEmail, replyTo } = getSenderIdentity(trainerName, businessName, trainerEmail);
+  const paid = parseFloat(amountPaid || "0") || 0;
+  const outstanding = (parseFloat(amount) || 0) - paid;
+
+  const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:0}
+    .container{max-width:600px;margin:0 auto;background:#fff}
+    .header{background:#dc2626;color:white;padding:30px;text-align:center}
+    .header h1{margin:0;font-size:24px}
+    .body{padding:30px}
+    .overdue-badge{display:inline-block;background:#fee2e2;color:#991b1b;padding:4px 12px;border-radius:12px;font-size:13px;font-weight:600;margin-bottom:16px}
+    .details-table{width:100%;border-collapse:collapse;margin:20px 0}
+    .details-table td{padding:10px 0;border-bottom:1px solid #eee;font-size:14px}
+    .details-table td:first-child{color:#666;width:40%}
+    .details-table td:last-child{color:#333;font-weight:500}
+    .amount-row td{font-size:18px!important;font-weight:700!important;border-bottom:2px solid #dc2626!important}
+    .amount-row td:last-child{color:#dc2626!important}
+    .footer{padding:20px 30px;background:#f9fafb;text-align:center;font-size:12px;color:#888}
+  </style></head><body>
+  <div class="container">
+    <div class="header"><h1>${senderName}</h1></div>
+    <div class="body">
+      <span class="overdue-badge">Payment overdue · ${daysOverdue} day${daysOverdue !== 1 ? "s" : ""}</span>
+      <p>Hi ${clientName},</p>
+      <p style="color:#555;font-size:14px;">This is a friendly reminder that invoice ${invoiceNumber} is now overdue. Here are the details:</p>
+      <table class="details-table">
+        <tr><td>Invoice Number</td><td>${invoiceNumber}</td></tr>
+        <tr><td>Due Date</td><td>${dueDate}</td></tr>
+        ${paid > 0 ? `<tr><td>Already Paid</td><td>${currency}${paid.toFixed(2)}</td></tr>` : ""}
+        <tr class="amount-row"><td>Amount Outstanding</td><td>${currency}${outstanding.toFixed(2)}</td></tr>
+      </table>
+      ${paymentMethodsHtml(paymentMethods)}
+      <p style="color:#555;font-size:14px;">If you've already made this payment, please disregard this message. Otherwise, get in touch if you have any questions.</p>
+      <p style="color:#333;font-size:14px;">Thank you,<br><strong>${trainerName}</strong></p>
+    </div>
+    <div class="footer">${businessAddress ? `<p>${businessAddress}</p>` : ""}<p>Sent via Practably</p></div>
+  </div>
+  </body></html>`;
+
+  try {
+    await brevo.transactionalEmails.sendTransacEmail({
+      subject: `Payment reminder: Invoice ${invoiceNumber} is overdue`,
+      htmlContent,
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: clientEmail, name: clientName }],
+      replyTo,
+    });
+    console.log("Overdue reminder email sent");
+  } catch (error: any) {
+    logError("Failed to send overdue reminder email", error);
+    throw error;
+  }
+}
+
 export async function sendBookingNotificationEmail(data: {
   clientName: string;
   clientEmail: string;

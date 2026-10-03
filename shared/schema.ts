@@ -165,6 +165,8 @@ export const invoices = pgTable("invoices", {
   amount: text("amount").notNull(),
   status: text("status").default("pending"),
   dueDate: text("due_date").notNull(),
+  originalDueDate: text("original_due_date"),
+  amountPaid: text("amount_paid").default("0"),
   sentDate: text("sent_date"),
   paidDate: text("paid_date"),
   notes: text("notes"),

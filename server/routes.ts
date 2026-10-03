@@ -6,6 +6,7 @@ import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSes
 import { isAuthenticated as defaultIsAuthenticated, authStorage } from "./replit_integrations/auth";
 import {
   sendInvoiceEmail as defaultSendInvoiceEmail,
+  sendOverdueReminderEmail as defaultSendOverdueReminderEmail,
   sendBookingNotificationEmail as defaultSendBookingNotificationEmail,
   sendSessionCancellationEmail,
   sendSessionRescheduleEmail,
@@ -153,6 +154,7 @@ export async function registerRoutes(
     isAuthenticated?: RequestHandler;
     sendBookingNotificationEmail?: typeof defaultSendBookingNotificationEmail;
     sendInvoiceEmail?: typeof defaultSendInvoiceEmail;
+    sendOverdueReminderEmail?: typeof defaultSendOverdueReminderEmail;
     sendParqEmail?: typeof defaultSendParqEmail;
     sendLowSessionsEmail?: typeof defaultSendLowSessionsEmail;
     sendBroadcastEmail?: typeof defaultSendBroadcastEmail;
@@ -166,6 +168,8 @@ export async function registerRoutes(
   const sendBookingNotificationEmail =
     dependencies.sendBookingNotificationEmail ?? defaultSendBookingNotificationEmail;
   const sendInvoiceEmail = dependencies.sendInvoiceEmail ?? defaultSendInvoiceEmail;
+  const sendOverdueReminderEmail =
+    dependencies.sendOverdueReminderEmail ?? defaultSendOverdueReminderEmail;
   const sendParqEmail = dependencies.sendParqEmail ?? defaultSendParqEmail;
   const sendLowSessionsEmail =
     dependencies.sendLowSessionsEmail ?? defaultSendLowSessionsEmail;
@@ -1250,9 +1254,87 @@ export async function registerRoutes(
   });
 
   app.patch("/api/invoices/:id", async (req, res) => {
-    const inv = await storage.updateInvoice(getUserId(req), req.params.id, withoutOwnershipFields(req.body));
+    const userId = getUserId(req);
+    const updates = withoutOwnershipFields(req.body);
+
+    // Keep the first due date a coach set when it's later extended, so the
+    // invoice can show "originally due X, extended to Y" instead of just
+    // silently overwriting it.
+    if (typeof updates.dueDate === "string") {
+      const existing = await storage.getInvoice(userId, req.params.id);
+      if (existing && updates.dueDate !== existing.dueDate && !existing.originalDueDate) {
+        updates.originalDueDate = existing.dueDate;
+      }
+    }
+
+    const inv = await storage.updateInvoice(userId, req.params.id, updates);
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
     res.json(inv);
+  });
+
+  app.post("/api/invoices/:id/record-payment", async (req, res) => {
+    const userId = getUserId(req);
+    const amountInput = parseFloat(req.body?.amount);
+    if (!Number.isFinite(amountInput) || amountInput <= 0) {
+      return res.status(400).json({ message: "Enter a valid payment amount." });
+    }
+
+    const inv = await storage.getInvoice(userId, req.params.id);
+    if (!inv) return res.status(404).json({ message: "Invoice not found" });
+
+    const previouslyPaid = parseFloat(inv.amountPaid || "0") || 0;
+    const total = parseFloat(inv.amount) || 0;
+    const newAmountPaid = Math.min(previouslyPaid + amountInput, total);
+    const isFullyPaid = newAmountPaid >= total;
+
+    const updated = await storage.updateInvoice(userId, req.params.id, {
+      amountPaid: newAmountPaid.toFixed(2),
+      status: isFullyPaid ? "paid" : "partially_paid",
+      paidDate: isFullyPaid ? (req.body?.date || new Date().toISOString().split("T")[0]) : inv.paidDate,
+    });
+
+    res.json(updated);
+  });
+
+  app.post("/api/invoices/:id/remind", async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const inv = await storage.getInvoice(userId, req.params.id);
+      if (!inv) return res.status(404).json({ message: "Invoice not found" });
+      const client = await storage.getClient(userId, inv.clientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!client.email) return res.status(400).json({ message: "Client has no email address" });
+
+      const today = new Date().toISOString().split("T")[0];
+      const daysOverdue = Math.max(
+        1,
+        Math.round((new Date(today).getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)),
+      );
+
+      const s = await storage.getSettings(userId);
+      const currency = s?.currency || "£";
+
+      await sendOverdueReminderEmail({
+        clientName: client.name,
+        clientEmail: client.email,
+        invoiceNumber: inv.invoiceNumber,
+        amount: inv.amount,
+        amountPaid: inv.amountPaid || undefined,
+        currency,
+        dueDate: inv.dueDate,
+        daysOverdue,
+        trainerName: s?.trainerName || "Coach",
+        businessName: s?.businessName || "",
+        businessAddress: s?.businessAddress || undefined,
+        trainerEmail: s?.trainerEmail || undefined,
+        paymentMethods: s,
+      });
+
+      res.json({ sent: true });
+    } catch (err) {
+      logError("Error sending overdue reminder email", err);
+      res.status(502).json(EMAIL_PROVIDER_ERROR);
+    }
   });
 
   app.post("/api/invoices/:id/send", async (req, res) => {

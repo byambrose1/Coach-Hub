@@ -191,6 +191,9 @@ before(async () => {
     sendInvoiceEmail: async () => {
       throw new Error("private-provider-detail: Brevo invoice request was rejected");
     },
+    sendOverdueReminderEmail: async () => {
+      throw new Error("private-provider-detail: Brevo reminder request was rejected");
+    },
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
@@ -311,6 +314,56 @@ test("creates the first client, booking, PAR-Q form, and invoice", async () => {
     dashboardLogs,
     /Test Client|client@example|First coaching session|PAR-Q Health Screening|Ready\?|INV-TEST-001|50\.00/,
   );
+});
+
+test("records partial payments against an invoice until it's fully paid", async () => {
+  const invoice = state.invoices[0];
+  assert.equal(invoice.amount, "50.00");
+
+  const partial = await request(`/api/invoices/${invoice.id}/record-payment`, {
+    method: "POST",
+    body: JSON.stringify({ amount: "20" }),
+  });
+  assert.equal(partial.response.status, 200);
+  assert.equal(partial.body.amountPaid, "20.00");
+  assert.equal(partial.body.status, "partially_paid");
+  assert.equal(partial.body.paidDate, undefined);
+
+  const rejected = await request(`/api/invoices/${invoice.id}/record-payment`, {
+    method: "POST",
+    body: JSON.stringify({ amount: "not-a-number" }),
+  });
+  assert.equal(rejected.response.status, 400);
+
+  const final = await request(`/api/invoices/${invoice.id}/record-payment`, {
+    method: "POST",
+    body: JSON.stringify({ amount: "30" }),
+  });
+  assert.equal(final.response.status, 200);
+  assert.equal(final.body.amountPaid, "50.00");
+  assert.equal(final.body.status, "paid");
+  assert.ok(final.body.paidDate);
+});
+
+test("keeps the original due date the first time an invoice's due date is extended", async () => {
+  const invoice = state.invoices[0];
+  assert.equal(invoice.originalDueDate, undefined);
+
+  const firstExtension = await request(`/api/invoices/${invoice.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ dueDate: "2026-09-28" }),
+  });
+  assert.equal(firstExtension.response.status, 200);
+  assert.equal(firstExtension.body.originalDueDate, "2026-09-14");
+  assert.equal(firstExtension.body.dueDate, "2026-09-28");
+
+  const secondExtension = await request(`/api/invoices/${invoice.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ dueDate: "2026-10-05" }),
+  });
+  assert.equal(secondExtension.response.status, 200);
+  assert.equal(secondExtension.body.originalDueDate, "2026-09-14");
+  assert.equal(secondExtension.body.dueDate, "2026-10-05");
 });
 
 test("prevents double-booking overlapping sessions but allows group and non-overlapping bookings", async () => {
@@ -480,6 +533,7 @@ test("email provider failures return stable responses without provider details",
     ],
     [`/api/packages/${pkg.id}/notify-low-sessions`, { method: "POST" }],
     [`/api/invoices/${invoice.id}/send`, { method: "POST" }],
+    [`/api/invoices/${invoice.id}/remind`, { method: "POST" }],
   ];
 
   for (const [path, init] of attempts) {
@@ -533,6 +587,8 @@ test("rejects record IDs owned by a different authenticated coach", async () => 
     [`/api/referrals/${foreignReferral.id}`, { method: "PATCH", body: JSON.stringify({ status: "converted" }) }],
     [`/api/invoices/${foreignInvoice.id}`, { method: "PATCH", body: JSON.stringify({ status: "paid" }) }],
     [`/api/invoices/${foreignInvoice.id}/send`, { method: "POST" }],
+    [`/api/invoices/${foreignInvoice.id}/record-payment`, { method: "POST", body: JSON.stringify({ amount: "50" }) }],
+    [`/api/invoices/${foreignInvoice.id}/remind`, { method: "POST" }],
   ];
 
   for (const [path, init] of attempts) {

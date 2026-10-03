@@ -13,12 +13,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Package, CreditCard, AlertTriangle, FileText, Clock, CheckCircle, Pencil, Download, Send, PoundSterling, TrendingUp, Users, Calendar } from "lucide-react";
+import { Plus, Package, CreditCard, AlertTriangle, FileText, Clock, CheckCircle, Pencil, Download, Send, PoundSterling, TrendingUp, Users, Calendar, BellRing, Banknote } from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import type { Client, Package as PackageType, Settings, Invoice, Session } from "@shared/schema";
 import { paymentMethodsHtml } from "@shared/payment-methods";
 import { trackActivationEvent } from "@/lib/activation";
 import { siteConfig } from "@/config/site";
+import { getDisplayStatus, isOverdue, DISPLAY_STATUS_LABELS, type InvoiceDisplayStatus } from "@/lib/invoice-status";
 
 function formatDateUK(dateStr: string): string {
   try {
@@ -286,16 +287,27 @@ function NewInvoiceDialog({ open, onOpenChange, clients, currency }: {
   );
 }
 
-function InvoiceStatusBadge({ status }: { status: string }) {
-  const variants: Record<string, "default" | "secondary" | "destructive"> = {
+function InvoiceStatusBadge({ invoice }: { invoice: Invoice }) {
+  const displayStatus = getDisplayStatus(invoice);
+  const variants: Record<InvoiceDisplayStatus, "default" | "secondary" | "destructive"> = {
     pending: "secondary",
     sent: "default",
     paid: "default",
     overdue: "destructive",
+    due_soon: "secondary",
+    partially_paid: "secondary",
+  };
+  const extraClass: Partial<Record<InvoiceDisplayStatus, string>> = {
+    due_soon: "bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200",
+    partially_paid: "bg-blue-100 text-blue-800 hover:bg-blue-100 border-blue-200",
   };
   return (
-    <Badge variant={variants[status] || "secondary"} data-testid={`badge-invoice-status-${status}`}>
-      {status}
+    <Badge
+      variant={variants[displayStatus]}
+      className={extraClass[displayStatus]}
+      data-testid={`badge-invoice-status-${displayStatus}`}
+    >
+      {DISPLAY_STATUS_LABELS[displayStatus]}
     </Badge>
   );
 }
@@ -415,6 +427,43 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
     },
   });
 
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [showRecordPayment, setShowRecordPayment] = useState(false);
+
+  const recordPaymentMutation = useMutation({
+    mutationFn: async (amount: string) => {
+      const res = await apiRequest("POST", `/api/invoices/${invoice.id}/record-payment`, { amount });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      toast({ title: "Payment recorded" });
+      setPaymentAmount("");
+      setShowRecordPayment(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error recording payment", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const remindMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/invoices/${invoice.id}/remind`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Reminder sent", description: "The client has been emailed about this overdue invoice." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error sending reminder", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const amountPaid = parseFloat(invoice.amountPaid || "0") || 0;
+  const totalAmount = parseFloat(invoice.amount) || 0;
+  const outstanding = Math.max(totalAmount - amountPaid, 0);
+  const overdue = isOverdue(invoice);
+
   const handleDownload = () => {
     const invoiceHTML = `
       <!DOCTYPE html>
@@ -518,7 +567,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
             {isEditing ? "Edit Invoice" : `Invoice ${invoice.invoiceNumber}`}
           </DialogTitle>
           <DialogDescription>
-            {clientName} · <InvoiceStatusBadge status={invoice.status || "pending"} />
+            {clientName} · <InvoiceStatusBadge invoice={invoice} />
           </DialogDescription>
         </DialogHeader>
 
@@ -567,6 +616,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
                   <SelectContent>
                     <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="partially_paid">Partially Paid</SelectItem>
                     <SelectItem value="paid">Paid</SelectItem>
                     <SelectItem value="overdue">Overdue</SelectItem>
                   </SelectContent>
@@ -612,10 +662,23 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
               <div>
                 <p className="text-xs text-muted-foreground">Amount</p>
                 <p className="text-lg font-bold" data-testid="text-detail-amount">{currency}{invoice.amount}</p>
+                {amountPaid > 0 && invoice.status !== "paid" && (
+                  <p className="text-xs text-blue-700 mt-0.5" data-testid="text-detail-amount-paid">
+                    {currency}{amountPaid.toFixed(2)} paid · {currency}{outstanding.toFixed(2)} outstanding
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Due Date</p>
-                <p className="text-sm font-medium" data-testid="text-detail-due-date">{formatDateUK(invoice.dueDate)}</p>
+                <p className={`text-sm font-medium ${overdue ? "text-destructive" : ""}`} data-testid="text-detail-due-date">
+                  {formatDateUK(invoice.dueDate)}
+                  {overdue && " (overdue)"}
+                </p>
+                {invoice.originalDueDate && invoice.originalDueDate !== invoice.dueDate && (
+                  <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-detail-original-due-date">
+                    Originally due {formatDateUK(invoice.originalDueDate)} · extended
+                  </p>
+                )}
               </div>
             </div>
 
@@ -647,6 +710,31 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
               </div>
             )}
 
+            {showRecordPayment && (
+              <div className="rounded-md border p-3 space-y-2">
+                <Label className="text-xs">Payment amount ({currency})</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder={outstanding.toFixed(2)}
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    data-testid="input-record-payment-amount"
+                  />
+                  <Button
+                    size="sm"
+                    disabled={!paymentAmount || recordPaymentMutation.isPending}
+                    onClick={() => recordPaymentMutation.mutate(paymentAmount)}
+                    data-testid="button-confirm-record-payment"
+                  >
+                    {recordPaymentMutation.isPending ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} data-testid="button-edit-invoice">
                 <Pencil className="w-3 h-3 mr-1" />
@@ -670,11 +758,35 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose }: {
               )}
               {invoice.status !== "paid" && (
                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowRecordPayment((v) => !v)}
+                  data-testid="button-record-payment"
+                >
+                  <Banknote className="w-3 h-3 mr-1" />
+                  Record Payment
+                </Button>
+              )}
+              {overdue && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => remindMutation.mutate()}
+                  disabled={remindMutation.isPending}
+                  data-testid="button-send-reminder"
+                >
+                  <BellRing className="w-3 h-3 mr-1" />
+                  {remindMutation.isPending ? "Sending..." : "Send Reminder"}
+                </Button>
+              )}
+              {invoice.status !== "paid" && (
+                <Button
                   variant="default"
                   size="sm"
                   onClick={() => {
                     apiRequest("PATCH", `/api/invoices/${invoice.id}`, {
                       status: "paid",
+                      amountPaid: invoice.amount,
                       paidDate: new Date().toISOString().split("T")[0],
                     }).then(() => {
                       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
@@ -747,7 +859,9 @@ export default function Payments() {
 
   const activePackages = packages.filter((p) => p.status === "active");
   const lowPackages = activePackages.filter((p) => p.billingType !== "monthly" && (p.totalSessions - (p.usedSessions || 0)) <= 2);
-  
+  const overdueInvoices = invoices.filter((inv) => isOverdue(inv));
+
+
   const calculateRevenue = () => {
     const monthlyRevenue = activePackages
       .filter((p) => p.billingType === "monthly" && p.monthlyRate)
@@ -1042,6 +1156,35 @@ export default function Payments() {
         </TabsContent>
 
         <TabsContent value="invoices" className="space-y-4 mt-4">
+          {overdueInvoices.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                  Overdue Invoices
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {overdueInvoices.map((inv) => (
+                    <div
+                      key={inv.id}
+                      className="flex items-center justify-between gap-2 py-1 cursor-pointer"
+                      onClick={() => setViewingInvoiceId(inv.id)}
+                      data-testid={`alert-overdue-${inv.id}`}
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{clientMap.get(inv.clientId) || "Unknown"}</p>
+                        <p className="text-xs text-muted-foreground">{inv.invoiceNumber} · due {formatDateUK(inv.dueDate)}</p>
+                      </div>
+                      <Badge variant="destructive">{currency}{inv.amount}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {invoices.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
@@ -1081,7 +1224,7 @@ export default function Payments() {
                             {inv.paymentMethod}
                           </Badge>
                         )}
-                        <InvoiceStatusBadge status={inv.status || "pending"} />
+                        <InvoiceStatusBadge invoice={inv} />
                       </div>
                     </div>
                     {inv.notes && (
