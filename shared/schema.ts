@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, date, jsonb } from "drizzle-orm/pg-core";
+import type { CustomQuestion } from "./custom-forms";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -233,3 +234,28 @@ export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({
 });
 export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
 export type BlogPost = typeof blogPosts.$inferSelect;
+
+export const formTemplates = pgTable("form_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  questions: jsonb("questions").$type<CustomQuestion[]>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+});
+
+export const formRequests = pgTable("form_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull(),
+  templateId: varchar("template_id").references(() => formTemplates.id, { onDelete: "set null" }),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  questions: jsonb("questions").$type<CustomQuestion[]>().notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  status: text("status").notNull().default("pending"),
+  expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true, mode: "string" }),
+  clientFormId: varchar("client_form_id").references(() => clientForms.id, { onDelete: "set null" }),
+});

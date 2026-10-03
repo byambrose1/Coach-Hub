@@ -1,4 +1,5 @@
 import { publicPlansFromConfig } from "@shared/public-site";
+import { registerCustomFormRoutes } from "./custom-form-routes";
 import { featureMinimumPlan, featureLabels, hasFeature, type FeatureName } from "@shared/subscription-features";
 import { revenueReport } from "./revenue-report";
 import { deleteSupabaseAccounts } from "./auth/identities";
@@ -383,6 +384,7 @@ export async function registerRoutes(
   app.use("/api/forms", isAuthenticated);
   app.use("/api/referrals", isAuthenticated);
   app.use("/api/invoices", isAuthenticated);
+  registerCustomFormRoutes(app, { storage, isAuthenticated, getUserId });
 
   const resolveStripePrice = async (plan: string): Promise<string> => {
     const priceId = getStripePriceId(plan);

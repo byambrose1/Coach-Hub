@@ -2,7 +2,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   clients, trainingSessions, packages, sessionNotes, settings, clientForms, referrals, invoices, users, platformConfig,
-  waitlistSignups, blogPosts,
+  waitlistSignups, blogPosts, formRequests, formTemplates,
   type Client, type InsertClient,
   type Session, type InsertSession,
   type Package, type InsertPackage,
@@ -290,6 +290,8 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAccountData(userId: string): Promise<void> {
     await db.transaction(async tx => {
+      await tx.delete(formRequests).where(eq(formRequests.userId, userId));
+      await tx.delete(formTemplates).where(eq(formTemplates.userId, userId));
       await tx.delete(invoices).where(eq(invoices.userId, userId));
       await tx.delete(sessionNotes).where(eq(sessionNotes.userId, userId));
       await tx.delete(clientForms).where(eq(clientForms.userId, userId));

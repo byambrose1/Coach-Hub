@@ -71,6 +71,12 @@ test("signed-in workspace shells do not publish private content or index themsel
   assert.ok(page.html.includes('content="noindex,nofollow"'));
   assert.ok(page.html.includes('<div id="root"></div>'));
 });
+test("client form entry renders a noindex shell without private information", async () => {
+  const page = await renderPublicDocument(template, "/f", publicStorage);
+  assert.equal(page.status, 200);
+  assert.ok(page.html.includes('content="noindex,nofollow"'));
+  assert.ok(page.html.includes('<div id="root"></div>'));
+});
 
 test("legal pages ask users to read the documents without requiring or claiming solicitor review", async () => {
   for (const pathname of ["/terms", "/privacy"]) {

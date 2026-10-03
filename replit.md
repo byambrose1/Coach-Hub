@@ -163,6 +163,15 @@ A business hub for independent coaches managing in-person and online clients. Fe
 - Monthly packages track rates and sessions; they do not automatically collect client payments.
 - Stripe handles Practably coach subscriptions separately from coach-client payments.
 
+## Custom client forms
+- Client profile → Forms supports reusable templates, question ordering, required fields, text, long text, yes/no, single choice and multiple choice.
+- Coaches can enter responses themselves or copy a private client link. Existing PAR-Q is preserved.
+- Assigned requests snapshot the questions. Template edits/deletion do not change already assigned forms or delete responses.
+- Client links use `/f#token`, expire after 30 days, accept one submission and can be revoked. Tokens are hashed at rest and are not sent in request URLs. Anyone possessing a link can submit; no recipient identity or signature verification is claimed.
+- Completed answers use the existing client-form records/viewer/export. Pending requests cascade on client deletion; account deletion removes templates and requests.
+- Server startup applies an additive, transactional, idempotent schema setup for the two new tables. Do not use a broad schema push to drop old payment columns.
+- Verification: `script/test-custom-forms-storage.ts` creates and cleans disposable fictional database fixtures; `script/test-custom-forms-browser.cjs` intercepts every API call.
+
 ## Terms & Conditions
 - `hasAcceptedTerms` field in settings table
 - `TermsModal` in `App.tsx` shown once on first login until accepted

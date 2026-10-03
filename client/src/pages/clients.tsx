@@ -21,6 +21,7 @@ import { UpgradePopup } from "@/components/upgrade-popup";
 import { trackActivationEvent } from "@/lib/activation";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { UpgradeNotice } from "@/components/upgrade-notice";
+import { CustomFormsPanel } from "@/components/custom-forms-panel";
 
 function formatDateUK(dateStr: string): string {
   try {
@@ -421,9 +422,24 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
         lines.push(`  ${formatDateUK(n.date)}: ${n.content}`);
       });
       lines.push("");
-      lines.push(`HEALTH FORMS (${data.forms.length})`);
+      lines.push(`CLIENT FORMS (${data.forms.length})`);
       data.forms.forEach((f: any) => {
         lines.push(`  ${formatDateUK(f.date)} - ${f.title} [${f.status}]`);
+        try {
+          const responses = JSON.parse(f.responses) as Array<{ question: string; answer: unknown }>;
+          if (Array.isArray(responses)) {
+            responses.forEach(response => {
+              const answer = Array.isArray(response.answer)
+                ? response.answer.join(", ")
+                : typeof response.answer === "boolean"
+                  ? (response.answer ? "Yes" : "No")
+                  : String(response.answer ?? "");
+              lines.push(`    ${response.question}: ${answer || "-"}`);
+            });
+          }
+        } catch {
+          if (f.responses) lines.push(`    Responses: ${f.responses}`);
+        }
       });
       lines.push("");
       lines.push(`INVOICES (${data.invoices.length})`);
@@ -834,6 +850,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                   </Button>
                 )}
               </div>
+              <CustomFormsPanel clientId={client.id} clientName={client.name} clientForms={clientForms} onViewForm={setViewingForm} />
               {clientForms.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No forms yet</p>
               ) : (
@@ -1009,13 +1026,25 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
           </DialogHeader>
           {viewingForm && (() => {
             try {
-              const responses = JSON.parse(viewingForm.responses) as Array<{ question: string; answer: boolean }>;
+              const responses = JSON.parse(viewingForm.responses) as Array<{ question: string; answer: unknown }>;
+              if (viewingForm.formType !== "parq") {
+                return (
+                  <div className="space-y-4">
+                    {responses.map((response, index) => (
+                      <div key={index} className="border-b pb-3 last:border-b-0">
+                        <p className="text-xs font-medium text-muted-foreground">{response.question}</p>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-sm">{Array.isArray(response.answer) ? response.answer.join(", ") : typeof response.answer === "boolean" ? (response.answer ? "Yes" : "No") : String(response.answer)}</p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
               return (
                 <div className="space-y-3">
                   {responses.map((r, i) => (
                     <div key={i} className="flex items-start gap-2 py-1 border-b last:border-b-0">
-                      <Badge variant={r.answer ? "destructive" : "secondary"} className="text-xs flex-shrink-0 mt-0.5">
-                        {r.answer ? "Yes" : "No"}
+                      <Badge variant={r.answer === true ? "destructive" : "secondary"} className="text-xs flex-shrink-0 mt-0.5">
+                        {Array.isArray(r.answer) ? r.answer.join(", ") : typeof r.answer === "boolean" ? (r.answer ? "Yes" : "No") : String(r.answer)}
                       </Badge>
                       <p className="text-sm">{r.question}</p>
                     </div>

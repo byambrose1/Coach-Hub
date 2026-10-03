@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
+import { ensureCustomFormsSchema } from "./custom-form-schema";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { createApiRequestLogger, logError } from "./safe-logging";
@@ -76,6 +77,7 @@ app.use(
   const { seedDatabase, seedBlogPosts } = await import("./seed");
   await seedDatabase();
   await seedBlogPosts();
+  await ensureCustomFormsSchema();
   await registerRoutes(httpServer, app);
   app.use("/api", (_req, res) => res.status(404).json({ message: "Endpoint not found." }));
 

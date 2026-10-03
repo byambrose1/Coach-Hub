@@ -14,7 +14,7 @@ const slides = [
   { label: "Overview", title: "A clearer view of the week.", detail: "The dashboard brings sessions, active clients, and low-session alerts into one practical starting point.", icon: CalendarDays },
   { label: "Clients", title: "Every client, in context.", detail: "Keep contact details, session history, coaching notes, packages, and forms together on one client record.", icon: Users },
   { label: "Scheduling", title: "Bookings that stay connected.", detail: "Book a session for a client, manage your schedule, and keep session type, time, and location visible.", icon: CalendarDays },
-  { label: "PARQ forms", title: "Forms in the client workflow.", detail: "Send a PAR-Q email and keep completed health-screening forms with the corresponding client record.", icon: ClipboardCheck },
+  { label: "Client forms", title: "PAR-Q and forms that fit your work.", detail: "Keep PAR-Q alongside custom client forms. Build question templates, share a private link for clients to complete, or enter responses together in the client record.", icon: ClipboardCheck },
   { label: "Invoices & email", title: "Clear follow-through for both sides.", detail: "Create and email invoices, track their status, and send routine client emails for bookings, forms, or low session balances.", icon: CreditCard },
 ];
 
@@ -29,7 +29,7 @@ function AppFrame({ children, section }: { children: ReactNode; section: string 
         <aside className="hidden border-r border-slate-200 bg-white p-3 sm:block">
           <p className="px-2 pb-3 pt-1 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400">Workspace</p>
           {[
-            [CalendarDays, "Dashboard"], [Users, "Clients"], [CalendarDays, "Schedule"], [ClipboardCheck, "PARQ forms"], [CreditCard, "Invoices"],
+            [CalendarDays, "Dashboard"], [Users, "Clients"], [CalendarDays, "Schedule"], [ClipboardCheck, "Client forms"], [CreditCard, "Invoices"],
           ].map(([Icon, label]: any) => <div key={label} className={`mb-1 flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold ${section === label ? "bg-violet-50 text-violet-800" : "text-slate-500"}`}><Icon className="h-3.5 w-3.5" />{label}</div>)}
         </aside>
         <div className="min-w-0 p-3 sm:p-6">{children}</div>
@@ -65,7 +65,26 @@ function ScheduleSlide() {
 }
 
 function FormsSlide() {
-  return <AppFrame section="PARQ forms"><div className="grid gap-4 md:grid-cols-[.9fr_1.1fr]"><div><p className="text-xs font-semibold text-slate-500">Client record · Taylor Reed</p><h3 className="mt-1 text-xl font-extrabold text-slate-950 sm:text-2xl">PAR-Q health screening</h3><p className="mt-2 text-xs leading-relaxed text-slate-600">Keep the form workflow close to the client record. Email a form for a client to complete, then review its status here.</p><div className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-50 p-3 text-xs font-bold text-emerald-900"><CheckCircle2 className="h-4 w-4" />Completed · 12 May</div><div className="mt-3 flex items-center gap-2 rounded-lg bg-orange-50 p-3 text-xs font-bold text-orange-900"><Mail className="h-4 w-4" />PAR-Q email ready to send</div><div className="mt-3 rounded-lg border border-slate-200 bg-white p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Client side</p><p className="mt-1 text-xs font-semibold text-slate-800">A clear email link to complete the form—no Practably dashboard login needed.</p></div></div><div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2 border-b border-slate-100 pb-3"><ClipboardCheck className="h-4 w-4 text-violet-700" /><p className="text-sm font-bold text-slate-900">PAR-Q questionnaire</p></div><p className="mt-3 text-[11px] leading-relaxed text-slate-600">Have you ever been told by a doctor that you have a heart condition?</p><div className="mt-2 flex gap-2"><span className="rounded-md bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-800">No</span><span className="rounded-md border border-slate-200 px-3 py-1.5 text-[10px] font-semibold text-slate-500">Yes</span></div><p className="mt-4 text-[11px] leading-relaxed text-slate-600">Do you feel pain in your chest when you do physical activity?</p><div className="mt-2 flex gap-2"><span className="rounded-md bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-800">No</span><span className="rounded-md border border-slate-200 px-3 py-1.5 text-[10px] font-semibold text-slate-500">Yes</span></div><div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 text-[10px] text-slate-500"><ShieldCheck className="h-3.5 w-3.5" />Illustrative form preview · not medical advice</div></div></div>
+  return <AppFrame section="Client forms">
+    <div className="grid gap-4 lg:grid-cols-[1.1fr_.9fr]">
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
+          <div><p className="text-[10px] font-bold uppercase tracking-wider text-violet-700">Template builder</p><h3 className="mt-1 text-lg font-extrabold text-slate-950">New client intake</h3></div>
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800">3 questions</span>
+        </div>
+        <div className="mt-4 space-y-4">
+          <div><p className="text-xs font-semibold text-slate-800">What would you like to focus on in our sessions?</p><div className="mt-2 h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] text-slate-400">Your answer</div></div>
+          <div><p className="text-xs font-semibold text-slate-800">Which days usually work for you?</p><div className="mt-2 flex flex-wrap gap-2"><span className="rounded-md bg-violet-50 px-2.5 py-1.5 text-[10px] font-bold text-violet-800">Monday</span><span className="rounded-md border border-slate-200 px-2.5 py-1.5 text-[10px] text-slate-500">Wednesday</span><span className="rounded-md border border-slate-200 px-2.5 py-1.5 text-[10px] text-slate-500">Friday</span></div></div>
+          <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3"><span className="flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-[10px] font-bold text-white"><Mail className="h-3.5 w-3.5" />Private link</span><span className="rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-semibold text-slate-600">Enter responses in session</span></div>
+        </div>
+      </section>
+      <section className="rounded-xl border border-slate-200 bg-[#f7f8fb] p-4">
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-3"><ClipboardCheck className="h-4 w-4 text-violet-700" /><div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Also in client forms</p><h3 className="text-sm font-extrabold text-slate-900">PAR-Q screening</h3></div></div>
+        <p className="mt-3 text-[11px] leading-relaxed text-slate-600">The existing PAR-Q workflow stays alongside custom forms on the client profile.</p>
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3"><p className="text-[11px] font-medium text-slate-700">Have you ever been told by a doctor that you have a heart condition?</p><div className="mt-2 flex gap-2"><span className="rounded-md bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-800">No</span><span className="rounded-md border border-slate-200 px-3 py-1.5 text-[10px] font-semibold text-slate-500">Yes</span></div></div>
+        <p className="mt-3 flex items-center gap-1.5 text-[10px] text-slate-500"><ShieldCheck className="h-3.5 w-3.5" />Illustrative preview · not medical advice</p>
+      </section>
+    </div>
   </AppFrame>;
 }
 

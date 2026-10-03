@@ -17,7 +17,7 @@ const features = [
   { icon: Users, title: "Know every client at a glance", description: "Keep profiles, contact details, notes, packages, and session history together instead of scattered across documents." },
   { icon: CalendarDays, title: "Make the week easier to run", description: "Book sessions, manage your calendar, and keep availability visible without rebuilding a spreadsheet each week." },
   { icon: CreditCard, title: "Invoice and track payments clearly", description: "Create invoices, see outstanding balances, and record payments collected through your own payment arrangements." },
-  { icon: ClipboardCheck, title: "Keep client forms in the workflow", description: "Keep client forms and responses alongside the client record, with the information your practice needs." },
+  { icon: ClipboardCheck, title: "Forms beyond PAR-Q, in context", description: "Create custom question templates, share private client links, or enter responses together. Keep completed forms beside the client record, alongside the existing PAR-Q workflow." },
   { icon: Zap, title: "Keep routine messages moving", description: "Use booking, cancellation, invoice, PARQ, and low-session email workflows without manually writing the same message every time." },
   { icon: TrendingUp, title: "See the business, not just the bookings", description: "Track revenue, packages, and invoices from a dashboard built around the decisions solo coaches make." },
 ];
@@ -26,7 +26,7 @@ const faqItems = [
   ["Who is Practably for?", "Practably is designed for independent coaches who want one place to manage their client roster with ease, without complicated infrastructure. Keep your calendar, sessions, forms, invoices and payment workflows together in one straightforward workspace."],
   ["What is included in the Free plan?", "The Free plan supports up to five client records with scheduling, client forms, basic invoicing, and client data export. It does not require a card to start."],
   ["How do client limits work?", "Each plan has a maximum number of client records. When you reach the limit, Practably shows an upgrade prompt before another client is added. A downgrade is blocked until the client count fits the target plan."],
-  ["Do my clients need a Practably login?", "No. Coaches use Practably to manage their own workflow. Clients can receive emails and forms without a Practably dashboard login."],
+  ["Do my clients need a Practably login?", "No. Coaches use Practably to manage their own workflow. Clients can complete a custom form from a private link without a Practably dashboard login; coaches can also enter responses themselves."],
   ["How do client payments work?", "Practably lets you create invoices and keep track of payments. You collect payments using your own arrangements, then record them against the relevant client or invoice."],
   ["How are client forms and health details handled?", "Form responses are stored against the relevant client record so you can manage your workflow. Practably is software, not medical advice; collect and use health information only where appropriate for your practice."],
   ["Can I export or delete data?", `You can export an individual client record from that client's profile. ${siteConfig.retentionPolicy}`],

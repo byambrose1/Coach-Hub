@@ -13,3 +13,9 @@ API-intercepted browser checks still depend on a stable development server for H
 **Why:** Restarting the workflow during a PDF-download check interrupted a dynamically loaded module and produced a false download failure; the same check passed once the server was stable.
 
 **How to apply:** Finish workflow restarts before running browser checks. Also distinguish a newly rendered record from an interactable control: dialog-closing animations and smooth scrolling can intercept or misdirect immediate clicks.
+
+Assert the resulting control state, not merely that a synthetic click ran.
+
+**Why:** Radix tabs and selects may react to focus, pointer or keyboard events rather than a bare DOM click, causing false failures in isolated browser tests.
+
+**How to apply:** Use browser-native interactions or the events the control actually handles, then wait for the selected tab, open options or completed mutation. Do not rewrite working app controls to accommodate an incomplete test interaction.
