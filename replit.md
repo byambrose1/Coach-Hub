@@ -62,7 +62,7 @@ A business hub for independent coaches managing in-person and online clients. Fe
 - **Dashboard**: Today's schedule, stats (Active Clients is clickable → /clients), upcoming sessions, low session alerts. UK date format.
 - **Schedule**: Month/Week/Day calendar views with toggle, day detail dialog, book sessions (1:1, group, online, outdoor), mark complete/cancel. UK date format.
 - **Clients**: Client profiles with edit dialog (phone/email save fix), PARQ health forms tab, session history, editable packages (inline edit total/used sessions), full notes CRUD (create/edit/delete within profile with "edited" indicator)
-- **Payments**: Revenue Overview card (week/month toggle, breakdown by monthly billing vs block bookings + session count), session packages (block & monthly billing) with edit sessions, full invoice management (view detail, edit, download PDF, send/mark sent, mark paid), Monthly Payments tab with GoCardless direct debit mandate management per client, configurable currency (£/$/€), summary stats
+- **Payments**: Revenue Overview card (week/month toggle, breakdown by monthly billing vs block bookings + session count), session packages (block & monthly billing) with edit sessions, full invoice management (view detail, edit, download PDF, send/mark sent, mark paid), monthly package and payment records, configurable currency (£/$/€), summary stats
 - **Settings**: Profile, cancellation policy (structured: notice hours + editable template), currency selector, payment settings, email notifications (stub), session reminders, HIPAA compliance, data retention, subscription plan display (shows current tier limits), account deletion
 - **Admin**: Comprehensive admin overview page at /admin - account info, subscription status, client/session/invoice/revenue stats, system info (auth/email/payment providers)
 
@@ -79,7 +79,7 @@ A business hub for independent coaches managing in-person and online clients. Fe
 ## Platform Config (Editable in Platform Admin)
 - `platform_config` table stores tier limits, prices, and payment links
 - All tier settings editable by owner in /platform-admin
-- Payment links support any provider (Stripe, GoCardless, etc.)
+- Coaches can save an external payment link for their own payment arrangements.
 
 ## Platform Admin Features (/platform-admin)
 - Platform stats overview
@@ -87,7 +87,7 @@ A business hub for independent coaches managing in-person and online clients. Fe
 - Searchable coach list (clickable rows)
 - Coach detail page at /platform-admin/coaches/:coachId - shows clients, stats, subscription plan management
 - Coach impersonation: owner can view the app as any coach; amber banner shows while impersonating with exit button
-- System status links (Brevo, GoCardless dashboards)
+- System links for email delivery and Stripe subscription billing.
 
 ## Removed Features
 - **Notes page**: Removed from sidebar. Notes now live within each client's profile (Notes tab).
@@ -158,18 +158,10 @@ A business hub for independent coaches managing in-person and online clients. Fe
 - `invoices.paymentMethod` (per-invoice, coach-recorded) options: cash, card_machine,
   bank_transfer, paypal, stripe, other.
 
-## GoCardless (Monthly Payments) - not recommended to enable yet
-- `gocardless-nodejs` package installed; `server/payments.ts` with `createMandateLink()`
-- Requires `GOCARDLESS_API_KEY` environment secret (not yet configured)
-- "Set Up Monthly Payment" button in client profile generates a redirect link for direct debit mandate setup
-- Uses `createRequire(import.meta.url)` to handle CJS package in ESM context
-- Reads `GOCARDLESS_ENVIRONMENT` (defaults to Sandbox; set to `live` to go live)
-- POST `/api/payments/create-mandate-link` endpoint
-- **Important:** this uses one platform-wide API key, so as built today every coach's direct
-  debits would run through Practably's own GoCardless account, not each coach's own. Leave
-  `GOCARDLESS_API_KEY` unset (or don't expose the mandate button) until this moves to per-coach
-  accounts or GoCardless's Partner program - it's the one integration that currently contradicts
-  "payments shouldn't go through Practably."
+## Client payment records
+- Coaches create invoices and record payments received through their own arrangements.
+- Monthly packages track rates and sessions; they do not automatically collect client payments.
+- Stripe handles Practably coach subscriptions separately from coach-client payments.
 
 ## Terms & Conditions
 - `hasAcceptedTerms` field in settings table
@@ -178,5 +170,3 @@ A business hub for independent coaches managing in-person and online clients. Fe
 - Modal is non-dismissable until accepted (the `onOpenChange` does nothing)
 
 ## API Routes (additional)
-- POST /api/payments/create-mandate-link
-- POST /api/webhooks/gocardless

@@ -1,4 +1,3 @@
-import { getPaymentCapabilities as defaultGetPaymentCapabilities } from "./payments";
 import { publicPlansFromConfig } from "@shared/public-site";
 import { featureMinimumPlan, featureLabels, hasFeature, type FeatureName } from "@shared/subscription-features";
 import { revenueReport } from "./revenue-report";
@@ -21,7 +20,6 @@ import {
   sendWaitlistConfirmationEmail,
   sendWaitlistNotificationEmail,
 } from "./email";
-import { createMandateLink as defaultCreateMandateLink } from "./payments";
 import type { RequestHandler } from "express";
 import type Stripe from "stripe";
 import { logError } from "./safe-logging";
@@ -39,11 +37,6 @@ import {
   validateStripeModeForBilling,
   validateStripePrice,
 } from "./stripe";
-
-const PAYMENT_PROVIDER_ERROR = {
-  code: "PAYMENT_PROVIDER_ERROR",
-  message: "Unable to create the payment link. Please try again.",
-} as const;
 
 const EMAIL_PROVIDER_ERROR = {
   code: "EMAIL_PROVIDER_ERROR",
@@ -185,7 +178,6 @@ export async function registerRoutes(
     isAuthenticated?: RequestHandler;
     stripeClient?: Stripe;
     withBillingCheckoutLock?: typeof withBillingCheckoutLock;
-    createMandateLink?: typeof defaultCreateMandateLink;
     sendBookingNotificationEmail?: typeof defaultSendBookingNotificationEmail;
     sendInvoiceEmail?: typeof defaultSendInvoiceEmail;
     sendParqEmail?: typeof defaultSendParqEmail;
@@ -193,15 +185,12 @@ export async function registerRoutes(
     sendBroadcastEmail?: typeof defaultSendBroadcastEmail;
     sendFeedbackEmail?: typeof defaultSendFeedbackEmail;
     deleteAuthUser?: typeof authStorage.deleteUser;
-    getPaymentCapabilities?: typeof defaultGetPaymentCapabilities;
   } = {},
 ): Promise<Server> {
   const storage = dependencies.storage ?? defaultStorage;
   const isAuthenticated = dependencies.isAuthenticated ?? defaultIsAuthenticated;
   const getBillingStripeClient = () => dependencies.stripeClient ?? getStripeClient();
   const lockBillingUser = dependencies.withBillingCheckoutLock ?? withBillingCheckoutLock;
-  const createMandateLink = dependencies.createMandateLink ?? defaultCreateMandateLink;
-  const getPaymentCapabilities = dependencies.getPaymentCapabilities ?? defaultGetPaymentCapabilities;
   const deleteAuthUser = dependencies.deleteAuthUser ?? authStorage.deleteUser.bind(authStorage);
   const sendBookingNotificationEmail =
     dependencies.sendBookingNotificationEmail ?? defaultSendBookingNotificationEmail;
@@ -394,33 +383,6 @@ export async function registerRoutes(
   app.use("/api/forms", isAuthenticated);
   app.use("/api/referrals", isAuthenticated);
   app.use("/api/invoices", isAuthenticated);
-
-  // --- GoCardless & Payments ---
-  app.get("/api/payments/status", isAuthenticated, (_req, res) => {
-    res.json(getPaymentCapabilities());
-  });
-  app.post("/api/payments/create-mandate-link", isAuthenticated, async (req, res) => {
-    try {
-      const { clientId } = req.body;
-      const client = await storage.getClient(getUserId(req), clientId);
-      if (!client) return res.status(404).json({ message: "Client not found" });
-      if (!client.email) return res.status(400).json({ message: "Client has no email" });
-      if (!getPaymentCapabilities().directDebitAvailable) {
-        return res.status(503).json({ message: getPaymentCapabilities().message });
-      }
-      const link = await createMandateLink(clientId, client.name, client.email);
-      res.json({ link });
-    } catch (err) {
-      logError("Failed to create payment mandate link", err);
-      res.status(502).json(PAYMENT_PROVIDER_ERROR);
-    }
-  });
-
-  app.post("/api/webhooks/gocardless", async (req, res) => {
-    const eventCount = Array.isArray(req.body?.events) ? req.body.events.length : 0;
-    console.log(`[gocardless-webhook] received events=${eventCount}`);
-    res.status(204).send();
-  });
 
   const resolveStripePrice = async (plan: string): Promise<string> => {
     const priceId = getStripePriceId(plan);

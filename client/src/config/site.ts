@@ -6,7 +6,7 @@ export const siteConfig = {
   name: "Practably",
   tagline: "The simple business hub for independent coaches.",
   description:
-    "Practably helps UK coaches manage clients, bookings, PARQ forms, invoices, and payments in one simple dashboard.",
+    "Practably helps independent coaches manage clients, calendars, sessions, forms, invoices, and payment records in one simple dashboard.",
   siteUrl: import.meta.env.VITE_SITE_URL || publicSite.siteUrl,
   supportEmail: "contact@practably.co.uk",
   legalOperator: "ElectriSoul Limited",
@@ -29,7 +29,7 @@ export const pricingTiers = [
     period: "forever",
     clients: "Up to 5 clients",
     description: "A focused starting point for independent coaches.",
-    features: ["5 client records", "Session scheduling", "PARQ forms", "Basic invoicing with Practably logo", "Client data export"],
+    features: ["5 client records", "Session scheduling", "Client forms", "Basic invoicing with Practably logo", "Client data export"],
   },
   {
     name: "Starter",
@@ -52,7 +52,7 @@ export const pricingTiers = [
     price: "£7.99",
     period: "/ month",
     clients: "Up to 50 clients",
-    description: "For larger rosters that still want a coach-sized tool.",
+    description: "For larger client rosters without complicated systems.",
     features: ["50 client records", "Everything in Professional", "Date and client revenue reports", "Custom business details", "Priority support: 4-hour response target"],
   },
 ];

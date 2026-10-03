@@ -23,7 +23,7 @@
     <text x="110" y="58" font-family="Inter,Arial,sans-serif" font-size="39" font-weight="800" fill="#0f172a">Practably</text>
     <text x="0" y="195" font-family="Inter,Arial,sans-serif" font-size="56" font-weight="800" fill="#0f172a">The simple business hub for</text>
     <text x="0" y="262" font-family="Inter,Arial,sans-serif" font-size="56" font-weight="800" fill="#7c3aed">independent coaches.</text>
-    <text x="0" y="350" font-family="Inter,Arial,sans-serif" font-size="23" fill="#475569">Clients · Bookings · PARQ forms · Invoices · Payments</text>
+    <text x="0" y="350" font-family="Inter,Arial,sans-serif" font-size="23" fill="#475569">Clients · Calendar · Forms · Invoices · Payments</text>
   </g>
   <g transform="translate(780 395)" filter="url(#s)">
     <rect width="305" height="145" rx="20" fill="#fff"/>

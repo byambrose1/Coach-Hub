@@ -19,3 +19,15 @@ Treat webhook configuration, local processing tests, and real Stripe delivery as
 **Why:** Read-only checks and synthetic fixtures can establish configuration and processing correctness without proving the complete live-payment flow.
 
 **How to apply:** Report these checks separately. Do not charge customers, resend production events, or change subscriptions just to claim full verification; obtain approval for a controlled live-payment check.
+
+Do not offer, mention or reintroduce GoCardless client payments without a new explicit owner request.
+
+**Why:** On 2026-10-03 the owner said there is no GoCardless and repeatedly requested its complete removal, including direct-debit unavailability messages.
+
+**How to apply:** Keep coach-client invoicing and payment records separate from Stripe's Practably subscription billing. Older proposals to add client direct debits do not override this decision.
+
+Retiring a payment integration must not delete historical customer/payment data.
+
+**Why:** The owner's removal request concerns the website and inactive integration, not deleting client records or legacy stored statuses.
+
+**How to apply:** Use additive, reviewed migrations for new features. Do not accept schema-push suggestions to drop legacy columns without separate data-deletion approval.

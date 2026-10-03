@@ -55,7 +55,6 @@ async function fulfill(event) {
   const resources = { "/api/clients": clients, "/api/packages": packages, "/api/notes": notes };
   if (method === "GET" && ["/api/auth/status", "/api/auth/user"].includes(url.pathname)) data = user;
   else if (method === "GET" && url.pathname === "/api/settings") data = settings;
-  else if (method === "GET" && url.pathname === "/api/payments/status") data = { directDebitAvailable: false, message: "Direct debit setup and collection are not available. Use your own payment arrangements." };
   else if (method === "GET" && url.pathname === "/api/invoices") data = [invoice];
   else if (method === "GET" && url.pathname === "/api/revenue") {
     assert.notEqual(settings.subscriptionPlan, "free", "Free must not request a paid report");
@@ -140,15 +139,15 @@ async function navigate(route, width = 1280) {
   await waitFor(`document.querySelector(${JSON.stringify(selector("stat-pending-invoices"))}).textContent === "£12.34"`, "Exact paid-plan summary");
   await waitFor(exists("tab-monthly"), "Mobile payments page");
   await click(selector("tab-monthly"));
-  await waitFor(exists("direct-debit-availability"), "Unavailable direct debit");
-  assert.ok(await evaluate(`document.querySelector(${JSON.stringify(selector("direct-debit-availability"))}).textContent.includes("setup is unavailable")`));
+  await waitFor(`document.querySelector(${JSON.stringify(selector("tab-monthly"))}).getAttribute("data-state") === "active"`, "Monthly records tab");
+  assert.doesNotMatch(await evaluate("document.body.innerText"), /gocardless|direct[- ]debit|setup is unavailable/i);
   assert.ok(await evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"), "Mobile page fits");
   assert.deepEqual(writes, ["/api/clients", "/api/notes", "/api/packages"]);
   assert.deepEqual(unexpected, []);
   const screenshot = await cdp("Page.captureScreenshot", { format: "jpeg", quality: 85 });
   fs.writeFileSync(path.join(profile, "mobile-payments.jpg"), Buffer.from(screenshot.data, "base64"));
   console.log(`Fixture screenshot: ${path.join(profile, "mobile-payments.jpg")}`);
-  console.log("Browser checks passed: Free saves/basic PDF with Practably logo, locked Free revenue, Business £12.34 summary, mobile direct-debit wording.");
+  console.log("Browser checks passed: Free saves/basic PDF with Practably logo, locked Free revenue, Business £12.34 summary, mobile monthly records without removed provider notices.");
   console.log("All API requests were intercepted; no live records, emails, payments or deletions occurred.");
 })().catch(async error => {
   console.error(error.stack);

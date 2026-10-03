@@ -931,9 +931,9 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2 rounded-md border p-4">
             <div>
-              <Label>Handling PARQ and health information</Label>
+              <Label>Handling client forms and health information</Label>
               <p className="text-xs text-muted-foreground mt-1">
-                PARQ responses are stored in the relevant client record. Only collect information you need for your coaching practice, limit access, and review your retention policy.
+                Form responses are stored in the relevant client record. Only collect information you need for your practice, limit access, and review your retention policy.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 text-sm font-medium">

@@ -231,7 +231,6 @@ export default function Admin() {
           </div>
           <div className="flex justify-between items-center py-2 border-b">
             <span className="text-sm text-muted-foreground">Payment Provider</span>
-            <Badge variant="outline" className="text-xs">GoCardless (Sandbox)</Badge>
           </div>
           <div className="flex justify-between items-center py-2 border-b">
             <span className="text-sm text-muted-foreground">Database</span>

@@ -1079,7 +1079,6 @@ export default function Payments() {
           <div className="flex items-start justify-between gap-2 flex-wrap">
             <div>
               <p className="font-medium">Monthly Payment Clients</p>
-              <p className="text-sm text-muted-foreground" role="status" data-testid="direct-debit-availability">GoCardless monthly payment setup is unavailable. You can still record monthly package rates and payments manually.</p>
             </div>
             <Badge variant="outline" className="flex items-center gap-1">
               <Users className="w-3 h-3" />

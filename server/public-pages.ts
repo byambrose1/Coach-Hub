@@ -31,13 +31,12 @@ export async function renderPublicDocument(template: string, requestPath: string
     const prices = plans.map(plan => `${plan.label}: £${plan.price}${plan.name === "free" ? "" : " per month"}, up to ${plan.max} clients.`).join(" ");
     metadata = { ...metadata, description: `Compare Practably plans. ${prices}` };
     body = paragraphs([prices, publicSite.vatTreatment, publicSite.paymentProviderFees,
-      publicSite.directDebitNotice, publicSite.refundTerms, publicSite.cancellationTerms]);
+      publicSite.refundTerms, publicSite.cancellationTerms]);
   }
   else if (pathname === "/") body = `${notice}${paragraphs([
     "The simple business hub for independent coaches.",
-    "Manage client records, bookings, PARQ forms, packages, invoices and payment records in one dashboard.",
+    "Manage client records, calendars, sessions, forms, packages, invoices and payment records in one dashboard.",
     "The Free plan supports up to five clients and does not require a payment card.",
-    publicSite.directDebitNotice,
   ])}<a href="/api/login">Sign up or log in</a>`;
   else if (pathname === "/blog") {
     const posts = await storage.getPublishedBlogPosts();

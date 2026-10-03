@@ -16,7 +16,6 @@ export const clients = pgTable("clients", {
   status: text("status").default("active"),
   referredBy: varchar("referred_by"),
   referralCode: text("referral_code"),
-  gocardlessMandateStatus: text("gocardless_mandate_status").default("inactive"),
 });
 
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true });

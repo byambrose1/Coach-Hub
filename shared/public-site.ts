@@ -9,13 +9,12 @@ export const publicSite = {
   governingLaw: "England and Wales",
   effectiveDate: "2 October 2026",
   vatTreatment: "Practably is not VAT-registered, so no VAT is added to these prices.",
-  paymentProviderFees: "Your Practably subscription is billed via Stripe. How you charge your own clients is your own arrangement; Practably does not process, hold, or take any share of payments between you and your clients. GoCardless client direct-debit setup and collection are not currently available.",
+  paymentProviderFees: "Your Practably subscription is billed via Stripe. How you charge your own clients is your own arrangement; Practably does not process, hold, or take any share of payments between you and your clients.",
   cancellationTerms: "You can cancel or downgrade a paid plan from Manage billing in Settings. Normal cancellation stops renewal at the end of the paid billing period. If your client count exceeds the resulting plan limit, existing data is retained but you cannot add clients until you are within the limit. Unused portions of a billing period are not automatically refunded.",
   refundTerms: "You can request a full refund of your first subscription payment within 24 hours of successful payment using Cancel and refund in Settings. This immediately cancels your subscription and returns your account to Free without deleting your client data. Renewals and repeat subscriptions are not covered. Additional payments or existing unrelated refund requests require support review. Refunds go to the original payment method and may take several days to appear, depending on your bank. This voluntary guarantee does not affect your statutory rights.",
   retentionPolicy: "Account deletion removes your account and client records from the active application database after any subscription cancellation is confirmed. Export records you need before deleting. Provider-held records and infrastructure backups are not removed by the same operation; applicable retention periods and backup deletion arrangements must be confirmed before public launch. Setting a retention period in Settings does not currently schedule automatic deletion.",
-  subprocessors: "Replit provides hosting, and Supabase provides authentication, including GitHub sign-in. Replit sign-in remains available to securely connect existing accounts. PostgreSQL is database software, not a separate processor company. Brevo sends requested emails, and Stripe handles Practably subscription billing. GoCardless client payments are not currently enabled. The operator must verify the actual database provider, locations, contractual terms and transfers before public launch.",
+  subprocessors: "Replit provides hosting, and Supabase provides email, Google and Apple authentication. Replit sign-in remains available to securely connect existing accounts. PostgreSQL is database software, not a separate processor company. Brevo sends requested emails, and Stripe handles Practably subscription billing. The operator must verify the actual database provider, locations, contractual terms and transfers before public launch.",
   paidPlanSupportResponse: "We aim to reply within 4 hours. Messages sent after 8pm GMT are answered the next morning.",
-  directDebitNotice: "Direct-debit setup and collection are not currently available. You can create invoices and record payments collected through your own payment arrangements.",
   betaNotice: "Practably is currently in private beta. Please review the current Practably Terms and Privacy information before using the service. Use fictional client and health information for beta testing while provider arrangements remain unconfirmed.",
 };
 
@@ -33,7 +32,7 @@ export const privacySections: PublicSection[] = [
   { heading: "Contact", paragraphs: [`Privacy contact: ${publicSite.supportEmail}. Responsible operator: ${publicSite.legalOperator}. Contact address: ${publicSite.contactAddress}.`] },
 ];
 export const termsSections: PublicSection[] = [
-  { heading: "Using Practably", paragraphs: ["Practably provides software tools for independent fitness coaches to manage client records, scheduling, forms, invoices and payment records. You are responsible for your account, the information you enter and your use of client data."] },
+  { heading: "Using Practably", paragraphs: ["Practably provides software tools for independent coaches to manage client records, calendars, sessions, forms, invoices and payment records. You are responsible for your account, the information you enter and your use of client data."] },
   { heading: "Acceptable use", paragraphs: ["Use the service lawfully, respect client privacy, keep sign-in details secure, and do not interfere with the service or use it to provide medical, legal or financial advice."] },
   { heading: "Subscriptions and billing", paragraphs: [`The Free plan supports up to five clients. Paid plans are billed monthly. ${publicSite.vatTreatment} ${publicSite.paymentProviderFees}`] },
   { heading: "24-hour first-payment refund guarantee", paragraphs: [publicSite.refundTerms] },
@@ -43,7 +42,7 @@ export const termsSections: PublicSection[] = [
 ];
 
 export const publicMetadata: Record<string, { title: string; description: string }> = {
-  "/": { title: "Practably | Coaching Business Software for Independent Fitness Coaches", description: "Manage clients, bookings, PARQ forms, invoices and payment records in one dashboard. Start with a five-client Free plan." },
+  "/": { title: "Practably | Business Software for Independent Coaches", description: "Manage clients, calendars, sessions, forms, invoices and payment records in one dashboard. Start with a five-client Free plan." },
   "/pricing": { title: "Pricing | Practably", description: "Compare Free, Starter (£1.99), Professional (£4.99) and Business (£7.99) monthly coaching software plans." },
   "/privacy": { title: "Privacy | Practably", description: "How Practably handles account, client and health-form information, processors, cookies, data rights and deletion." },
   "/terms": { title: "Terms of Use | Practably", description: "Practably subscription terms, cancellation, client data and the 24-hour first-payment refund guarantee." },

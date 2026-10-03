@@ -290,7 +290,7 @@ export default function LoginPage() {
         <p className="max-w-2xl sm:text-right">
           Returning Replit user?{" "}
           <a href="/api/auth/legacy/login" className="font-semibold text-violet-800 underline decoration-violet-300 underline-offset-2 hover:text-violet-950">Connect your existing coach account</a>
-          {" "}first, then sign in with GitHub or email to keep your records. This won’t create a duplicate account. Email addresses alone don’t automatically merge accounts.
+          {" "}first, then sign in with email, Google or Apple to keep your records. This won’t create a duplicate account. Email addresses alone don’t automatically merge accounts.
         </p>
       </footer>
     </main>

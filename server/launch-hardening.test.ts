@@ -128,14 +128,17 @@ test("production headers remove Express disclosure and unsafe inline script perm
   assert.equal(development.headers.get("x-frame-options"), null);
   assert.ok(development.headers.get("content-security-policy")!.includes("https://*.replit.dev"));
 });
-test("unavailable direct debit is explicit in both status and mutation endpoints", async () => {
-  const status = await (await fetch(`${origin}/api/payments/status`)).json();
-  assert.equal(status.directDebitAvailable, false);
+test("retired payment-provider endpoints cannot initiate client collections", async () => {
+  const status = await fetch(`${origin}/api/payments/status`);
+  assert.equal(status.status, 404);
   const response = await fetch(`${origin}/api/payments/create-mandate-link`, {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ clientId: "client-fixture" }),
   });
-  assert.equal(response.status, 503);
-  assert.match((await response.json()).message, /not currently available/);
+  assert.equal(response.status, 404);
+  const webhook = await fetch(`${origin}/api/webhooks/gocardless`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+  });
+  assert.equal(webhook.status, 404);
 });
 test("failed billing cancellation preserves account data; successful deletion remains available", async () => {
   const failure = await fetch(`${origin}/api/account`, { method: "DELETE" });
