@@ -2,11 +2,11 @@
 name: Subscription provider choice
 description: Owner-approved provider and account boundary for Practably coach subscriptions.
 ---
-Use the owner's existing live Stripe account for Practably coach subscriptions. Do not switch providers or provision a separate sandbox merely because another billing integration appears in the workspace.
+Earlier project notes record approval to use the existing live Stripe account for Practably coach subscriptions. The owner later said they do not recognize the connected account ID. Treat ownership and approval of this specific account as unverified until they confirm it.
 
-**Why:** The owner explicitly selected the current live account after being told that Practably plans would coexist with the account's existing fitness-coaching products. They want real coach upgrade payments, not a test-only demonstration.
+**Why:** The latest owner statement conflicts with the earlier provider-choice record. A live-mode key routes real billing, so that earlier choice cannot be assumed to authorize this specific account.
 
-**How to apply:** Preserve the existing Stripe connection when improving billing. Ask before changing the provider/account. Practably subscriptions and payments collected by coaches from their clients are different flows.
+**How to apply:** Share only the non-secret account identifier when verifying ownership. Do not create an account, rotate keys, switch providers, or pause checkout without explicit approval. Keep Practably subscriptions separate from payments coaches collect from their clients.
 
 Scope Practably checkout branding to this app rather than changing the shared account's identity. Obtain explicit approval before changing account-wide names, logos, or payment descriptors.
 
