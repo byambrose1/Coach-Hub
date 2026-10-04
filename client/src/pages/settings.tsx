@@ -41,6 +41,7 @@ interface Tier {
 interface SubscriptionStatus {
   ready: boolean;
   livemode: boolean;
+  checkoutPaused?: boolean;
   status?: string;
   subscriptionStatus?: string;
 }
@@ -288,6 +289,11 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
             Billing is not ready{subscriptionStatusQuery.isError ? " or its status could not be checked" : ""}. Checkout may be unavailable; please try again later or contact support.
           </div>
         )}
+        {subscriptionStatusQuery.data?.checkoutPaused && (
+          <div role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
+            New subscription checkouts are temporarily paused while Practably verifies its Stripe account. Existing subscriptions are unchanged.
+          </div>
+        )}
 
         <SubscriptionRefund
           enabled={Boolean(settings)}
@@ -373,7 +379,11 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
                     selectedPlan={checkoutMutation.variables}
                     pending={checkoutMutation.isPending}
                     onUpgrade={(plan) => checkoutMutation.mutate(plan)}
-                    disabled={subscriptionMutationPending || subscriptionStatusQuery.data?.ready !== true}
+                    disabled={
+                      subscriptionMutationPending ||
+                      subscriptionStatusQuery.data?.ready !== true ||
+                      (subscriptionStatusQuery.data?.checkoutPaused === true && !settings?.stripeSubscriptionId)
+                    }
                   />
                 ) : canDowngrade ? (
                   <Button

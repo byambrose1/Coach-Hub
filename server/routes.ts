@@ -570,6 +570,7 @@ export async function registerRoutes(
     return res.json({
       livemode,
       ready: messages.length === 0,
+      checkoutPaused: process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED !== "false",
       ...(messages.length
         ? { message: messages.filter((message, index) => messages.indexOf(message) === index).join(" ") }
         : {}),
@@ -749,9 +750,18 @@ export async function registerRoutes(
       if (!["starter", "professional", "business"].includes(plan)) {
         return res.status(400).json({ message: "A paid plan is required." });
       }
+      const current = await storage.getSettings(userId);
+      if (
+        process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED !== "false" &&
+        !current?.stripeSubscriptionId
+      ) {
+        return res.status(503).json({
+          code: "STRIPE_CHECKOUT_PAUSED",
+          message: "New Practably subscription checkouts are temporarily paused while the Stripe account is verified. Existing subscriptions are unchanged.",
+        });
+      }
       const priceId = await resolveStripePrice(plan);
 
-      const current = await storage.getSettings(userId);
       if (
         !current?.stripeCustomerId &&
         (process.env.STRIPE_WEBHOOK_CONFIGURED !== "true" || !getStripeWebhookSecret())
@@ -852,6 +862,13 @@ export async function registerRoutes(
         return res.status(409).json({
           message:
             "An active Stripe subscription already exists for this billing account. Manage it in the Billing Portal before starting another subscription.",
+        });
+      }
+
+      if (process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED !== "false") {
+        return res.status(503).json({
+          code: "STRIPE_CHECKOUT_PAUSED",
+          message: "New Practably subscription checkouts are temporarily paused while the Stripe account is verified. Existing subscriptions are unchanged.",
         });
       }
 

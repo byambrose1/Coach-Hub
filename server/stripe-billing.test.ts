@@ -17,6 +17,7 @@ const ENV_KEYS = [
   "STRIPE_PROFESSIONAL_PRICE_ID",
   "STRIPE_BUSINESS_PRICE_ID",
   "STRIPE_AUTOMATIC_TAX_ENABLED",
+  "STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED",
   "NODE_ENV",
 ] as const;
 
@@ -272,6 +273,7 @@ describe("hardened Stripe subscription billing", () => {
     process.env.STRIPE_STARTER_PRICE_ID = "price_starter";
     process.env.STRIPE_PROFESSIONAL_PRICE_ID = "price_professional";
     process.env.STRIPE_BUSINESS_PRICE_ID = "price_business";
+    process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED = "false";
     process.env.NODE_ENV = "test";
     delete process.env.STRIPE_AUTOMATIC_TAX_ENABLED;
 
@@ -313,8 +315,28 @@ describe("hardened Stripe subscription billing", () => {
     const response = await request("/api/subscription/status");
     const result = await response.json();
     assert.equal(response.status, 200);
-    assert.deepEqual(result, { livemode: false, ready: true });
+    assert.deepEqual(result, { livemode: false, ready: true, checkoutPaused: false });
     assert.equal(JSON.stringify(result).includes("price_"), false);
+  });
+
+  test("paused checkout is visible and rejects new subscriptions before creating a Stripe customer", async () => {
+    process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED = "true";
+    state.settings.delete(USER_A);
+
+    const statusResponse = await request("/api/subscription/status");
+    const status = await statusResponse.json();
+    assert.equal(status.checkoutPaused, true);
+
+    const response = await request("/api/subscription/checkout", {
+      method: "POST",
+      body: JSON.stringify({ plan: "starter" }),
+    });
+    const body = await response.json();
+    assert.equal(response.status, 503);
+    assert.equal(body.code, "STRIPE_CHECKOUT_PAUSED");
+    assert.match(body.message, /temporarily paused/);
+    assert.equal(state.customers.size, 1);
+    assert.equal(state.checkoutCreateCalls.length, 0);
   });
 
   test("checkout validates the configured GBP monthly price and includes confirmation URL", async () => {
@@ -508,6 +530,7 @@ describe("hardened Stripe subscription billing", () => {
   });
 
   test("an active paid subscription goes through the targeted configured Billing Portal", async () => {
+    process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED = "true";
     process.env.STRIPE_WEBHOOK_CONFIGURED = "false";
     const currentSubscription = makeSubscription();
     state.subscriptions.set(currentSubscription.id, currentSubscription);
