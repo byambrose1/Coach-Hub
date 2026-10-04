@@ -42,6 +42,9 @@ interface SubscriptionStatus {
   ready: boolean;
   livemode: boolean;
   checkoutPaused?: boolean;
+  billingCustomerNeedsReconnect?: boolean;
+  code?: string;
+  message?: string;
   status?: string;
   subscriptionStatus?: string;
 }
@@ -101,6 +104,7 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
     queryKey: ["/api/subscription/status"],
     enabled: !!settings,
   });
+  const billingLinkNeedsReview = subscriptionStatusQuery.data?.code === "BILLING_ACCOUNT_REVIEW_REQUIRED";
 
   const { data: clients = [] } = useQuery<any[]>({ queryKey: ["/api/clients"] });
 
@@ -247,18 +251,18 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <Crown className="h-4 w-4 text-amber-500" />
             <CardTitle className="text-base">Subscription Plan</CardTitle>
           </div>
-          {canManageBilling && (
+          {canManageBilling && !subscriptionStatusQuery.data?.billingCustomerNeedsReconnect && (
             <Button
               size="sm"
               variant="outline"
-              className="gap-1.5 text-xs"
+              className="min-h-11 w-full gap-1.5 text-xs sm:min-h-9 sm:w-auto"
               onClick={() => portalMutation.mutate()}
-              disabled={subscriptionMutationPending}
+              disabled={subscriptionMutationPending || billingLinkNeedsReview}
             >
               <CreditCard className="h-3 w-3" />
               {portalMutation.isPending ? "Opening..." : "Manage billing"}
@@ -286,8 +290,12 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
           </div>
         ) : (
           <div role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
-            Billing is not ready{subscriptionStatusQuery.isError ? " or its status could not be checked" : ""}. Checkout may be unavailable; please try again later or contact support.
+            <p>{subscriptionStatusQuery.data?.message || "Billing status could not be verified. Please try again later or contact support."}</p>
+            {billingLinkNeedsReview && <a href="/support" className="mt-2 inline-block font-medium underline underline-offset-4">Contact support to reconnect billing</a>}
           </div>
+        )}
+        {subscriptionStatusQuery.data?.billingCustomerNeedsReconnect && (
+          <p className="text-sm text-muted-foreground">Choose Upgrade to set up billing for your first paid plan.</p>
         )}
         {subscriptionStatusQuery.data?.checkoutPaused && (
           <div role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
@@ -339,14 +347,14 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
           return (
             <div
               key={tier.name}
-              className={`flex items-center justify-between gap-3 p-3 rounded-lg border transition-colors ${
+              className={`flex flex-col items-stretch gap-3 p-3 rounded-lg border transition-colors sm:flex-row sm:items-center sm:justify-between ${
                 isCurrent
                   ? "border-primary bg-primary/5"
                   : "border-border bg-background"
               }`}
               data-testid={`tier-card-${tier.name}`}
             >
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex min-w-0 items-center gap-3">
                 {isCurrent ? (
                   <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
                     <Check className="h-3.5 w-3.5 text-primary-foreground" />
@@ -370,7 +378,7 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
                 </div>
               </div>
 
-              <div className="flex-shrink-0">
+              <div className="w-full sm:w-auto sm:flex-shrink-0 [&>button]:min-h-11 [&>button]:w-full sm:[&>button]:min-h-9 sm:[&>button]:w-auto">
                 {isCurrent ? (
                   <span className="text-xs text-muted-foreground">{currentPlan === "free" ? "Active" : "Current"}</span>
                 ) : isUpgrade ? (
@@ -389,11 +397,11 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="gap-1.5 text-xs"
+                    className="min-h-11 w-full gap-1.5 text-xs sm:min-h-9 sm:w-auto"
                     onClick={() => settings?.stripeSubscriptionId
                       ? portalMutation.mutate()
                       : planMutation.mutate(tier.name)}
-                    disabled={subscriptionMutationPending}
+                    disabled={subscriptionMutationPending || billingLinkNeedsReview}
                     data-testid={`button-downgrade-${tier.name}`}
                   >
                     {settings?.stripeSubscriptionId ? <CreditCard className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
@@ -407,9 +415,9 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="gap-1.5 text-xs"
+                    className="min-h-11 w-full gap-1.5 text-xs sm:min-h-9 sm:w-auto"
                     onClick={() => portalMutation.mutate()}
-                    disabled={subscriptionMutationPending}
+                    disabled={subscriptionMutationPending || billingLinkNeedsReview}
                   >
                     <CreditCard className="h-3 w-3" />
                     {portalMutation.isPending ? "Opening..." : "Change in billing"}
@@ -548,7 +556,7 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6 max-w-2xl">
+      <div className="p-4 space-y-6 max-w-2xl sm:p-6">
         <Skeleton className="h-8 w-48" />
         {[1, 2, 3].map((i) => (
           <Card key={i}><CardContent className="p-6"><Skeleton className="h-24 w-full" /></CardContent></Card>
@@ -558,10 +566,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl">
-      <div className="flex items-center justify-between gap-2">
+    <div className="p-4 space-y-6 max-w-2xl sm:p-6">
+      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold" data-testid="text-settings-title">Settings</h1>
-        <Button onClick={() => mutation.mutate(formData)} disabled={mutation.isPending} data-testid="button-save-settings">
+        <Button className="min-h-11 w-full sm:min-h-9 sm:w-auto" onClick={() => mutation.mutate(formData)} disabled={mutation.isPending} data-testid="button-save-settings">
           <Save className="w-4 h-4 mr-1" />
           {mutation.isPending ? "Saving..." : "Save Changes"}
         </Button>
@@ -660,6 +668,7 @@ export default function SettingsPage() {
                 type="button"
                 variant="outline"
                 size="sm"
+                className="min-h-11 sm:min-h-8"
                 onClick={() => setFormData({
                   ...formData,
                   cancellationPolicy: `A minimum of ${formData.cancellationNoticeHours} hours' notice is required to cancel or reschedule a session. Cancellations made within ${formData.cancellationNoticeHours} hours of the scheduled start time may result in the session being deducted from your package. We appreciate your understanding and cooperation.`
@@ -694,7 +703,7 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Label>Cash</Label>
               <p className="text-xs text-muted-foreground">Client pays you in person.</p>
@@ -708,7 +717,7 @@ export default function SettingsPage() {
 
           <Separator />
 
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Label>Card machine</Label>
               <p className="text-xs text-muted-foreground">You take card payment in person with your own terminal.</p>
@@ -723,7 +732,7 @@ export default function SettingsPage() {
           <Separator />
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <Label>Bank transfer</Label>
                 <p className="text-xs text-muted-foreground">Client pays directly into your bank account.</p>
@@ -748,7 +757,7 @@ export default function SettingsPage() {
           <Separator />
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <Label>PayPal</Label>
                 <p className="text-xs text-muted-foreground">Add your own PayPal.me link.</p>
@@ -772,12 +781,12 @@ export default function SettingsPage() {
           <Separator />
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <Label>Stripe payment link</Label>
                 <p className="text-xs text-muted-foreground">
                   Add a Payment Link from your own Stripe account (create one for free at{" "}
-                  <a href="https://dashboard.stripe.com/payment-links" target="_blank" rel="noopener noreferrer" className="underline">
+                  <a href="https://dashboard.stripe.com/payment-links" target="_blank" rel="noopener noreferrer" className="break-all underline">
                     dashboard.stripe.com/payment-links
                   </a>
                   ). Payments go straight into your Stripe account, not ours.
@@ -802,7 +811,7 @@ export default function SettingsPage() {
           <Separator />
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <Label>Other</Label>
                 <p className="text-xs text-muted-foreground">Any other payment method you accept (e.g. Klarna, another provider).</p>
@@ -900,7 +909,7 @@ export default function SettingsPage() {
 
           <Separator />
 
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Label>Email Notifications</Label>
               <p className="text-xs text-muted-foreground mt-0.5">Receive email alerts for bookings, cancellations, and low sessions</p>
@@ -913,7 +922,7 @@ export default function SettingsPage() {
           </div>
           {!canEditNotifications && <UpgradeNotice feature="emailNotifications" compact />}
 
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Label>Session Reminders</Label>
               <p className="text-xs text-muted-foreground mt-0.5">Scheduled session reminders are not available yet.</p>
@@ -971,7 +980,7 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground">How long to retain client data after last activity. Default is 365 days.</p>
           </div>
 
-          <div className="flex items-center justify-between gap-4 rounded-md border p-4">
+          <div className="flex flex-col items-start gap-3 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Label>Terms & Conditions</Label>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -1004,14 +1013,14 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-medium">Delete Account</p>
               <p className="text-xs text-muted-foreground mt-0.5">Permanently delete your account and all associated data. This cannot be undone.</p>
             </div>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" data-testid="button-delete-account">
+                <Button className="min-h-11 w-full sm:min-h-8 sm:w-auto" variant="destructive" size="sm" data-testid="button-delete-account">
                   Delete Account
                 </Button>
               </AlertDialogTrigger>

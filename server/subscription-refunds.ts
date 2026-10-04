@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import type { IStorage } from "./storage";
 import type { SubscriptionRefundStatus } from "@shared/subscription-refund";
 import { getStripePlanForPrice, validateStripeModeForBilling, validateStripePrice } from "./stripe";
+import { isUnpaidBillingSetup, retrieveBillingCustomer, StripeBillingLinkError } from "./stripe-billing-links";
 
 const WINDOW_SECONDS = 24 * 60 * 60;
 const POLICY = "practably_first_payment_24h";
@@ -88,7 +89,15 @@ async function inspect(userId: string, dependencies: Dependencies) {
   if (!settings?.stripeCustomerId) {
     return { status: ineligible("The 24-hour guarantee applies to your first subscription payment. You have no paid subscription payment yet.") };
   }
-  const customer = await stripe.customers.retrieve(settings.stripeCustomerId);
+  let customer: Stripe.Customer;
+  try {
+    customer = await retrieveBillingCustomer(stripe, settings.stripeCustomerId);
+  } catch (error) {
+    if (error instanceof StripeBillingLinkError && isUnpaidBillingSetup(settings)) {
+      return { status: ineligible("You have no paid subscription payment to refund yet. The 24-hour guarantee starts after your first subscription payment.") };
+    }
+    throw error;
+  }
   if ("deleted" in customer || customer.metadata.userId !== userId) {
     throw new SubscriptionRefundError(403, "BILLING_OWNERSHIP", "This billing account is not connected to your account.");
   }

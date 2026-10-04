@@ -69,9 +69,9 @@ export default function Admin() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
         <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-28" />
           ))}
@@ -81,7 +81,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Admin Overview</h1>
         <p className="text-sm text-muted-foreground">{today}</p>
@@ -97,41 +97,41 @@ export default function Admin() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
               <span className="text-sm text-muted-foreground">Business Name</span>
-              <span className="text-sm font-medium">{settings?.businessName || settings?.trainerName || "-"}</span>
+              <span className="min-w-0 break-words text-right text-sm font-medium">{settings?.businessName || settings?.trainerName || "-"}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
               <span className="text-sm text-muted-foreground">Trainer</span>
-              <span className="text-sm font-medium">{settings?.trainerName || "-"}</span>
+              <span className="min-w-0 break-words text-right text-sm font-medium">{settings?.trainerName || "-"}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
               <span className="text-sm text-muted-foreground">Contact Email</span>
-              <span className="text-sm font-medium">{settings?.trainerEmail || "-"}</span>
+              <span className="min-w-0 break-all text-right text-sm font-medium">{settings?.trainerEmail || "-"}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
               <span className="text-sm text-muted-foreground">Currency</span>
               <span className="text-sm font-medium">{settings?.currency || "£"}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
               <span className="text-sm text-muted-foreground">Subscription</span>
               <Badge variant={settings?.subscriptionStatus === "active" ? "default" : "secondary"} className="text-xs">
                 {settings?.subscriptionStatus || "free"} · {settings?.subscriptionPlan || "starter"}
               </Badge>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
               <span className="text-sm text-muted-foreground">Privacy review</span>
               <Badge variant={settings?.hipaaCompliant ? "default" : "secondary"} className="text-xs">
                 {settings?.hipaaCompliant ? "Recorded" : "Not recorded"}
               </Badge>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
               <span className="text-sm text-muted-foreground">Email Notifications</span>
               <Badge variant={settings?.enableEmailNotifications ? "default" : "secondary"} className="text-xs">
                 {settings?.enableEmailNotifications ? "Enabled" : "Disabled"}
               </Badge>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
               <span className="text-sm text-muted-foreground">Session Reminders</span>
               <Badge variant={settings?.enableSessionReminders ? "default" : "secondary"} className="text-xs">
                 {settings?.enableSessionReminders ? `${settings.reminderHoursBefore}h before` : "Disabled"}
@@ -146,7 +146,7 @@ export default function Admin() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
           <Users className="w-4 h-4" /> Clients
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
           <StatCard title="Total Clients" value={stats?.totalClients ?? 0} icon={Users} color="blue" />
           <StatCard title="Active Clients" value={stats?.activeClients ?? 0} icon={Activity} color="green" />
           <StatCard title="Monthly Subscribers" value={stats?.monthlySubscribers ?? 0} icon={CheckCircle} color="purple" sub="on monthly billing" />
@@ -158,7 +158,7 @@ export default function Admin() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
           <Calendar className="w-4 h-4" /> Sessions
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
           <StatCard title="Total Sessions" value={stats?.totalSessions ?? 0} icon={Calendar} color="blue" />
           <StatCard title="This Week" value={stats?.sessionsThisWeek ?? 0} icon={Calendar} color="green" />
           <StatCard title="This Month" value={stats?.sessionsThisMonth ?? 0} icon={Calendar} color="amber" />
@@ -170,7 +170,7 @@ export default function Admin() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
           <TrendingUp className="w-4 h-4" /> Revenue
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
           <StatCard
             title="Total Revenue"
             value={`${currency}${(stats?.totalRevenue ?? 0).toFixed(0)}`}
@@ -204,7 +204,7 @@ export default function Admin() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
           <FileText className="w-4 h-4" /> Data
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
           <StatCard title="Active Packages" value={stats?.activePackages ?? 0} icon={Package} color="purple" />
           <StatCard title="Total Invoices" value={stats?.totalInvoices ?? 0} icon={FileText} color="blue" />
           <StatCard title="Session Notes" value={stats?.totalNotes ?? 0} icon={FileText} color="amber" />
@@ -221,22 +221,22 @@ export default function Admin() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <div className="flex justify-between items-center py-2 border-b">
+          <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
             <span className="text-sm text-muted-foreground">Auth Provider</span>
             <Badge variant="outline" className="text-xs">Replit Auth (OIDC)</Badge>
           </div>
-          <div className="flex justify-between items-center py-2 border-b">
+          <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
             <span className="text-sm text-muted-foreground">Email Provider</span>
             <Badge variant="outline" className="text-xs">Brevo Transactional</Badge>
           </div>
-          <div className="flex justify-between items-center py-2 border-b">
+          <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
             <span className="text-sm text-muted-foreground">Payment Provider</span>
           </div>
-          <div className="flex justify-between items-center py-2 border-b">
+          <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
             <span className="text-sm text-muted-foreground">Database</span>
             <Badge variant="outline" className="text-xs">PostgreSQL (Drizzle ORM)</Badge>
           </div>
-          <div className="flex justify-between items-center py-2">
+          <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2">
             <span className="text-sm text-muted-foreground">Data Retention</span>
             <Badge variant="outline" className="text-xs">{settings?.dataRetentionDays ?? 365} days</Badge>
           </div>

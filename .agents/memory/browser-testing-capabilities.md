@@ -19,3 +19,9 @@ Assert the resulting control state, not merely that a synthetic click ran.
 **Why:** Radix tabs and selects may react to focus, pointer or keyboard events rather than a bare DOM click, causing false failures in isolated browser tests.
 
 **How to apply:** Use browser-native interactions or the events the control actually handles, then wait for the selected tab, open options or completed mutation. Do not rewrite working app controls to accommodate an incomplete test interaction.
+
+Select a Chromium debugging target with type `page`; do not assume the first target is the application.
+
+**Why:** The environment's Chromium wrapper can expose an extension background target before the actual browser page. Attaching to that target makes navigation and UI assertions fail without exercising the app.
+
+**How to apply:** Select the intended page target explicitly. Mock both the acceptance and legacy acceptance fields when simulating a user who already accepted terms; otherwise a real terms dialog correctly blocks clicks.

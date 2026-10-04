@@ -102,7 +102,7 @@ function NewClientDialog({ open, onOpenChange, onUpgradeRequired }: {
               data-testid="input-client-name"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Email</Label>
               <Input
@@ -479,7 +479,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
   return (
     <>
       <Dialog open={true} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[calc(100dvh-2rem)] overflow-x-hidden overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <Avatar className="w-10 h-10">
@@ -493,6 +493,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-11 w-11 shrink-0 sm:h-9 sm:w-9"
+                    aria-label="Edit client"
                     onClick={() => {
                       setEditData({
                         name: currentClient.name,
@@ -511,6 +513,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-11 w-11 shrink-0 sm:h-9 sm:w-9"
+                    aria-label="Export client data"
                     onClick={handleExportData}
                     title="Export client data"
                     data-testid="button-export-client"
@@ -520,6 +524,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-11 w-11 shrink-0 sm:h-9 sm:w-9"
+                    aria-label="Delete client"
                     onClick={() => setShowDeleteConfirm(true)}
                     data-testid="button-delete-client"
                   >
@@ -528,6 +534,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-11 w-11 shrink-0 sm:h-9 sm:w-9"
+                    aria-label="Book a session for this client"
                     onClick={() => {
                       setBookFormData({ date: format(new Date(), "yyyy-MM-dd"), startTime: "09:00", endTime: "10:00", sessionType: "1:1", location: "" });
                       setBookSessionOpen(true);
@@ -578,13 +586,13 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
             {currentClient.email && (
               <div className="flex items-center gap-2 text-sm">
                 <Mail className="w-4 h-4 text-muted-foreground" />
-                <span data-testid="text-client-email">{currentClient.email}</span>
+                <span className="min-w-0 break-all" data-testid="text-client-email">{currentClient.email}</span>
               </div>
             )}
             {currentClient.phone && (
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="w-4 h-4 text-muted-foreground" />
-                <span data-testid="text-client-phone">{currentClient.phone}</span>
+                <span className="min-w-0 break-words" data-testid="text-client-phone">{currentClient.phone}</span>
               </div>
             )}
 
@@ -603,10 +611,10 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
 
           <Tabs defaultValue="sessions" className="mt-2">
             <TabsList className="w-full">
-              <TabsTrigger value="sessions" className="flex-1" data-testid="tab-client-sessions">Sessions</TabsTrigger>
-              <TabsTrigger value="packages" className="flex-1" data-testid="tab-client-packages">Packages</TabsTrigger>
-              <TabsTrigger value="notes" className="flex-1" data-testid="tab-client-notes">Notes</TabsTrigger>
-              <TabsTrigger value="forms" className="flex-1" data-testid="tab-client-forms">Forms</TabsTrigger>
+              <TabsTrigger value="sessions" className="min-h-11 flex-1" data-testid="tab-client-sessions">Sessions</TabsTrigger>
+              <TabsTrigger value="packages" className="min-h-11 flex-1" data-testid="tab-client-packages">Packages</TabsTrigger>
+              <TabsTrigger value="notes" className="min-h-11 flex-1" data-testid="tab-client-notes">Notes</TabsTrigger>
+              <TabsTrigger value="forms" className="min-h-11 flex-1" data-testid="tab-client-forms">Forms</TabsTrigger>
             </TabsList>
             <TabsContent value="sessions" className="mt-3 space-y-2">
               {clientSessions.length === 0 ? (
@@ -653,7 +661,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="w-7 h-7"
+                              className="h-11 w-11 sm:h-9 sm:w-9"
+                              aria-label={`Edit ${p.name} package sessions`}
                               onClick={() => {
                                 setEditingPkgId(p.id);
                                 setEditPkgTotal(p.totalSessions);
@@ -669,7 +678,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
 
                       {isEditingThis ? (
                         <div className="space-y-3 pt-2 border-t">
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
                             <div className="space-y-1">
                               <Label className="text-xs">Total</Label>
                               <Input
@@ -698,6 +707,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                           <div className="flex gap-2">
                             <Button
                               size="sm"
+                              className="min-h-11 sm:min-h-8"
                               onClick={() => updatePkgMutation.mutate({ id: p.id, totalSessions: editPkgTotal, usedSessions: editPkgUsed })}
                               disabled={updatePkgMutation.isPending}
                               data-testid="button-save-pkg"
@@ -705,7 +715,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                               <Save className="w-3 h-3 mr-1" />
                               {updatePkgMutation.isPending ? "Saving..." : "Save"}
                             </Button>
-                            <Button size="sm" variant="secondary" onClick={() => setEditingPkgId(null)} data-testid="button-cancel-pkg-edit">
+                            <Button size="sm" className="min-h-11 sm:min-h-8" variant="secondary" onClick={() => setEditingPkgId(null)} data-testid="button-cancel-pkg-edit">
                               Cancel
                             </Button>
                           </div>
@@ -735,6 +745,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                 />
                 <Button
                   size="sm"
+                  className="min-h-11 sm:min-h-8"
                   onClick={() => createNoteMutation.mutate(newNoteContent)}
                   disabled={!newNoteContent.trim() || createNoteMutation.isPending}
                   data-testid="button-add-note"
@@ -755,6 +766,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                         <div className="flex gap-2">
                           <Button
                             size="sm"
+                            className="min-h-11 sm:min-h-8"
                             variant="destructive"
                             onClick={() => deleteNoteMutation.mutate(n.id)}
                             disabled={deleteNoteMutation.isPending}
@@ -762,7 +774,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                           >
                             {deleteNoteMutation.isPending ? "Deleting..." : "Delete"}
                           </Button>
-                          <Button size="sm" variant="secondary" onClick={() => setDeletingNoteId(null)} data-testid="button-cancel-delete-note">
+                          <Button size="sm" className="min-h-11 sm:min-h-8" variant="secondary" onClick={() => setDeletingNoteId(null)} data-testid="button-cancel-delete-note">
                             Cancel
                           </Button>
                         </div>
@@ -778,13 +790,14 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                         <div className="flex gap-2">
                           <Button
                             size="sm"
+                            className="min-h-11 sm:min-h-8"
                             onClick={() => updateNoteMutation.mutate({ id: n.id, content: editingNoteContent })}
                             disabled={!editingNoteContent.trim() || updateNoteMutation.isPending}
                             data-testid="button-save-note"
                           >
                             {updateNoteMutation.isPending ? "Saving..." : "Save"}
                           </Button>
-                          <Button size="sm" variant="secondary" onClick={() => { setEditingNoteId(null); setEditingNoteContent(""); }} data-testid="button-cancel-edit-note">
+                          <Button size="sm" className="min-h-11 sm:min-h-8" variant="secondary" onClick={() => { setEditingNoteId(null); setEditingNoteContent(""); }} data-testid="button-cancel-edit-note">
                             Cancel
                           </Button>
                         </div>
@@ -800,7 +813,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="w-6 h-6"
+                              className="h-11 w-11 sm:h-9 sm:w-9"
+                              aria-label="Edit note"
                               onClick={() => { setEditingNoteId(n.id); setEditingNoteContent(n.content); }}
                               data-testid={`button-edit-note-${n.id}`}
                             >
@@ -809,7 +823,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="w-6 h-6"
+                              className="h-11 w-11 sm:h-9 sm:w-9"
+                              aria-label="Delete note"
                               onClick={() => setDeletingNoteId(n.id)}
                               data-testid={`button-delete-note-${n.id}`}
                             >
@@ -898,7 +913,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                 data-testid="input-edit-client-name"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Email</Label>
                 <Input
@@ -917,7 +932,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Session Type</Label>
                 <Select value={editData.sessionType} onValueChange={(v) => setEditData({ ...editData, sessionType: v })}>
@@ -986,6 +1001,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                   <Button
                     type="button"
                     size="sm"
+                    className="min-h-11 sm:min-h-8"
                     variant={parqAnswers[i] === true ? "default" : "secondary"}
                     onClick={() => setParqAnswers({ ...parqAnswers, [i]: true })}
                     data-testid={`button-parq-yes-${i}`}
@@ -996,6 +1012,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                   <Button
                     type="button"
                     size="sm"
+                    className="min-h-11 sm:min-h-8"
                     variant={parqAnswers[i] === false ? "default" : "secondary"}
                     onClick={() => setParqAnswers({ ...parqAnswers, [i]: false })}
                     data-testid={`button-parq-no-${i}`}
@@ -1069,12 +1086,13 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
               <Label>Date</Label>
               <Input
                 type="date"
+                className="w-full min-w-0 max-w-full"
                 value={bookFormData.date}
                 onChange={(e) => setBookFormData({ ...bookFormData, date: e.target.value })}
                 data-testid="input-book-date"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Start Time</Label>
                 <TimeSelect
@@ -1289,7 +1307,7 @@ export default function Clients() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
         <Skeleton className="h-8 w-48" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
@@ -1301,18 +1319,18 @@ export default function Clients() {
   }
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 sm:p-6 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-clients-title">Clients</h1>
           <p className="text-sm text-muted-foreground">{clients.length} total clients</p>
         </div>
-        <div className="flex items-center gap-2">
-          {canBroadcast ? <Button variant="outline" onClick={() => setBroadcastOpen(true)} data-testid="button-send-announcement">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          {canBroadcast ? <Button className="min-h-11 flex-1 sm:min-h-9 sm:flex-none" variant="outline" onClick={() => setBroadcastOpen(true)} data-testid="button-send-announcement">
             <Send className="w-4 h-4 mr-1" />
             Send Announcement
           </Button> : <UpgradeNotice feature="broadcastEmails" compact />}
-          <Button onClick={() => setNewClientOpen(true)} data-testid="button-add-client">
+          <Button className="min-h-11 flex-1 sm:min-h-9 sm:flex-none" onClick={() => setNewClientOpen(true)} data-testid="button-add-client">
             <Plus className="w-4 h-4 mr-1" />
             Add Client
           </Button>

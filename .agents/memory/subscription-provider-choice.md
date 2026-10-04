@@ -14,6 +14,12 @@ Validate existing coach billing references separately after switching Stripe acc
 
 **How to apply:** Check existing customer and subscription accessibility before declaring billing ready. Preserve historical payment links and do not blindly recreate subscriptions or clear records, which could lose refund history or cause duplicate billing.
 
+The owner confirmed on 2026-10-04 that nobody had paid and the reported error affected a Free account. Stripe customer records from abandoned checkout are not evidence of a payment.
+
+**Why:** Initial diagnosis treated missing setup references as potentially paid legacy billing, but the owner clarified there was no paid history at the account switch.
+
+**How to apply:** Recover missing unpaid Free setup only on an intentional upgrade, with no linked subscription or active entitlement. Preserve linked subscriptions and block ambiguous cases. Do not assume the launch-time absence of payments remains true indefinitely.
+
 Scope Practably checkout branding to this app rather than changing the shared account's identity. Obtain explicit approval before changing account-wide names, logos, or payment descriptors.
 
 **Why:** Existing fitness-coaching products coexist with Practably in the selected account. Fixing Practably's checkout appearance should not unexpectedly rebrand unrelated sales, invoices, or receipts.

@@ -185,7 +185,7 @@ function AuthenticatedApp() {
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
           <ImpersonationBanner />
-          <header className="flex items-center gap-2 p-2 border-b h-12 flex-shrink-0">
+          <header className="flex h-14 flex-shrink-0 items-center gap-2 border-b px-3 py-1.5 md:h-12">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
           </header>
           <main className="flex-1 overflow-auto">

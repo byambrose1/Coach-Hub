@@ -37,7 +37,7 @@ export function FormAnswerFields({ questions, answers, onChange, questionNumberO
         <legend className="mb-2 text-sm font-medium">{questionNumberOffset + index + 1}. {question.label}{question.required && <span className="ml-1 text-destructive" aria-label="required">*</span>}</legend>
         {question.type === "text" && <><Label htmlFor={`answer-${question.id}`} className="sr-only">Answer for {question.label}</Label><Input id={`answer-${question.id}`} value={typeof value === "string" ? value : ""} required={question.required} maxLength={4000} onChange={event => onChange(question.id, event.target.value)} /></>}
         {question.type === "textarea" && <><Label htmlFor={`answer-${question.id}`} className="sr-only">Answer for {question.label}</Label><Textarea id={`answer-${question.id}`} value={typeof value === "string" ? value : ""} required={question.required} maxLength={4000} rows={3} onChange={event => onChange(question.id, event.target.value)} /></>}
-        {question.type === "yes_no" && <div className="flex gap-2">{["Yes", "No"].map(choice => <Button key={choice} type="button" variant={value === choice ? "secondary" : "outline"} aria-pressed={value === choice} onClick={() => onChange(question.id, choice)}>{choice}</Button>)}</div>}
+        {question.type === "yes_no" && <div className="flex gap-2">{["Yes", "No"].map(choice => <Button key={choice} type="button" className="min-h-11" variant={value === choice ? "secondary" : "outline"} aria-pressed={value === choice} onClick={() => onChange(question.id, choice)}>{choice}</Button>)}</div>}
         {question.type === "single_choice" && <div className="space-y-2">{(question.options || []).map(choice => <label key={choice} className="flex cursor-pointer items-center gap-2 text-sm"><input type="radio" name={question.id} required={question.required} checked={value === choice} onChange={() => onChange(question.id, choice)} />{choice}</label>)}</div>}
         {question.type === "multiple_choice" && <div className="space-y-2">{(question.options || []).map(choice => {
           const selected = Array.isArray(value) ? value : [];
@@ -170,9 +170,9 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
 
   return <section className="space-y-4" aria-label="Custom client forms">
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-        <div><CardTitle className="text-base">Custom forms</CardTitle><p className="mt-1 text-sm text-muted-foreground">Build forms for client work beyond PAR-Q. Use a private link or record answers together.</p></div>
-        <Button size="sm" variant="outline" onClick={() => beginEdit(null)}><FilePlus2 className="mr-2 h-4 w-4" />New template</Button>
+      <CardHeader className="flex flex-col items-stretch gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0"><CardTitle className="text-base">Custom forms</CardTitle><p className="mt-1 text-sm text-muted-foreground">Build forms for client work beyond PAR-Q. Use a private link or record answers together.</p></div>
+        <Button className="min-h-11 w-full sm:min-h-8 sm:w-auto" size="sm" variant="outline" onClick={() => beginEdit(null)}><FilePlus2 className="mr-2 h-4 w-4" />New template</Button>
       </CardHeader>
       <CardContent className="space-y-4">
         {pending && <div className="space-y-2" aria-label="Loading custom forms"><div className="h-10 animate-pulse rounded-md bg-muted" /><div className="h-10 animate-pulse rounded-md bg-muted" /></div>}
@@ -181,14 +181,14 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
         {templates.map(template => <div key={template.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0"><p className="font-medium">{template.title}</p><p className="text-xs text-muted-foreground">{template.questions.length} {template.questions.length === 1 ? "question" : "questions"}{template.description ? ` · ${template.description}` : ""}</p></div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => setAssignTemplate(template)}><Send className="mr-1.5 h-3.5 w-3.5" />Send link</Button>
-            <Button size="sm" variant="secondary" onClick={() => {
+            <Button className="min-h-11" size="sm" onClick={() => setAssignTemplate(template)}><Send className="mr-1.5 h-3.5 w-3.5" />Send link</Button>
+            <Button className="min-h-11" size="sm" variant="secondary" onClick={() => {
               setAssignTemplate(template);
               setCompletionRequest({ ...template, id: "", clientId, templateId: template.id, status: "pending", expiresAt: "", completedAt: null, clientFormId: null });
               setAnswers({});
             }}><Clipboard className="mr-1.5 h-3.5 w-3.5" />Enter answers</Button>
-            <Button size="sm" variant="outline" onClick={() => beginEdit(template)}>Edit</Button>
-            <Button size="icon" variant="ghost" aria-label={`Delete ${template.title}`} onClick={() => setConfirmDelete(template)}><Trash2 className="h-4 w-4" /></Button>
+            <Button className="min-h-11" size="sm" variant="outline" onClick={() => beginEdit(template)}>Edit</Button>
+            <Button className="h-11 w-11" size="icon" variant="ghost" aria-label={`Delete ${template.title}`} onClick={() => setConfirmDelete(template)}><Trash2 className="h-4 w-4" /></Button>
           </div>
         </div>)}
       </CardContent>
@@ -203,14 +203,14 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
           <div className="flex items-center gap-2">
             <Badge variant={request.status === "completed" ? "secondary" : request.status === "revoked" ? "destructive" : "outline"}>{request.status}</Badge>
             {request.status === "pending" && <>
-              <Button size="sm" variant="outline" onClick={() => { setCompletionRequest(request); setAnswers({}); }}><Clipboard className="mr-1.5 h-3.5 w-3.5" />Enter responses</Button>
-              <Button size="icon" variant="ghost" aria-label="Revoke link" disabled={revokeMutation.isPending} onClick={() => revokeMutation.mutate(request.id)}><X className="h-4 w-4" /></Button>
+              <Button className="min-h-11" size="sm" variant="outline" onClick={() => { setCompletionRequest(request); setAnswers({}); }}><Clipboard className="mr-1.5 h-3.5 w-3.5" />Enter responses</Button>
+              <Button className="h-11 w-11" size="icon" variant="ghost" aria-label="Revoke link" disabled={revokeMutation.isPending} onClick={() => revokeMutation.mutate(request.id)}><X className="h-4 w-4" /></Button>
             </>}
             {request.status === "completed" && request.clientFormId && <Button size="sm" variant="outline" onClick={() => {
               const form = clientForms.find(item => item.id === request.clientFormId);
               if (form) onViewForm(form);
               else toast({ title: "Completed form", description: "Responses are listed in the forms below." });
-            }}>View responses</Button>}
+            }} className="min-h-11">View responses</Button>}
           </div>
         </div>)}
       </CardContent>
@@ -239,9 +239,9 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
           <div className="space-y-3">
             {draft.questions.map((question, index) => <div key={question.id} className="space-y-3 rounded-lg border bg-muted/20 p-3">
               <div className="flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Question {index + 1}</p><div className="flex items-center gap-1">
-                <Button type="button" size="icon" variant="ghost" aria-label="Move question up" disabled={index === 0} onClick={() => moveQuestion(index, -1)}><ArrowUp className="h-4 w-4" /></Button>
-                <Button type="button" size="icon" variant="ghost" aria-label="Move question down" disabled={index === draft.questions.length - 1} onClick={() => moveQuestion(index, 1)}><ArrowDown className="h-4 w-4" /></Button>
-                <Button type="button" size="icon" variant="ghost" aria-label="Remove question" onClick={() => setDraft({ ...draft, questions: draft.questions.filter((_, i) => i !== index) })}><X className="h-4 w-4" /></Button>
+                <Button type="button" className="h-11 w-11 sm:h-10 sm:w-10" size="icon" variant="ghost" aria-label="Move question up" disabled={index === 0} onClick={() => moveQuestion(index, -1)}><ArrowUp className="h-4 w-4" /></Button>
+                <Button type="button" className="h-11 w-11 sm:h-10 sm:w-10" size="icon" variant="ghost" aria-label="Move question down" disabled={index === draft.questions.length - 1} onClick={() => moveQuestion(index, 1)}><ArrowDown className="h-4 w-4" /></Button>
+                <Button type="button" className="h-11 w-11 sm:h-10 sm:w-10" size="icon" variant="ghost" aria-label="Remove question" onClick={() => setDraft({ ...draft, questions: draft.questions.filter((_, i) => i !== index) })}><X className="h-4 w-4" /></Button>
               </div></div>
               <div className="grid gap-3 sm:grid-cols-[1fr_190px]">
                 <Input value={question.label} required maxLength={300} placeholder="Question wording" aria-label={`Question ${index + 1} wording`} onChange={event => updateQuestion(index, { label: event.target.value })} />
@@ -255,7 +255,7 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
               {["single_choice", "multiple_choice"].includes(question.type) && <div className="space-y-2"><Label>Options, one per line</Label><Textarea value={(question.options || []).join("\n")} rows={3} onChange={event => updateQuestion(index, { options: event.target.value.split("\n").slice(0, 20) })} /><p className="text-xs text-muted-foreground">Use at least two distinct options.</p></div>}
               <label className="flex items-center gap-2 text-sm"><Checkbox checked={question.required} onCheckedChange={checked => updateQuestion(index, { required: !!checked })} />Response required</label>
             </div>)}
-            <Button type="button" variant="outline" disabled={draft.questions.length >= 40} onClick={() => setDraft({ ...draft, questions: [...draft.questions, newQuestion()] })}><Plus className="mr-2 h-4 w-4" />Add question</Button>
+            <Button type="button" className="min-h-11" variant="outline" disabled={draft.questions.length >= 40} onClick={() => setDraft({ ...draft, questions: [...draft.questions, newQuestion()] })}><Plus className="mr-2 h-4 w-4" />Add question</Button>
             {draft.questions.length === 0 && <p className="text-sm text-muted-foreground">A template needs at least one question.</p>}
           </div>
           <DialogFooter><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button disabled={templateMutation.isPending || draft.questions.length === 0}>{templateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save template</Button></DialogFooter>

@@ -68,14 +68,14 @@ function QuickBookDialog({ open, onOpenChange, clients }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-md overflow-x-hidden overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Quick Book Session</DialogTitle>
           <DialogDescription>Book a session without leaving the dashboard.</DialogDescription>
         </DialogHeader>
         <form
           onSubmit={(e) => { e.preventDefault(); mutation.mutate(formData); }}
-          className="space-y-4"
+          className="min-w-0 space-y-4"
         >
           <div className="space-y-2">
             <Label>Client</Label>
@@ -91,11 +91,12 @@ function QuickBookDialog({ open, onOpenChange, clients }: {
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Date</Label>
               <Input
                 type="date"
+                className="w-full min-w-0 max-w-full"
                 value={formData.date}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                 data-testid="input-quickbook-date"

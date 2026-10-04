@@ -104,7 +104,7 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate, presel
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-md overflow-x-hidden overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Book New Session</DialogTitle>
           <DialogDescription>Schedule a training session with a client.</DialogDescription>
@@ -115,7 +115,7 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate, presel
             const title = formData.title || (selectedClient ? `Session with ${selectedClient.name}` : "Training Session");
             mutation.mutate({ ...formData, title });
           }}
-          className="space-y-4"
+          className="min-w-0 space-y-4"
         >
           <div className="space-y-2">
             <Label>Client</Label>
@@ -141,11 +141,12 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate, presel
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Date</Label>
               <Input
                 type="date"
+                className="w-full min-w-0 max-w-full"
                 value={formData.date}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                 data-testid="input-session-date"
@@ -267,7 +268,7 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
 
   return (
     <Dialog open={true} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[calc(100dvh-2rem)] overflow-x-hidden overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{format(date, "EEEE, d MMMM yyyy")}</DialogTitle>
           <DialogDescription>
@@ -289,7 +290,7 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground hover:text-destructive h-7 px-2 flex-shrink-0"
+                className="text-muted-foreground hover:text-destructive min-h-11 flex-shrink-0 px-3 sm:min-h-9"
                 onClick={async () => {
                   for (const b of blockedSessions) {
                     await apiRequest("DELETE", `/api/sessions/${b.id}`, undefined);
@@ -335,20 +336,22 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="w-7 h-7"
+                          className="h-11 w-11 sm:h-9 sm:w-9"
                           onClick={() => updateStatus({ id: session.id, status: "completed" })}
                           data-testid={`button-complete-${session.id}`}
                           title="Mark complete"
+                          aria-label="Mark session complete"
                         >
                           <Check className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="w-7 h-7"
+                          className="h-11 w-11 sm:h-9 sm:w-9"
                           onClick={() => handleCancelClick(session)}
                           data-testid={`button-cancel-${session.id}`}
                           title="Cancel session"
+                          aria-label="Cancel session"
                         >
                           <X className="w-4 h-4" />
                         </Button>
@@ -401,6 +404,7 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
                   <div className="flex gap-2">
                     <Button
                       size="sm"
+                      className="min-h-11 sm:min-h-8"
                       variant={deductSession ? "default" : "outline"}
                       onClick={() => setDeductSession(true)}
                       data-testid="button-deduct-yes"
@@ -409,6 +413,7 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
                     </Button>
                     <Button
                       size="sm"
+                      className="min-h-11 sm:min-h-8"
                       variant={!deductSession ? "default" : "outline"}
                       onClick={() => setDeductSession(false)}
                       data-testid="button-deduct-no"
@@ -424,6 +429,7 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
               <Button
                 variant="destructive"
                 size="sm"
+                className="min-h-11 sm:min-h-8"
                 onClick={handleConfirmCancel}
                 data-testid="button-confirm-cancel-session"
               >
@@ -432,6 +438,7 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
               <Button
                 variant="outline"
                 size="sm"
+                className="min-h-11 sm:min-h-8"
                 onClick={() => setCancellingSession(null)}
                 data-testid="button-abort-cancel-session"
               >
@@ -442,7 +449,7 @@ function DayDetailDialog({ date, sessions, clientMap, onClose, onAddSession, upd
         )}
 
         <Button
-          className="w-full mt-2"
+          className="mt-2 min-h-11 w-full sm:min-h-9"
           variant="outline"
           onClick={() => { onClose(); onAddSession(dateStr); }}
           data-testid="button-add-session-day"
@@ -553,26 +560,26 @@ function BlockTimeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>From</Label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} data-testid="input-block-start" />
+              <Input type="date" className="w-full min-w-0 max-w-full" value={startDate} onChange={(e) => setStartDate(e.target.value)} data-testid="input-block-start" />
             </div>
             <div className="space-y-2">
               <Label>To</Label>
-              <Input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} data-testid="input-block-end" />
+              <Input type="date" className="w-full min-w-0 max-w-full" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} data-testid="input-block-end" />
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
             All days in this range will appear as unavailable on your calendar.
           </p>
         </div>
-        <div className="flex gap-2 mt-2">
-          <Button className="flex-1" onClick={() => mutation.mutate()} disabled={mutation.isPending} data-testid="button-confirm-block">
+        <div className="flex flex-col gap-2 mt-2 sm:flex-row">
+          <Button className="min-h-11 flex-1 sm:min-h-9" onClick={() => mutation.mutate()} disabled={mutation.isPending} data-testid="button-confirm-block">
             <Ban className="w-4 h-4 mr-2" />
             {mutation.isPending ? "Blocking..." : "Block Dates"}
           </Button>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button className="min-h-11 sm:min-h-9" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -700,7 +707,7 @@ export default function Schedule() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
         <Skeleton className="h-8 w-48" />
         <div className="grid grid-cols-7 gap-1">
           {Array.from({ length: 35 }).map((_, i) => (
@@ -715,8 +722,9 @@ export default function Schedule() {
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-bold" data-testid="text-schedule-title">Schedule</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <Button
+            className="min-h-11 flex-1 sm:min-h-9 sm:flex-none"
             variant="outline"
             onClick={() => setBlockDialogOpen(true)}
             data-testid="button-block-time"
@@ -725,6 +733,7 @@ export default function Schedule() {
             Block Time Off
           </Button>
           <Button
+            className="min-h-11 flex-1 sm:min-h-9 sm:flex-none"
             onClick={() => {
               const dateForView = calView === "day"
                 ? format(currentDay, "yyyy-MM-dd")
@@ -747,6 +756,7 @@ export default function Schedule() {
             key={v}
             variant={calView === v ? "default" : "outline"}
             size="sm"
+            className="h-11 px-4 sm:h-8 sm:px-3"
             onClick={() => setCalView(v)}
             data-testid={`button-view-${v}`}
           >
@@ -756,18 +766,18 @@ export default function Schedule() {
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <Button variant="ghost" size="icon" onClick={navigatePrev} data-testid="button-prev-month">
+        <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={navigatePrev} data-testid="button-prev-month" aria-label="Previous period">
           <ChevronLeft className="w-4 h-4" />
         </Button>
-        <div className="text-center">
-          <span className="text-lg font-semibold" data-testid="text-current-month">
+        <div className="min-w-0 flex-1 text-center">
+          <span className="text-base font-semibold sm:text-lg" data-testid="text-current-month">
             {headerLabel()}
           </span>
           {showTodayButton() && (
             <Button
               variant="ghost"
               size="sm"
-              className="ml-2 text-xs underline"
+              className="min-h-11 text-xs underline sm:min-h-8"
               onClick={navigateToday}
               data-testid="button-today"
             >
@@ -775,7 +785,7 @@ export default function Schedule() {
             </Button>
           )}
         </div>
-        <Button variant="ghost" size="icon" onClick={navigateNext} data-testid="button-next-month">
+        <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={navigateNext} data-testid="button-next-month" aria-label="Next period">
           <ChevronRight className="w-4 h-4" />
         </Button>
       </div>
@@ -951,7 +961,7 @@ export default function Schedule() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-gray-500 hover:text-destructive h-7 px-2"
+                    className="text-gray-500 hover:text-destructive min-h-11 px-3 sm:min-h-9"
                     onClick={async () => {
                       for (const b of blockedForDay) {
                         await apiRequest("DELETE", `/api/sessions/${b.id}`, undefined);

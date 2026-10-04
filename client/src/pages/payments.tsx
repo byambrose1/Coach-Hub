@@ -132,7 +132,7 @@ function NewPackageDialog({ open, onOpenChange, clients, currency, allowMonthly 
               />
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Monthly Rate</Label>
                 <Input
@@ -146,6 +146,7 @@ function NewPackageDialog({ open, onOpenChange, clients, currency, allowMonthly 
                 <Label>Next Billing Date</Label>
                 <Input
                   type="date"
+                  className="w-full min-w-0 max-w-full"
                   value={formData.nextBillingDate}
                   onChange={(e) => setFormData({ ...formData, nextBillingDate: e.target.value })}
                   data-testid="input-next-billing-date"
@@ -236,7 +237,7 @@ function NewInvoiceDialog({ open, onOpenChange, clients, currency, allowPaymentT
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Invoice Number</Label>
               <Input
@@ -256,11 +257,12 @@ function NewInvoiceDialog({ open, onOpenChange, clients, currency, allowPaymentT
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Due Date</Label>
               <Input
                 type="date"
+                className="w-full min-w-0 max-w-full"
                 value={formData.dueDate}
                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                 required
@@ -473,7 +475,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose, allowInvo
             }}
             className="space-y-4"
           >
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Invoice Number</Label>
                 <Input
@@ -491,11 +493,12 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose, allowInvo
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Due Date</Label>
                 <Input
                   type="date"
+                  className="w-full min-w-0 max-w-full"
                   value={editData.dueDate}
                   onChange={(e) => setEditData({ ...editData, dueDate: e.target.value })}
                   data-testid="input-edit-invoice-due-date"
@@ -551,7 +554,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose, allowInvo
           </form>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-xs text-muted-foreground">Amount</p>
                 <p className="text-lg font-bold" data-testid="text-detail-amount">{currency}{invoice.amount}</p>
@@ -623,7 +626,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose, allowInvo
                     toast({ title: "Invoice status updated" });
                   }).catch((err: Error) => toast({ title: "Could not update invoice status", description: err.message, variant: "destructive" }));
                 }}>
-                  <SelectTrigger className="h-8 w-36" aria-label="Invoice status"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-8 min-h-11 w-36" aria-label="Invoice status"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="sent">Sent</SelectItem>
@@ -642,7 +645,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose, allowInvo
                     toast({ title: "Payment method updated" });
                   }).catch((err: Error) => toast({ title: "Could not update payment method", description: err.message, variant: "destructive" }));
                 }}>
-                  <SelectTrigger className="h-8 w-40" aria-label="Record payment method"><SelectValue placeholder="Payment method" /></SelectTrigger>
+                  <SelectTrigger className="h-8 min-h-11 w-40" aria-label="Record payment method"><SelectValue placeholder="Payment method" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No method recorded</SelectItem>
                     <SelectItem value="cash">Cash</SelectItem>
@@ -764,7 +767,7 @@ export default function Payments() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
         <Skeleton className="h-8 w-48" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
@@ -776,10 +779,10 @@ export default function Payments() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-payments-title">Payments & Packages</h1>
+          <h1 className="text-xl font-bold sm:text-2xl" data-testid="text-payments-title">Payments & Packages</h1>
           <p className="text-sm text-muted-foreground">{activePackages.length} active packages</p>
         </div>
       </div>
@@ -845,13 +848,13 @@ export default function Payments() {
         </CardHeader>
         <CardContent>
           {canBusinessReports && <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-1"><Label htmlFor="report-from">From</Label><Input id="report-from" type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} data-testid="input-revenue-from" /></div>
-            <div className="space-y-1"><Label htmlFor="report-to">To</Label><Input id="report-to" type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} data-testid="input-revenue-to" /></div>
+            <div className="min-w-0 space-y-1"><Label htmlFor="report-from">From</Label><Input id="report-from" type="date" className="w-full min-w-0 max-w-full" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} data-testid="input-revenue-from" /></div>
+            <div className="min-w-0 space-y-1"><Label htmlFor="report-to">To</Label><Input id="report-to" type="date" className="w-full min-w-0 max-w-full" value={reportTo} onChange={(e) => setReportTo(e.target.value)} data-testid="input-revenue-to" /></div>
             <div className="space-y-1"><Label htmlFor="report-client">Client</Label><Select value={reportClientId} onValueChange={setReportClientId}><SelectTrigger id="report-client" data-testid="select-revenue-client"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All clients</SelectItem>{clients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>)}</SelectContent></Select></div>
           </div>}
           {canBusinessReports && !validReportRange && <p className="mb-3 text-sm text-destructive" role="alert">Choose a valid date range with the start date on or before the end date.</p>}
-          {revenueQuery.isError ? <div role="alert" className="space-y-2 rounded-md border border-destructive/30 p-4 text-sm"><p>Revenue report could not be loaded.</p><Button variant="outline" size="sm" onClick={() => revenueQuery.refetch()}>Retry</Button></div> : revenueQuery.isLoading ? <div className="grid grid-cols-2 md:grid-cols-4 gap-4"><Skeleton className="h-20" /><Skeleton className="h-20" /><Skeleton className="h-20" /><Skeleton className="h-20" /></div> : <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {revenueQuery.isError ? <div role="alert" className="space-y-2 rounded-md border border-destructive/30 p-4 text-sm"><p>Revenue report could not be loaded.</p><Button variant="outline" size="sm" onClick={() => revenueQuery.refetch()}>Retry</Button></div> : revenueQuery.isLoading ? <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4"><Skeleton className="h-20" /><Skeleton className="h-20" /><Skeleton className="h-20" /><Skeleton className="h-20" /></div> : <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Total Revenue</p>
               <p className="text-2xl font-bold text-primary" data-testid="stat-scope-total">{currency}{(report?.totalRevenue || 0).toFixed(2)}</p>
@@ -889,17 +892,17 @@ export default function Payments() {
 
       <Tabs defaultValue="packages">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <TabsList data-testid="tabs-payments">
-            <TabsTrigger value="packages" data-testid="tab-packages">Packages</TabsTrigger>
-            <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
-            <TabsTrigger value="monthly" data-testid="tab-monthly">Monthly Payments</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 sm:w-auto" data-testid="tabs-payments">
+            <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-1 text-xs sm:min-h-8 sm:px-3 sm:text-sm" value="packages" data-testid="tab-packages">Packages</TabsTrigger>
+            <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-1 text-xs sm:min-h-8 sm:px-3 sm:text-sm" value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
+            <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-1 text-xs sm:min-h-8 sm:px-3 sm:text-sm" value="monthly" data-testid="tab-monthly">Monthly Payments</TabsTrigger>
           </TabsList>
-          <div className="flex gap-2">
-            <Button onClick={() => setNewPackageOpen(true)} data-testid="button-add-package">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button className="min-h-11 w-full sm:min-h-9 sm:w-auto" onClick={() => setNewPackageOpen(true)} data-testid="button-add-package">
               <Plus className="w-4 h-4 mr-1" />
               New Package
             </Button>
-            <Button variant="secondary" onClick={() => setNewInvoiceOpen(true)} data-testid="button-add-invoice">
+            <Button className="min-h-11 w-full sm:min-h-9 sm:w-auto" variant="secondary" onClick={() => setNewInvoiceOpen(true)} data-testid="button-add-invoice">
               <FileText className="w-4 h-4 mr-1" />
               Create Invoice
             </Button>

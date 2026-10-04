@@ -311,11 +311,91 @@ describe("hardened Stripe subscription billing", () => {
     }
   });
 
+  test("missing customer links block billing safely without replacing payment history", async () => {
+    state.settings.set(USER_A, {
+      ...state.settings.get(USER_A), stripeSubscriptionId: "sub_legacy",
+      subscriptionPlan: "starter", subscriptionStatus: "active",
+    });
+    const before = { ...state.settings.get(USER_A) };
+    stripe.customers.retrieve = async () => {
+      throw Object.assign(new Error("No such customer"), { code: "resource_missing", statusCode: 404 });
+    };
+    const readiness = await (await request("/api/subscription/status")).json();
+    assert.equal(readiness.ready, false);
+    assert.equal(readiness.code, "BILLING_ACCOUNT_REVIEW_REQUIRED");
+    for (const [path, method, body] of [
+      ["/api/subscription/checkout", "POST", { plan: "starter" }],
+      ["/api/subscription/portal", "POST", {}],
+      ["/api/subscription/refund", "GET", undefined],
+      ["/api/subscription/refund", "POST", { confirm: true }],
+    ] as const) {
+      const response = await request(path, { method, ...(body ? { body: JSON.stringify(body) } : {}) });
+      assert.equal(response.status, 409);
+      assert.equal((await response.json()).code, "BILLING_ACCOUNT_REVIEW_REQUIRED");
+    }
+    assert.deepEqual(state.settings.get(USER_A), before);
+    assert.equal(state.nextCustomer, 1);
+    assert.equal(state.checkoutCreateCalls.length, 0);
+    assert.equal(state.portalCreateCalls.length, 0);
+  });
+
+  test("abandoned unpaid setup reconnects on upgrade but not on refund or status reads", async () => {
+    const originalRetrieve = stripe.customers.retrieve;
+    stripe.customers.retrieve = async (id: string) => {
+      if (id === "cus_a") {
+        throw Object.assign(new Error("No such customer"), { code: "resource_missing", statusCode: 404 });
+      }
+      return originalRetrieve(id);
+    };
+    const before = { ...state.settings.get(USER_A) };
+    const readiness = await (await request("/api/subscription/status")).json();
+    assert.equal(readiness.ready, true);
+    assert.equal(readiness.billingCustomerNeedsReconnect, true);
+    const refund = await request("/api/subscription/refund");
+    assert.equal(refund.status, 200);
+    assert.equal((await refund.json()).state, "ineligible");
+    const portal = await request("/api/subscription/portal", { method: "POST", body: "{}" });
+    assert.equal(portal.status, 409);
+    assert.equal((await portal.json()).code, "BILLING_SETUP_REQUIRED");
+    assert.deepEqual(state.settings.get(USER_A), before);
+    assert.equal(state.nextCustomer, 1);
+    const checkout = await request("/api/subscription/checkout", { method: "POST", body: JSON.stringify({ plan: "starter" }) });
+    assert.equal(checkout.status, 200);
+    assert.equal(state.settings.get(USER_A).stripeCustomerId, "cus_new_1");
+    assert.equal(state.settings.get(USER_A).subscriptionPlan, "free");
+    assert.equal(state.checkoutCreateCalls.length, 1);
+    assert.equal(state.checkoutCreateCalls[0].params.customer, "cus_new_1");
+  });
+
+  test("temporary Stripe errors do not classify billing links as missing", async () => {
+    stripe.customers.retrieve = async () => {
+      throw Object.assign(new Error("Provider unavailable"), { code: "api_error", statusCode: 503 });
+    };
+    const response = await request("/api/subscription/portal", { method: "POST", body: "{}" });
+    assert.equal(response.status, 502);
+    assert.equal((await response.json()).code, "PAYMENT_PROVIDER_ERROR");
+    assert.equal(state.nextCustomer, 1);
+  });
+
+  test("unpaid stale setup cannot reconnect until webhook configuration is present", async () => {
+    stripe.customers.retrieve = async () => {
+      throw Object.assign(new Error("No such customer"), { code: "resource_missing", statusCode: 404 });
+    };
+    delete process.env.STRIPE_WEBHOOK_CONFIGURED;
+    const response = await request("/api/subscription/checkout", {
+      method: "POST", body: JSON.stringify({ plan: "starter" }),
+    });
+    assert.equal(response.status, 503);
+    assert.equal(state.nextCustomer, 1);
+    assert.equal(state.settings.get(USER_A).stripeCustomerId, "cus_a");
+    assert.equal(state.checkoutCreateCalls.length, 0);
+  });
+
   test("status reports mode/readiness without returning Stripe identifiers", async () => {
     const response = await request("/api/subscription/status");
     const result = await response.json();
     assert.equal(response.status, 200);
-    assert.deepEqual(result, { livemode: false, ready: true, checkoutPaused: false });
+    assert.deepEqual(result, { livemode: false, ready: true, checkoutPaused: false, billingCustomerNeedsReconnect: false });
     assert.equal(JSON.stringify(result).includes("price_"), false);
   });
 

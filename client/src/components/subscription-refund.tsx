@@ -6,6 +6,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ApiError } from "@/lib/api-error";
 
 const refundQueryKey = ["/api/subscription/refund"] as const;
 
@@ -111,6 +112,8 @@ export function SubscriptionRefund({
     refundMutation.mutate();
   };
   const status = refundQuery.data;
+  const billingLinkNeedsReview = refundQuery.error instanceof ApiError
+    && refundQuery.error.code === "BILLING_ACCOUNT_REVIEW_REQUIRED";
   const amount = formatAmount(status?.amount, status?.currency);
   const paidAt = formatDate(status?.paidAt);
   const localizedExpiry = formatDate(status?.expiresAt);
@@ -131,11 +134,13 @@ export function SubscriptionRefund({
         <div className="h-14 animate-pulse rounded-md bg-muted" aria-label="Checking refund eligibility" data-testid="refund-loading" />
       ) : refundQuery.isError ? (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm" role="alert" data-testid="refund-unavailable">
-          <p className="font-medium">Refund eligibility is unavailable</p>
+          <p className="font-medium">{billingLinkNeedsReview ? "Billing account needs reconnecting" : "Refund eligibility is unavailable"}</p>
           <p className="mt-1 text-xs text-muted-foreground">{refundQuery.error instanceof Error ? refundQuery.error.message : "Please try again."}</p>
-          <Button type="button" size="sm" variant="outline" className="mt-3 gap-2" onClick={retryStatus} disabled={disabled} data-testid="button-refund-retry-status">
+          {billingLinkNeedsReview ? (
+            <a href="/support" className="mt-3 inline-block font-medium underline underline-offset-4">Contact support</a>
+          ) : <Button type="button" size="sm" variant="outline" className="mt-3 gap-2" onClick={retryStatus} disabled={disabled} data-testid="button-refund-retry-status">
             <RotateCw className="h-3.5 w-3.5" aria-hidden="true" /> Retry check
-          </Button>
+          </Button>}
         </div>
       ) : status?.state === "eligible" ? (
         <div className="space-y-3" data-testid="refund-state-eligible">
@@ -190,7 +195,7 @@ export function SubscriptionRefund({
         </div>
       ) : status?.state === "ineligible" ? (
         <div className="rounded-md border bg-background p-3 text-sm" role="status" data-testid="refund-state-ineligible">
-          <p className="font-medium">Automatic refund unavailable</p>
+          <p className="font-medium">{status.message?.includes("no paid subscription payment") || status.message?.includes("no successful subscription payment") ? "No payment to refund" : "Automatic refund unavailable"}</p>
           <p className="mt-1 text-xs text-muted-foreground">{status.message || "Only the first subscription payment can be refunded within 24 hours."}</p>
         </div>
       ) : status?.state === "processing" ? (

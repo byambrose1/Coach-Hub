@@ -26,6 +26,7 @@ import type Stripe from "stripe";
 import { logError } from "./safe-logging";
 import { withBillingCheckoutLock } from "./db";
 import { cancelAndRefundSubscription, getSubscriptionRefundStatus, SubscriptionRefundError } from "./subscription-refunds";
+import { isUnpaidBillingSetup, retrieveBillingCustomer, StripeBillingLinkError } from "./stripe-billing-links";
 import {
   getStripeClient,
   getPractablyCheckoutBranding,
@@ -490,7 +491,7 @@ export async function registerRoutes(
   };
 
   const verifyStripeCustomerOwnership = async (customerId: string, userId: string) => {
-    const customer = await getBillingStripeClient().customers.retrieve(customerId);
+    const customer = await retrieveBillingCustomer(getBillingStripeClient(), customerId);
     if ("deleted" in customer || customer.metadata.userId !== userId) {
       throw new StripeBillingOwnershipError(
         "This Stripe customer is not connected to the authenticated account.",
@@ -529,10 +530,12 @@ export async function registerRoutes(
     }
   };
 
-  app.get("/api/subscription/status", isAuthenticated, async (_req, res) => {
+  app.get("/api/subscription/status", isAuthenticated, async (req, res) => {
     const mode = getStripeMode();
     const livemode = mode === "live";
     const messages: string[] = [];
+    let code: string | undefined;
+    let billingCustomerNeedsReconnect = false;
     if (mode === "unconfigured") messages.push("Stripe credentials are not configured.");
     else if (mode === "unknown") messages.push("Stripe credentials have an unrecognized mode.");
     else if (process.env.NODE_ENV === "production" && mode !== "live") {
@@ -557,8 +560,23 @@ export async function registerRoutes(
           }
           validateStripePrice(await stripe.prices.retrieve(priceId), plan, modeForValidation);
         }
+        const settings = await storage.getSettings(getUserId(req));
+        if (settings?.stripeCustomerId) {
+          try {
+            await verifyStripeCustomerOwnership(settings.stripeCustomerId, getUserId(req));
+          } catch (error) {
+            if (error instanceof StripeBillingLinkError && isUnpaidBillingSetup(settings)) {
+              billingCustomerNeedsReconnect = true;
+            } else {
+              throw error;
+            }
+          }
+        }
       } catch (err) {
-        if (err instanceof StripeBillingConfigurationError) {
+        if (err instanceof StripeBillingLinkError) {
+          code = err.code;
+          messages.push(err.message);
+        } else if (err instanceof StripeBillingConfigurationError || err instanceof StripeBillingOwnershipError) {
           messages.push(err.message);
         } else {
           logError("Stripe billing readiness check failed", err);
@@ -571,6 +589,8 @@ export async function registerRoutes(
       livemode,
       ready: messages.length === 0,
       checkoutPaused: process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED === "true",
+      billingCustomerNeedsReconnect,
+      ...(code ? { code } : {}),
       ...(messages.length
         ? { message: messages.filter((message, index) => messages.indexOf(message) === index).join(" ") }
         : {}),
@@ -772,7 +792,7 @@ export async function registerRoutes(
       }
       const claims = (req as any).user?.claims || {};
       const stripe = getBillingStripeClient();
-      const customer = current?.stripeCustomerId
+      let customer = current?.stripeCustomerId
         ? current.stripeCustomerId
         : await stripe.customers.create({
             email: claims.email,
@@ -785,7 +805,25 @@ export async function registerRoutes(
           stripeCustomerId: customer,
         });
       }
-      await verifyStripeCustomerOwnership(customer, userId);
+      try {
+        await verifyStripeCustomerOwnership(customer, userId);
+      } catch (error) {
+        if (!(error instanceof StripeBillingLinkError) || !isUnpaidBillingSetup(current) || !current?.stripeCustomerId) {
+          throw error;
+        }
+        if (process.env.STRIPE_WEBHOOK_CONFIGURED !== "true" || !getStripeWebhookSecret()) {
+          throw new StripeBillingConfigurationError("Stripe billing is not ready because the webhook signing secret has not been verified for this endpoint.");
+        }
+        // The owner confirmed there were no paid customers at the account
+        // switch. Recover only abandoned Free setup, never linked subscriptions.
+        const replacement = await stripe.customers.create({
+          email: claims.email,
+          metadata: { userId },
+        }, { idempotencyKey: `billing-setup-reconnect-${userId}-${customer}` });
+        customer = replacement.id;
+        await verifyStripeCustomerOwnership(customer, userId);
+        await storage.upsertSettings(userId, { ...current, stripeCustomerId: customer });
+      }
       const openSessions = await listOpenSubscriptionCheckoutSessions(customer);
 
       const subscriptions = await stripe.subscriptions.list({
@@ -933,6 +971,9 @@ export async function registerRoutes(
       return res.json({ url: session.url });
     } catch (err) {
       logError("Failed to create Stripe checkout session", err);
+      if (err instanceof StripeBillingLinkError) {
+        return res.status(409).json({ code: err.code, message: err.message });
+      }
       if (err instanceof StripeBillingOwnershipError) {
         return res.status(403).json({ message: err.message });
       }
@@ -1025,6 +1066,9 @@ export async function registerRoutes(
       });
     } catch (err) {
       logError("Stripe Checkout confirmation failed", err);
+      if (err instanceof StripeBillingLinkError) {
+        return res.status(409).json({ code: err.code, message: err.message });
+      }
       if (err instanceof StripeBillingConfigurationError) {
         return res.status(503).json({ message: err.message });
       }
@@ -1046,6 +1090,9 @@ export async function registerRoutes(
       }));
     } catch (err) {
       logError("Subscription refund eligibility check failed", err);
+      if (err instanceof StripeBillingLinkError) {
+        return res.status(409).json({ code: err.code, message: err.message });
+      }
       if (err instanceof SubscriptionRefundError) {
         return res.status(err.status).json({ code: err.code, message: err.message });
       }
@@ -1070,6 +1117,9 @@ export async function registerRoutes(
       })));
     } catch (err) {
       logError("Subscription cancellation and refund failed", err);
+      if (err instanceof StripeBillingLinkError) {
+        return res.status(409).json({ code: err.code, message: err.message });
+      }
       if (err instanceof SubscriptionRefundError) {
         return res.status(err.status).json({ code: err.code, message: err.message });
       }
@@ -1094,7 +1144,17 @@ export async function registerRoutes(
         });
       }
       validateStripeModeForBilling();
-      await verifyStripeCustomerOwnership(settings.stripeCustomerId, userId);
+      try {
+        await verifyStripeCustomerOwnership(settings.stripeCustomerId, userId);
+      } catch (error) {
+        if (error instanceof StripeBillingLinkError && isUnpaidBillingSetup(settings)) {
+          return res.status(409).json({
+            code: "BILLING_SETUP_REQUIRED",
+            message: "You have not started a paid subscription yet. Choose Upgrade on a plan to set up billing.",
+          });
+        }
+        throw error;
+      }
       const portal = await getBillingStripeClient().billingPortal.sessions.create({
         customer: settings.stripeCustomerId,
         configuration: portalConfiguration,
@@ -1103,6 +1163,9 @@ export async function registerRoutes(
       return res.json({ url: portal.url });
     } catch (err) {
       logError("Failed to create Stripe customer portal session", err);
+      if (err instanceof StripeBillingLinkError) {
+        return res.status(409).json({ code: err.code, message: err.message });
+      }
       if (err instanceof StripeBillingOwnershipError) {
         return res.status(403).json({ message: err.message });
       }
@@ -1437,6 +1500,9 @@ export async function registerRoutes(
     } catch (err: any) {
       if (err instanceof StripeBillingOwnershipError) {
         return res.status(403).json({ message: err.message });
+      }
+      if (err instanceof StripeBillingLinkError) {
+        return res.status(409).json({ code: err.code, message: err.message });
       }
       if (err instanceof StripeBillingConfigurationError) {
         return res.status(503).json({ message: err.message });
