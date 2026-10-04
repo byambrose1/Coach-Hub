@@ -570,7 +570,7 @@ export async function registerRoutes(
     return res.json({
       livemode,
       ready: messages.length === 0,
-      checkoutPaused: process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED !== "false",
+      checkoutPaused: process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED === "true",
       ...(messages.length
         ? { message: messages.filter((message, index) => messages.indexOf(message) === index).join(" ") }
         : {}),
@@ -752,7 +752,7 @@ export async function registerRoutes(
       }
       const current = await storage.getSettings(userId);
       if (
-        process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED !== "false" &&
+        process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED === "true" &&
         !current?.stripeSubscriptionId
       ) {
         return res.status(503).json({
@@ -865,7 +865,7 @@ export async function registerRoutes(
         });
       }
 
-      if (process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED !== "false") {
+      if (process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED === "true") {
         return res.status(503).json({
           code: "STRIPE_CHECKOUT_PAUSED",
           message: "New Practably subscription checkouts are temporarily paused while the Stripe account is verified. Existing subscriptions are unchanged.",

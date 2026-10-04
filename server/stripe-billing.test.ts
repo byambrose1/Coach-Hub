@@ -273,7 +273,7 @@ describe("hardened Stripe subscription billing", () => {
     process.env.STRIPE_STARTER_PRICE_ID = "price_starter";
     process.env.STRIPE_PROFESSIONAL_PRICE_ID = "price_professional";
     process.env.STRIPE_BUSINESS_PRICE_ID = "price_business";
-    process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED = "false";
+    delete process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED;
     process.env.NODE_ENV = "test";
     delete process.env.STRIPE_AUTOMATIC_TAX_ENABLED;
 
