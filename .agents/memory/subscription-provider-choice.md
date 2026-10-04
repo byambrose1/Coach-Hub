@@ -8,6 +8,12 @@ The owner chose to switch Practably's direct Stripe API credentials to the inten
 
 **How to apply:** Verify the account ID through the SDK using the configured secret without displaying it. Treat plan prices, webhook signing secrets/endpoints, and Billing Portal configuration as account-specific. Never request keys in chat. Do not claim old-account subscriptions migrated or remain app-manageable after replacing the key.
 
+Validate existing coach billing references separately after switching Stripe accounts; matching the key, prices, and portal configuration is not sufficient.
+
+**Why:** After the account switch, production checkout, portal access, and refund checks all returned Stripe `resource_missing` errors. Existing customer references can still belong to the former account even when the new account's configuration is correct.
+
+**How to apply:** Check existing customer and subscription accessibility before declaring billing ready. Preserve historical payment links and do not blindly recreate subscriptions or clear records, which could lose refund history or cause duplicate billing.
+
 Scope Practably checkout branding to this app rather than changing the shared account's identity. Obtain explicit approval before changing account-wide names, logos, or payment descriptors.
 
 **Why:** Existing fitness-coaching products coexist with Practably in the selected account. Fixing Practably's checkout appearance should not unexpectedly rebrand unrelated sales, invoices, or receipts.
