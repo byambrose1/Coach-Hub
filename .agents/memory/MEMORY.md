@@ -2,7 +2,7 @@
 - [GitHub upload layout](github-upload-layout.md) — verify the workflow root before syncing; uploads can create inactive nested client/server copies.
 - [Stale Preview email process](stale-preview-email-process.md) — compare server startup with sender changes before blaming Brevo or secrets.
 - [Product showcase boundary](product-showcase-boundary.md) — a public workflow tour and real signed-in billing access meet different needs; never conflate them.
-- [Subscription provider choice](subscription-provider-choice.md) — owner supplied a different intended account; verify the secure connection before resuming checkouts.
+- [Subscription provider choice](subscription-provider-choice.md) — owner confirmed the current live Stripe account is intended; do not replace it without approval.
 - [Subscription refund policy](subscription-refund-policy.md) — owner approved a 24-hour first-payment refund guarantee with immediate cancellation and retained client data.
 - [Browser testing capabilities](browser-testing-capabilities.md) — the documented testing helper may be unavailable; isolated Chromium checks must block financial side effects.
 - [Launch assurance gates](launch-assurance-gates.md) — distinguish code fixes from legal/provider evidence; retain beta precautions until health-data arrangements are verified.
