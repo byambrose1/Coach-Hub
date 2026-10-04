@@ -2,11 +2,11 @@
 name: Subscription provider choice
 description: Owner-approved provider and account boundary for Practably coach subscriptions.
 ---
-The owner now wants Practably to use a different Stripe account from the current live account. The intended account is not yet verified: the newly attached Stripe connector resolves to a third account with charges and payouts disabled. Do not switch the app until the exact target account is confirmed.
+The owner wants Practably to use a different Stripe account from the current live account. The intended account is confirmed in the agent's Stripe session, but the app's Stripe connector still resolves to a different account. Do not switch the app until the app-level connection or key is confirmed against the intended account.
 
-**Why:** The owner's account choice changed, and a read-only check showed the new connector is not attached to the intended account. Changing the key alone could also make existing account-scoped customer and subscription IDs inaccessible.
+**Why:** The owner specified the target account, but the agent's Stripe session and the app's Stripe connector have different account contexts. Changing the key alone could also make existing account-scoped customer and subscription IDs inaccessible.
 
-**How to apply:** Use Replit's Stripe integration flow to connect the intended account, then verify its account ID before switching app billing. Never request keys in chat. Preserve the old account's existing subscriptions and obtain an explicit plan before migrating them. If checkout is paused during setup, obtain explicit approval before re-enabling it.
+**How to apply:** Verify the account ID through the same app-level connection that will process billing before switching. Never request keys in chat. Preserve the old account's existing subscriptions and obtain an explicit plan before migrating them. If checkout is paused during setup, obtain explicit approval before re-enabling it.
 
 Scope Practably checkout branding to this app rather than changing the shared account's identity. Obtain explicit approval before changing account-wide names, logos, or payment descriptors.
 
