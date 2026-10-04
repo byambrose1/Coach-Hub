@@ -73,7 +73,7 @@ export interface IStorage {
   getCoachDetail(coachId: string): Promise<CoachDetail | undefined>;
   updateCoachPlan(coachId: string, plan: string): Promise<void>;
 
-  // Waitlist (pre-launch signups, gathered while the app is invite-only)
+  // Waitlist signups
   createWaitlistSignup(data: InsertWaitlistSignup): Promise<WaitlistSignup>;
   getWaitlistSignupByEmail(email: string): Promise<WaitlistSignup | undefined>;
   getWaitlistSignups(): Promise<WaitlistSignup[]>;

@@ -50,7 +50,7 @@ Practably is built for a different job: the day-to-day admin of running a coachi
 
 **Pick Practably if**: you're mostly coaching in person or already have your own way of programming workouts, you want simple, affordable client and business admin, and you don't want to pay enterprise pricing for a small roster.
 
-Practably is currently in private beta - if the second one sounds like you, join the waitlist below and we'll email you when a spot opens up.`,
+Practably is built for independent coaches who want straightforward tools for managing their clients and day-to-day business. [Create a Practably account](/login?mode=signup) to explore the product.`,
   },
   {
     slug: "best-personal-trainer-software-small-client-roster-2026",
@@ -91,7 +91,7 @@ Here's a straight look at four options, focused on what a smaller coaching busin
 
 Before comparing feature lists, ask: do you need software to help you *deliver* coaching (programme builders, video libraries, in-app messaging), or software to help you *run the business* around coaching you already know how to deliver (bookings, forms, invoices, payment tracking)?
 
-If it's the second one and your roster is still small, you're likely better off starting with something priced for where you are now rather than where a 50-client business would be. Practably is currently in private beta, built specifically for that - join the waitlist to get early access.`,
+If it's the second one and your roster is still small, you're likely better off starting with something priced for where you are now rather than where a 50-client business would be. Practably is built for coaches with smaller rosters who want a clear starting point and room to grow. [Create an account](/login?mode=signup) to explore it.`,
   },
   {
     slug: "parq-form-template-personal-trainers-uk",
@@ -134,15 +134,42 @@ Beyond the core seven questions, most coaches add:
 
 A paper PAR-Q works, but it's easy to lose, awkward to search back through, and not great if a client needs to update their answers later (a new diagnosis, a new medication). Collecting PAR-Q responses digitally against the client's own record means you can find them instantly, and they don't get left in a gym bag.
 
-Practably includes PARQ form collection built into each client record, so responses are stored alongside bookings, notes, and invoices rather than in a separate paper file. Practably is currently in private beta - join the waitlist to get early access.`,
+Practably includes PARQ form collection built into each client record, so responses are stored alongside bookings, notes, and invoices rather than in a separate paper file. [Create an account](/login?mode=signup) to explore Practably.`,
   },
 ];
 
 export async function seedBlogPosts() {
   const existing = await storage.getAllBlogPosts();
-  const existingSlugs = new Set(existing.map((p) => p.slug));
+  const existingBySlug = new Map(existing.map((p) => [p.slug, p]));
+  const staleCopyReplacements: Record<string, { from: string; to: string }> = {
+    "practably-vs-pt-distinction-vs-truecoach": {
+      from: "Practably is currently in private beta - if the second one sounds like you, join the waitlist below and we'll email you when a spot opens up.",
+      to: "Practably is built for independent coaches who want straightforward tools for managing their clients and day-to-day business. [Create a Practably account](/login?mode=signup) to explore the product.",
+    },
+    "best-personal-trainer-software-small-client-roster-2026": {
+      from: "If it's the second one and your roster is still small, you're likely better off starting with something priced for where you are now rather than where a 50-client business would be. Practably is currently in private beta, built specifically for that - join the waitlist to get early access.",
+      to: "If it's the second one and your roster is still small, you're likely better off starting with something priced for where you are now rather than where a 50-client business would be. Practably is built for coaches with smaller rosters who want a clear starting point and room to grow. [Create an account](/login?mode=signup) to explore it.",
+    },
+    "parq-form-template-personal-trainers-uk": {
+      from: "Practably includes PARQ form collection built into each client record, so responses are stored alongside bookings, notes, and invoices rather than in a separate paper file. Practably is currently in private beta - join the waitlist to get early access.",
+      to: "Practably includes PARQ form collection built into each client record, so responses are stored alongside bookings, notes, and invoices rather than in a separate paper file. [Create an account](/login?mode=signup) to explore Practably.",
+    },
+  };
   for (const post of STARTER_POSTS) {
-    if (existingSlugs.has(post.slug)) continue;
+    const existingPost = existingBySlug.get(post.slug);
+    if (existingPost) {
+      const replacement = staleCopyReplacements[post.slug];
+      if (replacement && existingPost.contentMarkdown.includes(replacement.from)) {
+        try {
+          await storage.updateBlogPost(existingPost.id, {
+            contentMarkdown: existingPost.contentMarkdown.replaceAll(replacement.from, replacement.to),
+          });
+        } catch (err) {
+          logError(`Failed to update outdated copy in blog post "${post.slug}"`, err);
+        }
+      }
+      continue;
+    }
     try {
       await storage.createBlogPost({
         slug: post.slug,

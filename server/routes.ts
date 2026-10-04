@@ -249,7 +249,7 @@ export async function registerRoutes(
     res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`);
   });
 
-  // --- Waitlist (public, pre-launch signup capture) ---
+  // --- Waitlist (public signup capture) ---
   const waitlistLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
     limit: 10,

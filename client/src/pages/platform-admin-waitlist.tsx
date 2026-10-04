@@ -56,7 +56,7 @@ export default function PlatformAdminWaitlist() {
             <Users className="h-6 w-6 text-violet-500" />
             <div>
               <h1 className="text-2xl font-bold">Waitlist</h1>
-              <p className="text-sm text-muted-foreground">{signups.length} people waiting for a beta invite</p>
+              <p className="text-sm text-muted-foreground">{signups.length} people on the waitlist</p>
             </div>
           </div>
         </div>

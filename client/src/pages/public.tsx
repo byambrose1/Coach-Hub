@@ -3,9 +3,7 @@ import type { ReactNode } from "react";
 import { ArrowLeft, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/brand-mark";
-import { WaitlistDialog } from "@/components/waitlist-dialog";
 import { siteConfig, OWNER_INPUT_REQUIRED } from "@/config/site";
-import { Fragment } from "react";
 import { publicSite, privacySections, termsSections } from "@shared/public-site";
 
 export function PublicHeader() {
@@ -23,7 +21,7 @@ export function PublicHeader() {
           <Link href="/#pricing" className="hidden rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 sm:inline-flex">
             Pricing
           </Link>
-          <WaitlistDialog trigger={<Button size="sm" className="rounded-full bg-violet-600 px-4 font-semibold hover:bg-violet-700">Join the waitlist</Button>} />
+          <Button asChild size="sm" className="rounded-full bg-violet-600 px-4 font-semibold hover:bg-violet-700"><Link href="/login?mode=signup">Sign up</Link></Button>
         </nav>
       </div>
     </header>
@@ -77,11 +75,8 @@ function LegalLayout({ title, eyebrow, children }: { title: string; eyebrow: str
 export function PrivacyPage() {
   return (
     <LegalLayout title="Privacy" eyebrow="Privacy information">
-      <div className="not-prose mb-8 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm text-orange-950">
-        <strong>Beta notice.</strong> {publicSite.betaNotice}
-      </div>
       <p><strong>Effective date:</strong> {siteConfig.effectiveDate}</p>
-      {privacySections.map(section => <Fragment key={section.heading}><h2>{section.heading}</h2>{section.paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>)}</Fragment>)}
+      {privacySections.map(section => <section key={section.heading}><h2>{section.heading}</h2>{section.paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>)}</section>)}
     </LegalLayout>
   );
 }
@@ -89,12 +84,9 @@ export function PrivacyPage() {
 export function TermsPage() {
   return (
     <LegalLayout title="Terms" eyebrow="Terms of use">
-      <div className="not-prose mb-8 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm text-orange-950">
-        <strong>Beta notice.</strong> {publicSite.betaNotice}
-      </div>
       <p><strong>Operator:</strong> {siteConfig.legalOperator}<br /><strong>Contact:</strong> {siteConfig.supportEmail}<br /><strong>Governing law:</strong> {siteConfig.governingLaw}</p>
       <p><strong>Effective date:</strong> {publicSite.effectiveDate}</p>
-      {termsSections.map(section => <Fragment key={section.heading}><h2>{section.heading}</h2>{section.paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>)}</Fragment>)}
+      {termsSections.map(section => <section key={section.heading}><h2>{section.heading}</h2>{section.paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>)}</section>)}
     </LegalLayout>
   );
 }

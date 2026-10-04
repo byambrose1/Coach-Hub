@@ -178,7 +178,7 @@ export default function PlatformAdmin() {
               <Users className="h-6 w-6 text-violet-500" />
               <div>
                 <p className="font-semibold text-sm">Waitlist</p>
-                <p className="text-xs text-muted-foreground">See and export pre-launch signups</p>
+                <p className="text-xs text-muted-foreground">See and export waitlist signups</p>
               </div>
             </div>
             <ArrowRight className="h-4 w-4 text-muted-foreground" />

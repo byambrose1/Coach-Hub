@@ -112,7 +112,7 @@ export default function PublicFormPage() {
             {submitMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Submit form
           </Button>
         </form>
-        <div className="flex items-start gap-2 border-t border-slate-100 px-6 py-4 text-xs leading-5 text-slate-500 sm:px-9"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-800" /><p>Anyone with this link can submit the form. Please complete it only if you received it directly from your coach. Practably is in private beta; use fictional information while pre-launch privacy checks remain open.</p></div>
+        <div className="flex items-start gap-2 border-t border-slate-100 px-6 py-4 text-xs leading-5 text-slate-500 sm:px-9"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-800" /><p>Anyone with this link can submit the form. Please complete it only if you received it directly from your coach.</p></div>
       </section>}
       {status === "success" && <section role="status" className="rounded-2xl border border-emerald-100 bg-white p-7 shadow-sm sm:p-10"><div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-900"><CheckCircle2 className="h-6 w-6" /></div><h1 className="text-2xl font-semibold tracking-tight">Form submitted</h1><p className="mt-3 text-sm leading-6 text-slate-600">Your answers have been sent to your coach. You can close this page.</p></section>}
       <footer className="mt-5 text-center text-xs text-slate-500">No account needed to complete this form.</footer>

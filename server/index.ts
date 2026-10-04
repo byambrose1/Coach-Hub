@@ -47,8 +47,8 @@ export function log(message: string, source = "express") {
 app.use(createApiRequestLogger(log));
 
 // Blanket abuse guard on every API and auth route: generous enough for normal
-// use, low enough to blunt scripted brute-forcing/scraping during beta
-// testing. Individual endpoints (e.g. broadcast email) add tighter limits
+// use, low enough to blunt scripted brute-forcing and scraping.
+// Individual endpoints (e.g. broadcast email) add tighter limits
 // of their own on top of this.
 app.use(
   "/api",

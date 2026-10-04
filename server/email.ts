@@ -456,7 +456,7 @@ export async function sendWaitlistConfirmationEmail(data: {
     <h1 style="color:#7c3aed;margin:0 0 16px">You're on the list</h1>
     <p style="font-size:15px;line-height:1.6;color:#333">${greeting}</p>
     <p style="font-size:15px;line-height:1.6;color:#333">Thanks for joining the Practably waitlist. Practably is a simple business hub for independent coaches - clients, bookings, PARQ forms, invoices, and payment tracking in one place.</p>
-    <p style="font-size:15px;line-height:1.6;color:#333">We're in private beta and inviting coaches in gradually. We'll email you as soon as a spot opens up.</p>
+    <p style="font-size:15px;line-height:1.6;color:#333">We'll email you when there is an update about Practably.</p>
     <p style="font-size:15px;line-height:1.6;color:#333">Thanks,<br/>The Practably team</p>
   </div>
   </body></html>`;

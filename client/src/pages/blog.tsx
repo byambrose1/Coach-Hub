@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { PublicHeader, PublicFooter } from "@/pages/public";
-import { WaitlistDialog } from "@/components/waitlist-dialog";
 import { Button } from "@/components/ui/button";
 import { renderMarkdown } from "@shared/markdown";
 import { getPublicSiteUrl, siteConfig } from "@/config/site";
@@ -157,9 +156,9 @@ export function BlogPostPage() {
           dangerouslySetInnerHTML={{ __html: renderMarkdown(post.contentMarkdown) }}
         />
         <div className="mt-14 rounded-2xl border border-violet-200 bg-violet-50 p-6 text-center">
-          <p className="text-lg font-bold text-slate-950">Want early access to Practably?</p>
-          <p className="mt-1 text-sm text-slate-600">We're in private beta and inviting coaches gradually.</p>
-          <WaitlistDialog trigger={<Button className="mt-4 rounded-full bg-violet-600 px-6 font-bold hover:bg-violet-700">Join the waitlist</Button>} />
+          <p className="text-lg font-bold text-slate-950">Ready to organise your coaching business?</p>
+          <p className="mt-1 text-sm text-slate-600">Create an account to explore Practably.</p>
+          <Button asChild className="mt-4 rounded-full bg-violet-600 px-6 font-bold hover:bg-violet-700"><Link href="/login?mode=signup">Create an account</Link></Button>
         </div>
       </main>
       <PublicFooter />

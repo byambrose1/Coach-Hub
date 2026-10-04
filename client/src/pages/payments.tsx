@@ -611,7 +611,6 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose, allowInvo
                   {sendMutation.isPending ? "Sending..." : "Send"}
                 </Button>
               )}
-              {!allowInvoiceManagement && currentStatus !== "sent" && currentStatus !== "paid" && <UpgradeNotice feature="invoiceManagement" compact />}
               {allowPaymentTracking && (
                 <Select value={currentStatus} onValueChange={(status) => {
                   if (!allowPaymentTracking) return;

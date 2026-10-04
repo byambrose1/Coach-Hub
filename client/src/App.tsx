@@ -189,9 +189,6 @@ function AuthenticatedApp() {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
           </header>
           <main className="flex-1 overflow-auto">
-            <aside className="border-b bg-amber-50 p-3 text-xs text-amber-950" data-testid="private-beta-data-notice">
-              Private beta: use fictional client and health information while pre-launch privacy checks remain open. <a href="/privacy" className="underline">Privacy details</a>
-            </aside>
             <Router />
           </main>
         </div>

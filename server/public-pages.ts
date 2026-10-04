@@ -18,9 +18,8 @@ export async function renderPublicDocument(template: string, requestPath: string
   let body = "";
   let jsonLd = "";
   let article = false;
-  const notice = `<aside>${escape(publicSite.betaNotice)}</aside>`;
-  if (pathname === "/privacy") body = `${notice}<p>Effective date: ${escape(publicSite.effectiveDate)}</p>${sections(privacySections)}`;
-  else if (pathname === "/terms") body = `${notice}<p>Effective date: ${escape(publicSite.effectiveDate)}</p>${sections(termsSections)}`;
+  if (pathname === "/privacy") body = `<p>Effective date: ${escape(publicSite.effectiveDate)}</p>${sections(privacySections)}`;
+  else if (pathname === "/terms") body = `<p>Effective date: ${escape(publicSite.effectiveDate)}</p>${sections(termsSections)}`;
   else if (pathname === "/support") body = paragraphs([
     `Email support: ${publicSite.supportEmail}`, publicSite.paidPlanSupportResponse,
     "Please do not send health responses, passwords or payment credentials in a support message.",
@@ -33,7 +32,7 @@ export async function renderPublicDocument(template: string, requestPath: string
     body = paragraphs([prices, publicSite.vatTreatment, publicSite.paymentProviderFees,
       publicSite.refundTerms, publicSite.cancellationTerms]);
   }
-  else if (pathname === "/") body = `${notice}${paragraphs([
+  else if (pathname === "/") body = `${paragraphs([
     "The simple business hub for independent coaches.",
     "Manage client records, calendars, sessions, forms, packages, invoices and payment records in one dashboard.",
     "The Free plan supports up to five clients and does not require a payment card.",

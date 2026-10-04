@@ -69,13 +69,13 @@ export function WaitlistDialog({ trigger }: { trigger: ReactNode }) {
           <div className="py-4 text-center">
             <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" aria-hidden="true" />
             <h3 className="mt-4 text-lg font-bold text-slate-950">You're on the list</h3>
-            <p className="mt-2 text-sm text-slate-600">We'll email you as soon as a beta spot opens up.</p>
+            <p className="mt-2 text-sm text-slate-600">We'll email you when there is an update about access.</p>
           </div>
         ) : (
           <>
             <DialogHeader>
               <DialogTitle>Join the waitlist</DialogTitle>
-              <DialogDescription>Practably is currently in private beta. Pop your details in and we'll email you when a spot opens up.</DialogDescription>
+              <DialogDescription>Leave your details and we'll contact you with updates about Practably.</DialogDescription>
             </DialogHeader>
             <form
               className="space-y-4"
