@@ -2,11 +2,11 @@
 name: Subscription provider choice
 description: Owner-approved provider and account boundary for Practably coach subscriptions.
 ---
-The owner wants Practably to use a different Stripe account from the current live account. The intended account is confirmed in the agent's Stripe session, but the app's Stripe connector still resolves to a different account. Do not switch the app until the app-level connection or key is confirmed against the intended account.
+The owner chose to switch Practably's direct Stripe API credentials to the intended live account after the Replit connector repeatedly resolved to other accounts. The new key has been verified against the intended account; subscriptions on the former account are not migrated.
 
-**Why:** The owner specified the target account, but the agent's Stripe session and the app's Stripe connector have different account contexts. Changing the key alone could also make existing account-scoped customer and subscription IDs inaccessible.
+**Why:** The app uses Stripe's SDK with Replit Secrets, while the Replit connector and agent Stripe session can resolve to different accounts. The owner chose the direct-secret path to avoid repeated connector setup.
 
-**How to apply:** Verify the account ID through the same app-level connection that will process billing before switching. Never request keys in chat. Preserve the old account's existing subscriptions and obtain an explicit plan before migrating them. If checkout is paused during setup, obtain explicit approval before re-enabling it.
+**How to apply:** Verify the account ID through the SDK using the configured secret without displaying it. Treat plan prices, webhook signing secrets/endpoints, and Billing Portal configuration as account-specific. Never request keys in chat. Do not claim old-account subscriptions migrated or remain app-manageable after replacing the key.
 
 Scope Practably checkout branding to this app rather than changing the shared account's identity. Obtain explicit approval before changing account-wide names, logos, or payment descriptors.
 
