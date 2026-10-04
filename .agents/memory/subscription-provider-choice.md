@@ -2,11 +2,11 @@
 name: Subscription provider choice
 description: Owner-approved provider and account boundary for Practably coach subscriptions.
 ---
-The owner has confirmed that the currently connected live Stripe account is the one Practably should use. Do not replace it with another account or provider without new explicit instruction.
+The owner now wants Practably to use a different Stripe account from the current live account. The intended account is not yet verified: the newly attached Stripe connector resolves to a third account with charges and payouts disabled. Do not switch the app until the exact target account is confirmed.
 
-**Why:** After initially not recognizing the account, the owner identified the current connected account ID and confirmed it is theirs and is the intended account.
+**Why:** The owner's account choice changed, and a read-only check showed the new connector is not attached to the intended account. Changing the key alone could also make existing account-scoped customer and subscription IDs inaccessible.
 
-**How to apply:** Preserve the current Stripe account and key. Never request keys in chat. If new checkouts are paused for account review, obtain explicit approval before re-enabling them. Preserve existing subscriptions and keep them separate from payments coaches collect from their clients.
+**How to apply:** Use Replit's Stripe integration flow to connect the intended account, then verify its account ID before switching app billing. Never request keys in chat. Preserve the old account's existing subscriptions and obtain an explicit plan before migrating them. If checkout is paused during setup, obtain explicit approval before re-enabling it.
 
 Scope Practably checkout branding to this app rather than changing the shared account's identity. Obtain explicit approval before changing account-wide names, logos, or payment descriptors.
 
