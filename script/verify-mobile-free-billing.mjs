@@ -116,7 +116,7 @@ try {
   const wait = async expression => {
     for (let i = 0; i < 100; i++) {
       if (interceptedError) throw interceptedError;
-      if (await evaluate(expression)) return;
+      if (await evaluate(`!!document.body && (${expression})`)) return;
       await sleep(100);
     }
     console.error(await evaluate(`JSON.stringify({url:location.href,text:document.body.textContent.slice(0,700)})`));
@@ -134,6 +134,7 @@ try {
   await send("Runtime.enable");
   await send("Fetch.enable", { patterns: [{ urlPattern: "*" }] });
   await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  if (!process.env.PRIVATE_FORMS_ONLY) {
   await send("Page.navigate", { url: origin });
   await wait(`!!document.querySelector('[data-testid="button-sidebar-toggle"]')`);
   assert.ok(await evaluate(`document.querySelector('[data-testid="button-sidebar-toggle"]').getBoundingClientRect().height>=44`));
@@ -191,6 +192,8 @@ try {
   }
   console.log("PASS: simulated mobile Menu/drawer, booking at 390/320px, Free refund state, enabled Upgrade and intercepted checkout redirect.");
   console.log("PASS: Clients, Payments, Schedule, Settings, Admin and add-client/invoice/session dialogs at 320/390px without page or dialog overflow.");
+  }
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   const fixture = `${profile}/evidence.pdf`;
   await writeFile(fixture, "%PDF-1.7\nSynthetic UI fixture\n%%EOF\n");
   const attachFile = async () => {

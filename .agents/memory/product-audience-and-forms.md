@@ -19,3 +19,9 @@ Assigned forms must preserve the questions originally shared, even when a reusab
 **Why:** Later template changes must not silently change what a client was asked or invalidate an in-progress response.
 
 **How to apply:** Apply template changes to new assignments. Changing an already shared questionnaire requires an explicit new request; deleting a template must not delete historical responses.
+
+Basic custom forms must remain included on Free.
+
+**Why:** On 2026-10-05 the owner explicitly said, “the free plan should allow basic forms,” while requesting secure document uploads to private forms.
+
+**How to apply:** Keep both private-link completion and coach-entered basic forms available without upgrading. Do not infer a new paid restriction merely from adding document uploads.
