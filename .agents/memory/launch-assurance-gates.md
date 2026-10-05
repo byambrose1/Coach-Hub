@@ -13,3 +13,9 @@ For this project, the owner considers the legal documents fine and explicitly do
 **Why:** On 2026-10-02 the owner clarified, “i do not need a solicitor, thats all fine,” after supplying the additional launch checklist.
 
 **How to apply:** Respect the owner's decision on document review. User-facing acceptance prompts and legal pages should ask readers to review the documents, not present internal owner/solicitor-review instructions or make unconfirmed professional-review claims. Continue practical engineering and provider checks without repeatedly asking for solicitor review. Do not interpret the decision as evidence that hosting locations, processor agreements or live-provider tests have been verified.
+
+Keep public document rendering and the signed-in acceptance prompt as separate test surfaces.
+
+**Why:** A launch check falsely expected the onboarding acceptance sentence inside the public legal documents. Changing the approved documents to satisfy that check would have obscured a test error.
+
+**How to apply:** Validate the actual policy headings and contents on public pages, and validate acceptance prompts where they are shown. Preserve checks against unconfirmed review claims on both surfaces.

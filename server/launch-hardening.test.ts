@@ -79,7 +79,7 @@ test("client form entry renders a noindex shell without private information", as
 });
 
 test("public legal documents render their headings without unconfirmed review claims", async () => {
-  for (const [pathname, title] of [["/terms", "Terms of Use"], ["/privacy", "Privacy Policy"]]) {
+  for (const [pathname, title] of [["/terms", "Terms of Use"], ["/privacy", "Privacy"]]) {
     const page = await renderPublicDocument(template, pathname, publicStorage);
     assert.equal(page.status, 200);
     assert.ok(page.html.includes(`<h1>${title}</h1>`));
