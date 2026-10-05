@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, date, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, date, jsonb, customType } from "drizzle-orm/pg-core";
 import type { CustomQuestion } from "./custom-forms";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -258,4 +258,20 @@ export const formRequests = pgTable("form_requests", {
   expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
   completedAt: timestamp("completed_at", { withTimezone: true, mode: "string" }),
   clientFormId: varchar("client_form_id").references(() => clientForms.id, { onDelete: "set null" }),
+});
+
+const documentBytes = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+export const formDocuments = pgTable("form_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull(),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  requestId: varchar("request_id").notNull().references(() => formRequests.id, { onDelete: "cascade" }),
+  questionId: text("question_id").notNull(),
+  clientFormId: varchar("client_form_id").references(() => clientForms.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  mediaType: text("media_type").notNull(),
+  byteSize: integer("byte_size").notNull(),
+  content: documentBytes("content").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }),
 });

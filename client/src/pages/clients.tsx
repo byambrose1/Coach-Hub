@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient, cacheSavedRecord } from "@/lib/queryClient";
-import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save, Download, CalendarPlus, Send, Users2 } from "lucide-react";
+import { Plus, Search, Mail, Phone, User, Calendar, FileText, Package, Pencil, Trash2, ClipboardCheck, Check, X, Save, Download, FileDown, CalendarPlus, Send, Users2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { Client, Session, Package as PackageType, SessionNote, ClientForm } from "@shared/schema";
 import { UpgradePopup } from "@/components/upgrade-popup";
@@ -1043,14 +1043,18 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
           </DialogHeader>
           {viewingForm && (() => {
             try {
-              const responses = JSON.parse(viewingForm.responses) as Array<{ question: string; answer: unknown }>;
+              const responses = JSON.parse(viewingForm.responses) as Array<{ question: string; answer: unknown; documentId?: string }>;
               if (viewingForm.formType !== "parq") {
                 return (
                   <div className="space-y-4">
                     {responses.map((response, index) => (
                       <div key={index} className="border-b pb-3 last:border-b-0">
                         <p className="text-xs font-medium text-muted-foreground">{response.question}</p>
-                        <p className="mt-1 whitespace-pre-wrap break-words text-sm">{Array.isArray(response.answer) ? response.answer.join(", ") : typeof response.answer === "boolean" ? (response.answer ? "Yes" : "No") : String(response.answer)}</p>
+                        {response.documentId
+                          ? <a className="mt-2 inline-flex min-h-11 max-w-full items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium text-primary underline-offset-4 hover:underline" href={`/api/form-documents/${encodeURIComponent(response.documentId)}/download`} download>
+                              <FileDown className="h-4 w-4 shrink-0" /><span className="break-all">{String(response.answer ?? "Download document")}</span>
+                            </a>
+                          : <p className="mt-1 whitespace-pre-wrap break-words text-sm">{Array.isArray(response.answer) ? response.answer.join(", ") : typeof response.answer === "boolean" ? (response.answer ? "Yes" : "No") : String(response.answer)}</p>}
                       </div>
                     ))}
                   </div>

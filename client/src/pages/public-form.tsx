@@ -4,6 +4,7 @@ import { CheckCircle2, FileText, Loader2, ShieldCheck } from "lucide-react";
 import type { FormAnswers, PublicForm } from "@shared/custom-forms";
 import { validateFormAnswers } from "@shared/custom-forms";
 import { apiRequest } from "@/lib/queryClient";
+import { ApiError } from "@/lib/api-error";
 import { Button } from "@/components/ui/button";
 import { FormAnswerFields } from "@/components/custom-forms-panel";
 
@@ -16,6 +17,7 @@ export default function PublicFormPage() {
   const [status, setStatus] = useState<FormStatus>("loading");
   const [loadFailed, setLoadFailed] = useState(false);
   const [validationError, setValidationError] = useState("");
+  const [pendingUploads, setPendingUploads] = useState<Record<string, boolean>>({});
   const loadStarted = useRef(false);
 
   useEffect(() => {
@@ -62,7 +64,7 @@ export default function PublicFormPage() {
       setToken("");
     },
     onError: (error: Error) => {
-      if (/^404(?:\s|:)/.test(error.message)) {
+      if (error instanceof ApiError && error.status === 404) {
         setStatus("unavailable");
         setForm(null);
         setToken("");
@@ -72,7 +74,7 @@ export default function PublicFormPage() {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!form) return;
+    if (!form || Object.values(pendingUploads).some(Boolean) || submitMutation.isPending) return;
     try {
       const clean = validateFormAnswers(form.questions, answers);
       setValidationError("");
@@ -103,13 +105,13 @@ export default function PublicFormPage() {
         <form onSubmit={handleSubmit} className="space-y-7 px-6 py-7 sm:px-9 sm:py-9">
           <div className="space-y-7" onChange={() => setValidationError("")}>
             {form.questions.map((question, index) => <div key={question.id} id={`public-question-${question.id}`} tabIndex={-1} className="rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-700/30">
-              <FormAnswerFields questions={[question]} questionNumberOffset={index} answers={answers} onChange={(id, value) => setAnswers(current => ({ ...current, [id]: value }))} />
+              <FormAnswerFields questions={[question]} questionNumberOffset={index} answers={answers} disabled={submitMutation.isPending} documentContext={{ token }} onUploadPendingChange={(id, pending) => setPendingUploads(current => ({ ...current, [id]: pending }))} onChange={(id, value) => setAnswers(current => ({ ...current, [id]: value }))} />
             </div>)}
           </div>
           {validationError && <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{validationError}</p>}
           {submitMutation.isError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">We couldn’t submit your answers. Please try again. Your responses remain here.</p>}
-          <Button type="submit" disabled={submitMutation.isPending} className="w-full bg-emerald-900 text-white hover:bg-emerald-800 sm:w-auto sm:min-w-44">
-            {submitMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Submit form
+          <Button type="submit" disabled={submitMutation.isPending || Object.values(pendingUploads).some(Boolean)} className="w-full bg-emerald-900 text-white hover:bg-emerald-800 sm:w-auto sm:min-w-44">
+            {(submitMutation.isPending || Object.values(pendingUploads).some(Boolean)) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Submit form
           </Button>
         </form>
         <div className="flex items-start gap-2 border-t border-slate-100 px-6 py-4 text-xs leading-5 text-slate-500 sm:px-9"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-800" /><p>Anyone with this link can submit the form. Please complete it only if you received it directly from your coach.</p></div>

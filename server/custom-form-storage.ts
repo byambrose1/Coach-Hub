@@ -1,7 +1,8 @@
-import { and, desc, eq } from "drizzle-orm";
-import { db } from "./db";
-import { clients, clientForms, formTemplates, formRequests } from "@shared/schema";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { db as applicationDb } from "./db";
+import { clients, clientForms, formTemplates, formRequests, formDocuments } from "@shared/schema";
 import { validateFormAnswers, type TemplateInput, type FormAnswers } from "@shared/custom-forms";
+import { validateDocumentAnswers } from "./form-document-validation";
 
 export type TemplateRow = typeof formTemplates.$inferSelect;
 export type RequestRow = typeof formRequests.$inferSelect;
@@ -25,7 +26,9 @@ export function cleanAnswers(request: Pick<RequestRow, "questions">, value: unkn
   catch { throw new InvalidFormAnswers("Check the required answers and selected choices."); }
 }
 
-export const customFormStorage: CustomFormStorage = {
+export function createCustomFormStorage(database = applicationDb): CustomFormStorage {
+const db = database;
+return {
   templates: userId => db.select().from(formTemplates).where(eq(formTemplates.userId, userId)).orderBy(desc(formTemplates.createdAt)),
   async template(userId, id) {
     return (await db.select().from(formTemplates).where(and(eq(formTemplates.userId, userId), eq(formTemplates.id, id))))[0];
@@ -56,9 +59,13 @@ export const customFormStorage: CustomFormStorage = {
     return row?.status === "pending" && Date.parse(row.expiresAt) > Date.now() ? row : undefined;
   },
   async revoke(userId, id) {
-    return (await db.update(formRequests).set({ status: "revoked" }).where(and(
-      eq(formRequests.id, id), eq(formRequests.userId, userId), eq(formRequests.status, "pending"),
-    )).returning())[0];
+    return db.transaction(async tx => {
+      const [request] = await tx.update(formRequests).set({ status: "revoked" }).where(and(
+        eq(formRequests.id, id), eq(formRequests.userId, userId), eq(formRequests.status, "pending"),
+      )).returning();
+      if (request) await tx.delete(formDocuments).where(and(eq(formDocuments.requestId, request.id), isNull(formDocuments.clientFormId)));
+      return request;
+    });
   },
   async complete(selector, value) {
     return db.transaction(async tx => {
@@ -73,15 +80,30 @@ export const customFormStorage: CustomFormStorage = {
       )))[0];
       if (!client) return undefined;
       const answers = cleanAnswers(request, value);
+      const documents = request.questions.some(question => question.type === "file") ? await tx.select({
+        id: formDocuments.id, userId: formDocuments.userId, requestId: formDocuments.requestId,
+        questionId: formDocuments.questionId, clientId: formDocuments.clientId, fileName: formDocuments.fileName,
+        mediaType: formDocuments.mediaType, byteSize: formDocuments.byteSize,
+      }).from(formDocuments).where(and(eq(formDocuments.requestId, request.id), eq(formDocuments.userId, request.userId),
+        isNull(formDocuments.clientFormId), gt(formDocuments.expiresAt, new Date().toISOString()))) : [];
+      const documentAnswers = validateDocumentAnswers(request, answers, documents);
       const now = new Date().toISOString();
       const form = (await tx.insert(clientForms).values({
         userId: request.userId, clientId: request.clientId, formType: "custom",
         title: request.title, status: "completed", date: now.slice(0, 10),
-        responses: JSON.stringify(request.questions.map(question => ({
+        responses: JSON.stringify(request.questions.map(question => documentAnswers.has(question.id) ? {
+          question: question.label, answer: documentAnswers.get(question.id)!.fileName,
+          documentId: documentAnswers.get(question.id)!.id,
+        } : ({
           question: question.label,
           answer: Array.isArray(answers[question.id]) ? (answers[question.id] as string[]).join(", ") : answers[question.id] || "",
         }))),
       }).returning())[0];
+      for (const document of Array.from(documentAnswers.values())) {
+        await tx.update(formDocuments).set({ clientFormId: form.id, expiresAt: null }).where(eq(formDocuments.id, document.id));
+      }
+      // Unselected/replaced documents never become historical client records.
+      await tx.delete(formDocuments).where(and(eq(formDocuments.requestId, request.id), isNull(formDocuments.clientFormId)));
       const updated = (await tx.update(formRequests).set({
         status: "completed", completedAt: now, clientFormId: form.id,
       }).where(eq(formRequests.id, request.id)).returning())[0];
@@ -89,3 +111,6 @@ export const customFormStorage: CustomFormStorage = {
     });
   },
 };
+}
+
+export const customFormStorage = createCustomFormStorage();

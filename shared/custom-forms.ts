@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { MAX_DOCUMENT_QUESTIONS } from "./form-documents";
 
 export const questionSchema = z.object({
   id: z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/),
   label: z.string().trim().min(1).max(300),
-  type: z.enum(["text", "textarea", "yes_no", "single_choice", "multiple_choice"]),
+  type: z.enum(["text", "textarea", "yes_no", "single_choice", "multiple_choice", "file"]),
   required: z.boolean(),
   options: z.array(z.string().trim().min(1).max(200)).max(20).optional(),
 }).strict().superRefine((question, context) => {
@@ -19,6 +20,9 @@ export const templateInputSchema = z.object({
 }).strict().superRefine((form, context) => {
   if (new Set(form.questions.map(question => question.id)).size !== form.questions.length) {
     context.addIssue({ code: "custom", message: "Question IDs must be unique.", path: ["questions"] });
+  }
+  if (form.questions.filter(question => question.type === "file").length > MAX_DOCUMENT_QUESTIONS) {
+    context.addIssue({ code: "custom", message: "A form can have up to five document-upload questions.", path: ["questions"] });
   }
 });
 export type CustomQuestion = z.infer<typeof questionSchema>;
@@ -54,6 +58,9 @@ export function validateFormAnswers(questions: CustomQuestion[], value: unknown)
         answer.some(item => !question.options?.includes(item))) throw new Error("Please select valid choices.");
       clean[question.id] = answer;
     } else {
+      if (question.type === "file" && (typeof answer !== "string" || !z.string().uuid().safeParse(answer).success)) {
+        throw new Error("Please upload a valid document.");
+      }
       if (typeof answer !== "string") throw new Error("Please enter a valid answer.");
       if (question.type === "yes_no" && !["Yes", "No"].includes(answer)) throw new Error("Please select Yes or No.");
       if (question.type === "single_choice" && !question.options?.includes(answer)) throw new Error("Please select a valid choice.");

@@ -34,6 +34,13 @@ try {
   const settings = { id: "ui-settings", userId: user.id, subscriptionPlan: "free",
     subscriptionStatus: "trial", stripeCustomerId: "cus_stale", termsAccepted: true, hasAcceptedTerms: true };
   const apiCalls = [];
+  const documentId = "11111111-1111-4111-8111-111111111111";
+  const documentQuestion = { id: "evidence", label: "Supporting document", type: "file", required: true };
+  const formTemplate = { id: "ui-template", title: "Private document check", description: "Synthetic upload test", questions: [documentQuestion], createdAt: "", updatedAt: "" };
+  const documentMeta = { id: documentId, fileName: "evidence.pdf", mediaType: "application/pdf", byteSize: 35 };
+  const completedForm = { id: "ui-form", clientId: "ui-client", formType: "custom", title: formTemplate.title,
+    status: "completed", date: "2026-10-05", responses: JSON.stringify([{ question: documentQuestion.label, answer: documentMeta.fileName, documentId }]) };
+  let publicSubmitted = false, coachRequest, coachCompleted = false;
   let interceptedError;
   ws.on("message", async bytes => {
     const message = JSON.parse(bytes.toString());
@@ -48,6 +55,7 @@ try {
         if (url.pathname.startsWith("/api/")) {
           apiCalls.push({ path: url.pathname, method: request.method, body: request.postData });
           let data = [];
+          let responseCode = 200;
           if (url.pathname.startsWith("/api/auth/")) data = user;
           if (url.pathname === "/api/settings") data = settings;
           if (url.pathname === "/api/admin/stats") data = {};
@@ -63,8 +71,33 @@ try {
             { name: "business", label: "Business", max: 50, price: "7.99" },
           ];
           if (url.pathname === "/api/subscription/checkout") data = { url: `${origin}/mock-checkout-complete` };
-          await send("Fetch.fulfillRequest", { requestId, responseCode: 200,
-            responseHeaders: [{ name: "Content-Type", value: "application/json" }], body: Buffer.from(JSON.stringify(data)).toString("base64") });
+          if (url.pathname === "/api/form-templates") data = [formTemplate];
+          if (url.pathname === "/api/forms") data = coachCompleted ? [completedForm] : [];
+          if (url.pathname === "/api/form-requests") {
+            if (request.method === "POST") {
+              coachRequest = { ...formTemplate, id: "ui-request", templateId: formTemplate.id, clientId: "ui-client",
+                status: "pending", completedAt: null, clientFormId: null, expiresAt: "2026-11-05T12:00:00Z" };
+              data = { request: coachRequest, token: "b".repeat(64) }; responseCode = 201;
+            } else data = coachRequest ? [coachRequest] : [];
+          }
+          if (url.pathname === "/api/form-requests/ui-request/complete") {
+            coachCompleted = true;
+            coachRequest = { ...coachRequest, status: "completed", clientFormId: completedForm.id };
+            data = { request: coachRequest, form: completedForm };
+          }
+          if (url.pathname === "/api/public-forms/load") {
+            data = publicSubmitted ? { message: "Form unavailable" } : { ...formTemplate, expiresAt: "2026-11-05T12:00:00Z" };
+            if (publicSubmitted) responseCode = 404;
+          }
+          if (url.pathname === "/api/public-forms/documents" || url.pathname === "/api/form-requests/ui-request/documents") {
+            await sleep(500); data = documentMeta; responseCode = 201;
+          }
+          if (url.pathname === `/api/public-forms/documents/${documentId}` && request.method === "DELETE") {
+            await sleep(300); responseCode = 204;
+          }
+          if (url.pathname === "/api/public-forms/submit") { publicSubmitted = true; data = { message: "Form submitted." }; }
+          await send("Fetch.fulfillRequest", { requestId, responseCode,
+            responseHeaders: [{ name: "Content-Type", value: "application/json" }], body: responseCode === 204 ? "" : Buffer.from(JSON.stringify(data)).toString("base64") });
         } else if (url.origin !== origin) {
           await send("Fetch.failRequest", { requestId, errorReason: "BlockedByClient" });
         } else await send("Fetch.continueRequest", { requestId });
@@ -158,6 +191,56 @@ try {
   }
   console.log("PASS: simulated mobile Menu/drawer, booking at 390/320px, Free refund state, enabled Upgrade and intercepted checkout redirect.");
   console.log("PASS: Clients, Payments, Schedule, Settings, Admin and add-client/invoice/session dialogs at 320/390px without page or dialog overflow.");
+  const fixture = `${profile}/evidence.pdf`;
+  await writeFile(fixture, "%PDF-1.7\nSynthetic UI fixture\n%%EOF\n");
+  const attachFile = async () => {
+    const { root } = await send("DOM.getDocument");
+    const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector: "#document-evidence" });
+    assert.ok(nodeId, "The upload input must exist");
+    await send("DOM.setFileInputFiles", { nodeId, files: [fixture] });
+  };
+  await send("Page.navigate", { url: `${origin}/f#${"a".repeat(64)}` });
+  await wait(`!!document.querySelector('#document-evidence')`);
+  await click('button[type="submit"]');
+  await wait(`document.body.innerText.includes('Please answer: Supporting document')`);
+  assert.ok(!apiCalls.some(c => c.path === "/api/public-forms/submit"), "Required file must prevent empty submission");
+  await attachFile();
+  await wait(`document.querySelector('button[type="submit"]').disabled`);
+  await wait(`!!document.querySelector('button[aria-label="Remove evidence.pdf"]') && !document.querySelector('button[type="submit"]').disabled`);
+  assert.ok(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`), "Upload controls must fit at 390px");
+  await click('button[aria-label="Remove evidence.pdf"]');
+  await wait(`document.querySelector('button[type="submit"]').disabled`);
+  await wait(`!!document.querySelector('#document-evidence') && !document.querySelector('button[type="submit"]').disabled`);
+  await attachFile();
+  await wait(`!!document.querySelector('button[aria-label="Remove evidence.pdf"]') && !document.querySelector('button[type="submit"]').disabled`);
+  const uploadShot = await send("Page.captureScreenshot", { format: "png" });
+  await writeFile("/tmp/practably-private-upload.png", Buffer.from(uploadShot.data, "base64"));
+  await click('button[type="submit"]');
+  await wait(`document.body.innerText.includes('Form submitted')`);
+  const submission = JSON.parse(apiCalls.find(c => c.path === "/api/public-forms/submit").body);
+  assert.equal(submission.answers.evidence, documentId);
+  await send("Page.navigate", { url: `${origin}/f#${"a".repeat(64)}` });
+  await wait(`document.body.innerText.includes('This form isn’t available')`);
+  await send("Page.navigate", { url: `${origin}/clients?client=ui-client` });
+  await wait(`!!document.querySelector('[data-testid="tab-client-forms"]')`);
+  await click('[data-testid="tab-client-forms"]');
+  await wait(`document.body.innerText.includes('Basic forms are included on Free')`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Enter answers').click()`);
+  await wait(`!!document.querySelector('#document-evidence')`);
+  await attachFile();
+  await wait(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('Save responses'))?.disabled`);
+  await wait(`!!document.querySelector('button[aria-label="Remove evidence.pdf"]') && !Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('Save responses')).disabled`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Save responses').click()`);
+  await wait(`document.body.innerText.includes('Responses saved')`);
+  await wait(`Array.from(document.querySelectorAll('button')).some(b=>b.textContent.trim()==='View responses')`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='View responses').click()`);
+  await wait(`!!document.querySelector('a[href="/api/form-documents/${documentId}/download"]')`);
+  const coachSubmission = JSON.parse(apiCalls.find(c => c.path === "/api/form-requests/ui-request/complete").body);
+  assert.equal(coachSubmission.answers.evidence, documentId);
+  const createIndex = apiCalls.findIndex(c => c.path === "/api/form-requests" && c.method === "POST");
+  const uploadIndex = apiCalls.findIndex(c => c.path === "/api/form-requests/ui-request/documents");
+  assert.ok(createIndex >= 0 && uploadIndex > createIndex, "Coach must get a real form request before uploading");
+  console.log("PASS: Free custom forms, required file validation, client upload/remove/upload/submit, busy-submit guards, used-link rejection, coach entry with a real request and private completed-document download link.");
   console.log("No real API calls or payments were made. Booking screenshot: /tmp/practably-mobile-booking.png");
 } finally {
   ws?.close();

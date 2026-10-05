@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { FormDocumentInput, type FormDocumentContext } from "@/components/form-document-input";
 
 const emptyTemplate = (): TemplateInput => ({ title: "", description: "", questions: [] });
 const newQuestion = (): CustomQuestion => ({
@@ -24,16 +25,19 @@ const newQuestion = (): CustomQuestion => ({
   required: false,
 });
 
-export function FormAnswerFields({ questions, answers, onChange, questionNumberOffset = 0 }: {
+export function FormAnswerFields({ questions, answers, onChange, questionNumberOffset = 0, documentContext, onUploadPendingChange, disabled = false }: {
   questions: CustomQuestion[];
   answers: FormAnswers;
   onChange: (id: string, value: string | string[]) => void;
   questionNumberOffset?: number;
+  documentContext?: FormDocumentContext;
+  onUploadPendingChange?: (questionId: string, pending: boolean) => void;
+  disabled?: boolean;
 }) {
   return <div className="space-y-5">
     {questions.map((question, index) => {
       const value = answers[question.id];
-      return <fieldset key={question.id} className="space-y-2">
+      return <fieldset key={question.id} disabled={disabled} className="space-y-2">
         <legend className="mb-2 text-sm font-medium">{questionNumberOffset + index + 1}. {question.label}{question.required && <span className="ml-1 text-destructive" aria-label="required">*</span>}</legend>
         {question.type === "text" && <><Label htmlFor={`answer-${question.id}`} className="sr-only">Answer for {question.label}</Label><Input id={`answer-${question.id}`} value={typeof value === "string" ? value : ""} required={question.required} maxLength={4000} onChange={event => onChange(question.id, event.target.value)} /></>}
         {question.type === "textarea" && <><Label htmlFor={`answer-${question.id}`} className="sr-only">Answer for {question.label}</Label><Textarea id={`answer-${question.id}`} value={typeof value === "string" ? value : ""} required={question.required} maxLength={4000} rows={3} onChange={event => onChange(question.id, event.target.value)} /></>}
@@ -43,6 +47,13 @@ export function FormAnswerFields({ questions, answers, onChange, questionNumberO
           const selected = Array.isArray(value) ? value : [];
           return <label key={choice} className="flex cursor-pointer items-center gap-2 text-sm"><Checkbox checked={selected.includes(choice)} onCheckedChange={checked => onChange(question.id, checked ? [...selected, choice] : selected.filter(item => item !== choice))} />{choice}</label>;
         })}</div>}
+        {question.type === "file" && <FormDocumentInput
+          questionId={question.id}
+          value={typeof value === "string" ? value : ""}
+          context={documentContext}
+          onChange={documentId => onChange(question.id, documentId)}
+          onPendingChange={pending => onUploadPendingChange?.(question.id, pending)}
+        />}
       </fieldset>;
     })}
   </div>;
@@ -62,6 +73,7 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
   const [answers, setAnswers] = useState<FormAnswers>({});
   const [issuedLink, setIssuedLink] = useState<{ url: string; requestId: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<FormTemplate | null>(null);
+  const [pendingUploads, setPendingUploads] = useState<Record<string, boolean>>({});
 
   const templatesQuery = useQuery<FormTemplate[]>({ queryKey: ["/api/form-templates"] });
   const requestsQuery = useQuery<FormRequest[]>({ queryKey: [`/api/form-requests?clientId=${encodeURIComponent(clientId)}`] });
@@ -91,32 +103,33 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
     onError: (error: Error) => toast({ title: "Could not delete template", description: error.message, variant: "destructive" }),
   });
   const assignMutation = useMutation({
-    mutationFn: async ({ template, coachAnswers }: { template: FormTemplate; coachAnswers?: FormAnswers }) => {
-      if (coachAnswers) validateFormAnswers(template.questions, coachAnswers);
+    mutationFn: async ({ template }: { template: FormTemplate }) => {
       const templateId = template.id;
       const res = await apiRequest("POST", "/api/form-requests", { templateId, clientId });
       const payload = await res.json() as { request: FormRequest; token: string };
-      if (coachAnswers) {
-        try {
-          await apiRequest("POST", `/api/form-requests/${payload.request.id}/complete`, { answers: coachAnswers });
-        } catch (error) {
-          setCompletionRequest(payload.request);
-          throw error;
-        }
-      } else {
-        setIssuedLink({ url: `${window.location.origin}/f#${payload.token}`, requestId: payload.request.id });
-      }
+      setIssuedLink({ url: `${window.location.origin}/f#${payload.token}`, requestId: payload.request.id });
       return payload.request;
     },
-    onSuccess: (_request, variables) => {
+    onSuccess: () => {
       refreshRequests();
-      queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
       setAssignTemplate(null);
-      setCompletionRequest(null);
-      setAnswers({});
-      toast({ title: variables.coachAnswers ? "Responses saved" : "Private link created", description: variables.coachAnswers ? "The completed form is now on the client record." : "Copy this one-time link now. It will not be shown again." });
+      toast({ title: "Private link created", description: "Copy this one-time link now. It will not be shown again." });
     },
     onError: (error: Error) => toast({ title: "Could not create form request", description: error.message, variant: "destructive" }),
+  });
+  const enterAnswersMutation = useMutation({
+    mutationFn: async (template: FormTemplate) => {
+      const res = await apiRequest("POST", "/api/form-requests", { templateId: template.id, clientId });
+      const payload = await res.json() as { request: FormRequest };
+      return payload.request;
+    },
+    onSuccess: request => {
+      refreshRequests();
+      setAssignTemplate(null);
+      setCompletionRequest(request);
+      setAnswers({});
+    },
+    onError: (error: Error) => toast({ title: "Could not start form", description: error.message, variant: "destructive" }),
   });
   const completeMutation = useMutation({
     mutationFn: async ({ requestId, value, questions }: { requestId: string; value: FormAnswers; questions: CustomQuestion[] }) => {
@@ -170,8 +183,8 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
 
   return <section className="space-y-4" aria-label="Custom client forms">
     <Card>
-      <CardHeader className="flex flex-col items-stretch gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0"><CardTitle className="text-base">Custom forms</CardTitle><p className="mt-1 text-sm text-muted-foreground">Build forms for client work beyond PAR-Q. Use a private link or record answers together.</p></div>
+       <CardHeader className="flex flex-col items-stretch gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+         <div className="min-w-0"><CardTitle className="text-base">Custom forms</CardTitle><p className="mt-1 text-sm text-muted-foreground">Build forms for client work beyond PAR-Q. Use a private link or record answers together.</p><p className="mt-2 text-xs text-muted-foreground">Basic forms are included on Free. Document uploads are available on every plan.</p></div>
         <Button className="min-h-11 w-full sm:min-h-8 sm:w-auto" size="sm" variant="outline" onClick={() => beginEdit(null)}><FilePlus2 className="mr-2 h-4 w-4" />New template</Button>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -182,11 +195,7 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
           <div className="min-w-0"><p className="font-medium">{template.title}</p><p className="text-xs text-muted-foreground">{template.questions.length} {template.questions.length === 1 ? "question" : "questions"}{template.description ? ` · ${template.description}` : ""}</p></div>
           <div className="flex flex-wrap gap-2">
             <Button className="min-h-11" size="sm" onClick={() => setAssignTemplate(template)}><Send className="mr-1.5 h-3.5 w-3.5" />Send link</Button>
-            <Button className="min-h-11" size="sm" variant="secondary" onClick={() => {
-              setAssignTemplate(template);
-              setCompletionRequest({ ...template, id: "", clientId, templateId: template.id, status: "pending", expiresAt: "", completedAt: null, clientFormId: null });
-              setAnswers({});
-            }}><Clipboard className="mr-1.5 h-3.5 w-3.5" />Enter answers</Button>
+            <Button className="min-h-11" size="sm" variant="secondary" disabled={enterAnswersMutation.isPending} onClick={() => enterAnswersMutation.mutate(template)}><Clipboard className="mr-1.5 h-3.5 w-3.5" />Enter answers</Button>
             <Button className="min-h-11" size="sm" variant="outline" onClick={() => beginEdit(template)}>Edit</Button>
             <Button className="h-11 w-11" size="icon" variant="ghost" aria-label={`Delete ${template.title}`} onClick={() => setConfirmDelete(template)}><Trash2 className="h-4 w-4" /></Button>
           </div>
@@ -218,7 +227,7 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
 
     <Dialog open={editing !== null} onOpenChange={open => { if (!open) setEditing(null); }}>
       <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
-        <DialogHeader><DialogTitle>{editing === "new" ? "New form template" : "Edit form template"}</DialogTitle><DialogDescription>Keep questions clear and focused. Up to 40 questions per form.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{editing === "new" ? "New form template" : "Edit form template"}</DialogTitle><DialogDescription>Keep questions clear and focused. Up to 40 questions per form. You can add up to five document upload questions.</DialogDescription></DialogHeader>
         <form className="space-y-5" onSubmit={event => {
           event.preventDefault();
           const data: TemplateInput = {
@@ -245,14 +254,21 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
               </div></div>
               <div className="grid gap-3 sm:grid-cols-[1fr_190px]">
                 <Input value={question.label} required maxLength={300} placeholder="Question wording" aria-label={`Question ${index + 1} wording`} onChange={event => updateQuestion(index, { label: event.target.value })} />
-                <Select value={question.type} onValueChange={type => updateQuestion(index, { type: type as CustomQuestion["type"], options: ["single_choice", "multiple_choice"].includes(type) ? question.options || ["Option 1", "Option 2"] : undefined })}>
+                 <Select value={question.type} onValueChange={type => {
+                   if (type === "file" && (draft.questions.filter(item => (item.type as string) === "file").length >= 5) && (question.type as string) !== "file") {
+                     toast({ title: "Document question limit reached", description: "A form can have up to five document upload questions.", variant: "destructive" });
+                     return;
+                   }
+                   updateQuestion(index, { type: type as CustomQuestion["type"], options: ["single_choice", "multiple_choice"].includes(type) ? question.options || ["Option 1", "Option 2"] : undefined });
+                 }}>
                   <SelectTrigger aria-label="Question type"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="text">Short text</SelectItem><SelectItem value="textarea">Long text</SelectItem><SelectItem value="yes_no">Yes / no</SelectItem><SelectItem value="single_choice">Choose one</SelectItem><SelectItem value="multiple_choice">Choose many</SelectItem>
+                     <SelectItem value="text">Short text</SelectItem><SelectItem value="textarea">Long text</SelectItem><SelectItem value="yes_no">Yes / no</SelectItem><SelectItem value="single_choice">Choose one</SelectItem><SelectItem value="multiple_choice">Choose many</SelectItem><SelectItem value="file" disabled={(draft.questions.filter(item => (item.type as string) === "file").length >= 5) && (question.type as string) !== "file"}>Document upload</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {["single_choice", "multiple_choice"].includes(question.type) && <div className="space-y-2"><Label>Options, one per line</Label><Textarea value={(question.options || []).join("\n")} rows={3} onChange={event => updateQuestion(index, { options: event.target.value.split("\n").slice(0, 20) })} /><p className="text-xs text-muted-foreground">Use at least two distinct options.</p></div>}
+               {["single_choice", "multiple_choice"].includes(question.type) && <div className="space-y-2"><Label>Options, one per line</Label><Textarea value={(question.options || []).join("\n")} rows={3} onChange={event => updateQuestion(index, { options: event.target.value.split("\n").slice(0, 20) })} /><p className="text-xs text-muted-foreground">Use at least two distinct options.</p></div>}
+               {(question.type as string) === "file" && <p className="text-xs leading-relaxed text-muted-foreground">Clients can securely upload one PDF, DOCX, JPEG, or PNG up to 5 MB. The file remains private to you and is not previewed here.</p>}
               <label className="flex items-center gap-2 text-sm"><Checkbox checked={question.required} onCheckedChange={checked => updateQuestion(index, { required: !!checked })} />Response required</label>
             </div>)}
             <Button type="button" className="min-h-11" variant="outline" disabled={draft.questions.length >= 40} onClick={() => setDraft({ ...draft, questions: [...draft.questions, newQuestion()] })}><Plus className="mr-2 h-4 w-4" />Add question</Button>
@@ -263,14 +279,14 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
       </DialogContent>
     </Dialog>
 
-    <Dialog open={!!assignTemplate || !!completionRequest} onOpenChange={open => { if (!open) { setAssignTemplate(null); setCompletionRequest(null); setAnswers({}); } }}>
+    <Dialog open={!!assignTemplate || !!completionRequest} onOpenChange={open => { if (!open && !Object.values(pendingUploads).some(Boolean) && !completeMutation.isPending && !assignMutation.isPending && !enterAnswersMutation.isPending) { setAssignTemplate(null); setCompletionRequest(null); setAnswers({}); setPendingUploads({}); } }}>
       <DialogContent className="max-h-[90dvh] max-w-xl overflow-y-auto">
         <DialogHeader><DialogTitle>{completionRequest ? `Enter responses · ${completionRequest.title}` : assignTemplate?.title}</DialogTitle><DialogDescription>{completionRequest ? `Record ${clientName}'s answers in Practably.` : `Choose how ${clientName} will complete this form.`}</DialogDescription></DialogHeader>
         {assignTemplate && !completionRequest && <div className="space-y-3"><Button className="w-full justify-start" onClick={() => assignMutation.mutate({ template: assignTemplate })} disabled={assignMutation.isPending}><Link2 className="mr-2 h-4 w-4" />Create private client link</Button><p className="text-xs leading-relaxed text-muted-foreground">This private link expires after 30 days and allows one submission. Anyone who has the link can submit it, so share it directly with {clientName} and do not forward it.</p></div>}
-        {completionRequest && <form className="space-y-5" onSubmit={event => { event.preventDefault(); if (completionRequest.id) completeMutation.mutate({ requestId: completionRequest.id, value: answers, questions: completionRequest.questions }); else if (assignTemplate) assignMutation.mutate({ template: assignTemplate, coachAnswers: answers }); }}>
+         {completionRequest && <form className="space-y-5" onSubmit={event => { event.preventDefault(); if (Object.values(pendingUploads).some(Boolean) || completeMutation.isPending) return; if (completionRequest.id) completeMutation.mutate({ requestId: completionRequest.id, value: answers, questions: completionRequest.questions }); }}>
           {completionRequest.description && <p className="text-sm text-muted-foreground">{completionRequest.description}</p>}
-          <FormAnswerFields questions={completionRequest.questions} answers={answers} onChange={(id, value) => setAnswers(current => ({ ...current, [id]: value }))} />
-          <DialogFooter><Button type="button" variant="outline" onClick={() => { setAssignTemplate(null); setCompletionRequest(null); }}>Cancel</Button><Button disabled={completeMutation.isPending || assignMutation.isPending}>{(completeMutation.isPending || assignMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save responses</Button></DialogFooter>
+           <FormAnswerFields questions={completionRequest.questions} answers={answers} disabled={completeMutation.isPending} documentContext={{ requestId: completionRequest.id }} onUploadPendingChange={(id, pending) => setPendingUploads(current => ({ ...current, [id]: pending }))} onChange={(id, value) => setAnswers(current => ({ ...current, [id]: value }))} />
+          <DialogFooter><Button type="button" variant="outline" disabled={Object.values(pendingUploads).some(Boolean) || completeMutation.isPending} onClick={() => { setAssignTemplate(null); setCompletionRequest(null); setAnswers({}); setPendingUploads({}); }}>Cancel</Button><Button disabled={completeMutation.isPending || Object.values(pendingUploads).some(Boolean)}>{(completeMutation.isPending || Object.values(pendingUploads).some(Boolean)) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save responses</Button></DialogFooter>
         </form>}
       </DialogContent>
     </Dialog>
