@@ -78,10 +78,11 @@ test("client form entry renders a noindex shell without private information", as
   assert.ok(page.html.includes('<div id="root"></div>'));
 });
 
-test("legal pages ask users to read the documents without requiring or claiming solicitor review", async () => {
-  for (const pathname of ["/terms", "/privacy"]) {
+test("public legal documents render their headings without unconfirmed review claims", async () => {
+  for (const [pathname, title] of [["/terms", "Terms of Use"], ["/privacy", "Privacy Policy"]]) {
     const page = await renderPublicDocument(template, pathname, publicStorage);
-    assert.ok(page.html.includes("Please review the current Practably Terms and Privacy information"));
+    assert.equal(page.status, 200);
+    assert.ok(page.html.includes(`<h1>${title}</h1>`));
     assert.doesNotMatch(page.html, /solicitor|owner review|pre-launch legal review|terms require legal review|were reviewed for/i);
   }
 });
