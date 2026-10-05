@@ -13,6 +13,7 @@ import { ArrowLeft, FileText, Plus, Pencil, Trash2, ExternalLink } from "lucide-
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { permissionMessage } from "@/lib/permission-message";
 
 interface BlogPost {
   id: string;
@@ -142,7 +143,7 @@ function PostEditor({ post, onClose }: { post: BlogPost | null; onClose: () => v
 export default function PlatformAdminBlog() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { data: posts = [], isLoading } = useQuery<BlogPost[]>({ queryKey: ["/api/platform-admin/blog"] });
+  const { data: posts = [], isLoading, error, refetch } = useQuery<BlogPost[]>({ queryKey: ["/api/platform-admin/blog"] });
   const [editing, setEditing] = useState<BlogPost | null | "new">(null);
 
   const deleteMutation = useMutation({
@@ -180,6 +181,13 @@ export default function PlatformAdminBlog() {
         <CardContent className="pt-0">
           {isLoading ? (
             <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-14 animate-pulse bg-muted rounded" />)}</div>
+          ) : error ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <p role="alert" className="text-sm text-destructive">
+                {permissionMessage(error, "Access denied: platform publishing is available to the owner only.")}
+              </p>
+              <Button size="sm" variant="outline" onClick={() => refetch()}>Try again</Button>
+            </div>
           ) : posts.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No posts yet. Create your first one.</p>
           ) : (

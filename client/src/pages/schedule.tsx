@@ -31,6 +31,7 @@ import {
   eachDayOfInterval,
 } from "date-fns";
 import type { Session, Client, Settings } from "@shared/schema";
+import { emailNotificationFeedback } from "@/lib/email-notification-feedback";
 
 type CalView = "month" | "week" | "day";
 
@@ -80,10 +81,14 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate, presel
       const res = await apiRequest("POST", "/api/sessions", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (payload) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      if (payload && typeof payload === "object" && "emailNotifications" in payload) {
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications/usage"] });
+      }
       onOpenChange(false);
-      toast({ title: "Session booked successfully" });
+      const feedback = emailNotificationFeedback(payload, "Session booking");
+      toast({ title: feedback.title, description: feedback.description, variant: feedback.variant });
       setFormData({
         clientId: "",
         title: "",
@@ -617,9 +622,16 @@ export default function Schedule() {
       const res = await apiRequest("PATCH", `/api/sessions/${id}`, { status, deductSession });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (payload) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      if (payload && typeof payload === "object" && "emailNotifications" in payload) {
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications/usage"] });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      if (payload && typeof payload === "object" && "emailNotifications" in payload) {
+        const feedback = emailNotificationFeedback(payload, "Session update");
+        toast({ title: feedback.title, description: feedback.description, variant: feedback.variant });
+      }
     },
     onError: (err: Error) => {
       toast({ title: "Error updating session", description: err.message, variant: "destructive" });

@@ -14,11 +14,10 @@ import { Calendar, Users, Clock, AlertTriangle, Plus, ChevronRight, Bell } from 
 import { format, isToday, isTomorrow, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Session, Client, Package } from "@shared/schema";
+import type { Session, Client, Package, Settings } from "@shared/schema";
 import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import { trackActivationEvent } from "@/lib/activation";
-import { useFeatureAccess } from "@/hooks/use-feature-access";
-import { UpgradeNotice } from "@/components/upgrade-notice";
+import { emailNotificationFeedback } from "@/lib/email-notification-feedback";
 
 function QuickBookDialog({ open, onOpenChange, clients }: {
   open: boolean;
@@ -45,10 +44,14 @@ function QuickBookDialog({ open, onOpenChange, clients }: {
       const res = await apiRequest("POST", "/api/sessions", { ...data, title });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (payload) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      if (payload && typeof payload === "object" && "emailNotifications" in payload) {
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications/usage"] });
+      }
       onOpenChange(false);
-      toast({ title: "Session booked!" });
+      const feedback = emailNotificationFeedback(payload, "Session booking");
+      toast({ title: feedback.title, description: feedback.description, variant: feedback.variant });
       trackActivationEvent("first_booking_created");
       setFormData({
         clientId: "",
@@ -243,34 +246,32 @@ function SessionRow({ session, clientName }: { session: Session; clientName: str
 
 function NotifyButton({ packageId }: { packageId: string }) {
   const { toast } = useToast();
-  const featureAccess = useFeatureAccess();
-  const canNotify = featureAccess.hasFeature("emailNotifications");
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!canNotify) throw new Error("Low-session email notifications require Starter.");
       const res = await apiRequest("POST", `/api/packages/${packageId}/notify-low-sessions`, {});
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to send");
-      }
+      return res.json();
     },
-    onSuccess: () => toast({ title: "Notification sent", description: "Client has been emailed about their remaining sessions." }),
+    onSuccess: (payload) => {
+      const result = emailNotificationFeedback(payload, "Low-session notification");
+      toast({ title: result.title, description: result.description, variant: result.variant });
+    },
     onError: (err: Error) => toast({ title: "Could not send notification", description: err.message, variant: "destructive" }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["/api/notifications/usage"] }),
   });
 
-  if (!canNotify) return <UpgradeNotice feature="emailNotifications" compact />;
   return (
     <Button
       size="sm"
       variant="outline"
       className="h-7 px-2 text-xs flex-shrink-0"
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); mutation.mutate(); }}
-      disabled={mutation.isPending || mutation.isSuccess}
+      disabled={mutation.isPending}
       data-testid={`button-notify-${packageId}`}
       title="Email client about low sessions"
+      aria-label="Email client about low sessions"
     >
       <Bell className="w-3 h-3 mr-1" />
-      {mutation.isPending ? "..." : mutation.isSuccess ? "Sent" : "Notify"}
+      {mutation.isPending ? "Sending…" : "Notify"}
     </Button>
   );
 }
@@ -290,6 +291,7 @@ export default function Dashboard() {
   const { data: packages = [], isLoading: packagesLoading } = useQuery<Package[]>({
     queryKey: ["/api/packages"],
   });
+  const { data: settings } = useQuery<Settings>({ queryKey: ["/api/settings"] });
 
   const isLoading = sessionsLoading || clientsLoading || packagesLoading;
 
@@ -305,7 +307,9 @@ export default function Dashboard() {
     .slice(0, 5);
 
   const lowSessionPackages = packages.filter(
-    (p) => p.status === "active" && (p.totalSessions - (p.usedSessions || 0)) <= 2 && clientMap.has(p.clientId)
+    (p) => p.status === "active" && p.billingType !== "monthly"
+      && (p.totalSessions - (p.usedSessions || 0)) <= (settings?.lowSessionThreshold ?? 3)
+      && clientMap.has(p.clientId)
   );
 
   const activeClients = clients.filter((c) => c.status === "active").length;

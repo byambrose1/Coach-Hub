@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Download, Users } from "lucide-react";
 import { format } from "date-fns";
+import { permissionMessage } from "@/lib/permission-message";
 
 interface WaitlistSignup {
   id: string;
@@ -30,7 +31,7 @@ function toCsv(rows: WaitlistSignup[]): string {
 
 export default function PlatformAdminWaitlist() {
   const [, navigate] = useLocation();
-  const { data: signups = [], isLoading } = useQuery<WaitlistSignup[]>({
+  const { data: signups = [], isLoading, error, refetch } = useQuery<WaitlistSignup[]>({
     queryKey: ["/api/platform-admin/waitlist"],
   });
 
@@ -72,6 +73,13 @@ export default function PlatformAdminWaitlist() {
         <CardContent className="pt-0">
           {isLoading ? (
             <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-12 animate-pulse bg-muted rounded" />)}</div>
+          ) : error ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <p role="alert" className="text-sm text-destructive">
+                {permissionMessage(error, "Access denied: the waitlist is available to the platform owner only.")}
+              </p>
+              <Button size="sm" variant="outline" onClick={() => refetch()}>Try again</Button>
+            </div>
           ) : signups.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No one has joined the waitlist yet.</p>
           ) : (

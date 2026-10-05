@@ -19,6 +19,7 @@ import type { Client, Package as PackageType, Settings, Invoice } from "@shared/
 import { trackActivationEvent } from "@/lib/activation";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { UpgradeNotice } from "@/components/upgrade-notice";
+import { emailNotificationFeedback } from "@/lib/email-notification-feedback";
 
 function formatDateUK(dateStr: string): string {
   try {
@@ -440,6 +441,21 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose, allowInvo
     },
   });
 
+  const overdueReminderMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/invoices/${invoice.id}/remind-overdue`);
+      return res.json();
+    },
+    onSuccess: (payload) => {
+      const feedback = emailNotificationFeedback(payload, "Overdue invoice reminder");
+      toast({ title: feedback.title, description: feedback.description, variant: feedback.variant });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not send overdue reminder", description: err.message, variant: "destructive" });
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["/api/notifications/usage"] }),
+  });
+
   const [downloading, setDownloading] = useState(false);
   const handleDownload = async () => {
     setDownloading(true);
@@ -612,6 +628,21 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose, allowInvo
                 >
                   <Send className="w-3 h-3 mr-1" />
                   {sendMutation.isPending ? "Sending..." : "Send"}
+                </Button>
+              )}
+              {allowInvoiceManagement
+                && invoice.dueDate < format(new Date(), "yyyy-MM-dd")
+                && currentStatus !== "paid"
+                && currentStatus !== "cancelled" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => overdueReminderMutation.mutate()}
+                  disabled={overdueReminderMutation.isPending}
+                  data-testid="button-remind-overdue-invoice"
+                >
+                  <Send className="w-3 h-3 mr-1" />
+                  {overdueReminderMutation.isPending ? "Sending reminder…" : "Send overdue reminder"}
                 </Button>
               )}
               {allowPaymentTracking && (
@@ -951,7 +982,7 @@ export default function Payments() {
               {packages.map((pkg) => {
                 const remaining = pkg.totalSessions - (pkg.usedSessions || 0);
                 const pct = ((pkg.usedSessions || 0) / pkg.totalSessions) * 100;
-                const isLow = remaining <= 2 && pkg.status === "active";
+                const isLow = remaining <= 3 && pkg.status === "active";
                 const isMonthly = pkg.billingType === "monthly";
 
                 return (

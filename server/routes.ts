@@ -2,6 +2,10 @@ import { publicPlansFromConfig } from "@shared/public-site";
 import { registerCustomFormRoutes } from "./custom-form-routes";
 import { featureMinimumPlan, featureLabels, hasFeature, type FeatureName } from "@shared/subscription-features";
 import { revenueReport } from "./revenue-report";
+import { createEmailNotifications, notificationHttpStatus } from "./email-notifications";
+import type { NotificationBudgetStore } from "./email-notification-budget";
+import { platformStaffStore, legacySupportIds, type PlatformStaffStore } from "./platform-staff";
+import { LOW_SESSION_EMAIL_THRESHOLD, type EmailNotificationResult } from "@shared/email-notifications";
 import { deleteSupabaseAccounts } from "./auth/identities";
 import type { Express, Response } from "express";
 import rateLimit from "express-rate-limit";
@@ -12,8 +16,9 @@ import { isAuthenticated as defaultIsAuthenticated, authStorage } from "./replit
 import {
   sendInvoiceEmail as defaultSendInvoiceEmail,
   sendBookingNotificationEmail as defaultSendBookingNotificationEmail,
-  sendSessionCancellationEmail,
-  sendSessionRescheduleEmail,
+  sendSessionCancellationEmail as defaultSendSessionCancellationEmail,
+  sendSessionRescheduleEmail as defaultSendSessionRescheduleEmail,
+  sendInvoiceReminderEmail as defaultSendInvoiceReminderEmail,
   sendParqEmail as defaultSendParqEmail,
   sendLowSessionsEmail as defaultSendLowSessionsEmail,
   sendBroadcastEmail as defaultSendBroadcastEmail,
@@ -44,6 +49,20 @@ const EMAIL_PROVIDER_ERROR = {
   code: "EMAIL_PROVIDER_ERROR",
   message: "Unable to send the email. Please try again.",
 } as const;
+
+function notificationFailed(res: Response, result: EmailNotificationResult): boolean {
+  if (result.status === "sent") return false;
+  if (result.status === "failed") {
+    res.status(502).json(EMAIL_PROVIDER_ERROR);
+    return true;
+  }
+  res.status(notificationHttpStatus(result)).json({
+    code: "EMAIL_NOTIFICATION_NOT_SENT",
+    message: result.message,
+    emailNotifications: [result],
+  });
+  return true;
+}
 
 declare module "express-session" {
   interface SessionData {
@@ -160,6 +179,7 @@ function isOwner(req: any): boolean {
 // see or change platform pricing/tier configuration or a coach's billing plan.
 // Configure this env var with the admin person's Replit user ID once you have it.
 function isSupportStaff(req: any): boolean {
+  if (req.platformStaffResolved) return req.platformStaffRole === "support";
   const userId = getRealUserId(req);
   const supportIds = (process.env.SUPPORT_USER_IDS || "")
     .split(",")
@@ -181,6 +201,11 @@ export async function registerRoutes(
     stripeClient?: Stripe;
     withBillingCheckoutLock?: typeof withBillingCheckoutLock;
     sendBookingNotificationEmail?: typeof defaultSendBookingNotificationEmail;
+    sendSessionCancellationEmail?: typeof defaultSendSessionCancellationEmail;
+    sendSessionRescheduleEmail?: typeof defaultSendSessionRescheduleEmail;
+    sendInvoiceReminderEmail?: typeof defaultSendInvoiceReminderEmail;
+    notificationBudget?: NotificationBudgetStore;
+    platformStaff?: PlatformStaffStore;
     sendInvoiceEmail?: typeof defaultSendInvoiceEmail;
     sendParqEmail?: typeof defaultSendParqEmail;
     sendLowSessionsEmail?: typeof defaultSendLowSessionsEmail;
@@ -197,6 +222,57 @@ export async function registerRoutes(
   const sendBookingNotificationEmail =
     dependencies.sendBookingNotificationEmail ?? defaultSendBookingNotificationEmail;
   const sendInvoiceEmail = dependencies.sendInvoiceEmail ?? defaultSendInvoiceEmail;
+  const sendSessionCancellationEmail = dependencies.sendSessionCancellationEmail ?? defaultSendSessionCancellationEmail;
+  const sendSessionRescheduleEmail = dependencies.sendSessionRescheduleEmail ?? defaultSendSessionRescheduleEmail;
+  const sendInvoiceReminderEmail = dependencies.sendInvoiceReminderEmail ?? defaultSendInvoiceReminderEmail;
+  const notifications = createEmailNotifications(dependencies.notificationBudget);
+  const staffAccess = dependencies.platformStaff ?? platformStaffStore;
+
+  // Removing a manager must also end an already-open support view, not
+  // merely hide the admin menu on their next visit.
+  app.use("/api", (req, res, next) => {
+    if (!req.session?.impersonatedUserId) return next();
+    isAuthenticated(req, res, async (error?: unknown) => {
+      if (error) return next(error);
+      try {
+        if (!isOwner(req)) {
+          const realUserId = getRealUserId(req);
+          const grant = await staffAccess.get(realUserId);
+          if (!(grant ? grant.active : legacySupportIds().includes(realUserId))) {
+            delete req.session.impersonatedUserId;
+            delete req.session.impersonatedUserName;
+            return res.status(403).json({ message: "Account-manager access has been revoked. The support view has ended." });
+          }
+        }
+        next();
+      } catch (error) {
+        logError("Support view permissions could not be checked", error);
+        res.status(503).json({ message: "Support view permissions could not be checked. Access has not been granted." });
+      }
+    });
+  });
+
+  // Authentication and the verified real identity, never an impersonated
+  // coach or client-supplied role, authorize every platform-admin endpoint.
+  app.use("/api/platform-admin", isAuthenticated, async (req, res, next) => {
+    try {
+      const userId = getRealUserId(req);
+      const context = req as typeof req & { platformStaffResolved: boolean; platformStaffRole: string };
+      context.platformStaffResolved = true;
+      if (isOwner(req)) context.platformStaffRole = "owner";
+      else {
+        const grant = await staffAccess.get(userId);
+        // A persistent revocation overrides older environment-based grants.
+        const permitted = grant ? grant.active : legacySupportIds().includes(userId);
+        context.platformStaffRole = permitted ? "support" : "coach";
+      }
+      res.set("Cache-Control", "private, no-store");
+      next();
+    } catch (error) {
+      logError("Platform administration permissions could not be checked", error);
+      res.status(503).json({ message: "Administrator permissions could not be checked. Access has not been granted." });
+    }
+  });
   const sendParqEmail = dependencies.sendParqEmail ?? defaultSendParqEmail;
   const sendLowSessionsEmail =
     dependencies.sendLowSessionsEmail ?? defaultSendLowSessionsEmail;
@@ -1188,14 +1264,15 @@ export async function registerRoutes(
       if (!client) return res.status(404).json({ message: "Client not found" });
       if (!client.email) return res.status(400).json({ message: "Client has no email address" });
       const s = await storage.getSettings(userId);
-      await sendParqEmail({
+      const notification = await notifications.send({ userId, settings: s, clientEmail: client.email, kind: "parq", manual: true, deliver: () => sendParqEmail({
         clientName: client.name,
-        clientEmail: client.email,
+        clientEmail: client.email!,
         trainerName: s?.trainerName || "Coach",
         businessName: s?.businessName || "",
         trainerEmail: s?.trainerEmail || undefined,
-      });
-      res.json({ message: "PAR-Q email sent successfully" });
+      }) });
+      if (notificationFailed(res, notification)) return;
+      res.json({ message: "PAR-Q email accepted for sending", emailNotifications: [notification] });
     } catch (err) {
       logError("Failed to send PAR-Q email", err);
       res.status(502).json(EMAIL_PROVIDER_ERROR);
@@ -1326,6 +1403,58 @@ export async function registerRoutes(
   });
 
   // --- Platform Owner Admin ---
+  app.get("/api/platform-admin/staff", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Only the owner can manage account-manager access." });
+    try {
+      const [grants, accounts] = await Promise.all([staffAccess.list(), storage.getAllUsers()]);
+      const byId = new Map(grants.map(grant => [grant.userId, grant]));
+      const staff = accounts.filter(account => {
+        if (account.id === process.env.OWNER_USER_ID) return false;
+        const grant = byId.get(account.id);
+        return grant ? grant.active : legacySupportIds().includes(account.id);
+      }).map(account => ({
+        userId: account.id, email: account.email, firstName: account.firstName, lastName: account.lastName,
+        businessName: (account as typeof account & { businessName?: string | null }).businessName || null,
+        source: byId.has(account.id) ? "database" : "environment",
+      }));
+      res.json({ staff });
+    } catch (error) {
+      logError("Account managers could not be loaded", error);
+      res.status(503).json({ message: "Account managers could not be loaded. Please try again." });
+    }
+  });
+  app.post("/api/platform-admin/staff", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Only the owner can add account managers." });
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: "Enter the email of an existing Practably account." });
+    }
+    try {
+      const accounts = (await storage.getAllUsers()).filter(account => account.email?.toLowerCase() === email);
+      if (accounts.length === 0) return res.status(404).json({ message: "No existing account has that email. Ask them to sign in to Practably first." });
+      if (accounts.length !== 1) return res.status(409).json({ message: "That email matches multiple accounts. Resolve the duplicate before granting administrator access." });
+      const account = accounts[0];
+      if (account.id === process.env.OWNER_USER_ID) return res.status(400).json({ message: "The owner already has access and cannot be added as an account manager." });
+      await staffAccess.setAccess(account.id, true, getRealUserId(req));
+      res.json({ success: true });
+    } catch (error) {
+      logError("Account manager access could not be granted", error);
+      res.status(503).json({ message: "Account manager access could not be granted. Please try again." });
+    }
+  });
+  app.delete("/api/platform-admin/staff/:userId", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Only the owner can revoke account-manager access." });
+    const userId = getRouteParam(req.params.userId);
+    if (userId === process.env.OWNER_USER_ID) return res.status(400).json({ message: "The owner account cannot be revoked." });
+    try {
+      if (!(await storage.getAllUsers()).some(account => account.id === userId)) return res.status(404).json({ message: "Account not found" });
+      await staffAccess.setAccess(userId, false, getRealUserId(req));
+      res.json({ success: true });
+    } catch (error) {
+      logError("Account manager access could not be revoked", error);
+      res.status(503).json({ message: "Account manager access could not be revoked. Please try again." });
+    }
+  });
   app.get("/api/platform-admin/role", isAuthenticated, async (req, res) => {
     if (!isOwnerOrSupport(req)) return res.status(403).json({ message: "Forbidden" });
     res.json({ role: isOwner(req) ? "owner" : "support" });
@@ -1352,7 +1481,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/platform-admin/config", isAuthenticated, async (req, res) => {
-    if (!isOwnerOrSupport(req)) return res.status(403).json({ message: "Forbidden" });
+    if (!isOwner(req)) return res.status(403).json({ message: "Only the owner can access platform billing configuration." });
     try {
       const config = await storage.getPlatformConfig();
       res.json(config);
@@ -1644,6 +1773,8 @@ export async function registerRoutes(
     }
 
     const session = await storage.createSession(userId, parsed.data);
+    const emailNotifications: EmailNotificationResult[] = [];
+    let lowSessionAlert: { packageName: string; remainingSessions: number } | undefined;
 
     // Deduct 1 session from the client's active block package when booked
     try {
@@ -1652,9 +1783,14 @@ export async function registerRoutes(
         (p) => p.clientId === session.clientId && p.status === "active" && p.billingType === "block" && (p.totalSessions - (p.usedSessions || 0)) > 0
       );
       if (activePackage) {
-        await storage.updatePackage(userId, activePackage.id, {
+        const previousRemaining = activePackage.totalSessions - (activePackage.usedSessions || 0);
+        const updatedPackage = await storage.updatePackage(userId, activePackage.id, {
           usedSessions: (activePackage.usedSessions || 0) + 1,
         });
+        if (updatedPackage && previousRemaining > LOW_SESSION_EMAIL_THRESHOLD &&
+          updatedPackage.totalSessions - (updatedPackage.usedSessions || 0) === LOW_SESSION_EMAIL_THRESHOLD) {
+          lowSessionAlert = { packageName: updatedPackage.name, remainingSessions: LOW_SESSION_EMAIL_THRESHOLD };
+        }
       }
     } catch (err) {
       logError("Package deduction error", err);
@@ -1663,22 +1799,30 @@ export async function registerRoutes(
     try {
       const client = await storage.getClient(userId, session.clientId);
       const s = await storage.getSettings(userId);
-      if (client?.email && s?.enableEmailNotifications && hasFeature(s, "emailNotifications")) {
-        await sendBookingNotificationEmail({
-          clientName: client.name,
-          clientEmail: client.email,
+      if (session.sessionType !== "blocked" && session.clientId !== "__blocked__") {
+        emailNotifications.push(await notifications.send({ userId, settings: s, clientEmail: client?.email, kind: "booking", deliver: () => sendBookingNotificationEmail({
+          clientName: client!.name,
+          clientEmail: client!.email!,
           sessionDate: session.date,
           sessionTime: session.startTime,
           trainerName: s?.trainerName || "Coach",
           businessName: s?.businessName || "",
           trainerEmail: s?.trainerEmail || undefined,
-        });
+        }) }));
+        if (lowSessionAlert) {
+          emailNotifications.push(await notifications.send({ userId, settings: s, clientEmail: client?.email, kind: "low_sessions", deliver: () => sendLowSessionsEmail({
+            clientName: client!.name, clientEmail: client!.email!, packageName: lowSessionAlert!.packageName,
+            remainingSessions: lowSessionAlert!.remainingSessions, trainerName: s?.trainerName || "Coach",
+            businessName: s?.businessName || undefined, trainerEmail: s?.trainerEmail || undefined, paymentMethods: s,
+          }) }));
+        }
       }
     } catch (err) {
       logError("Notification error", err);
+      emailNotifications.push({ kind: "booking", status: "failed", message: "Session booked, but the email notification could not be checked or sent." });
     }
 
-    res.status(201).json(session);
+    res.status(201).json({ ...session, emailNotifications });
   });
 
   app.patch("/api/sessions/:id", async (req, res) => {
@@ -1709,6 +1853,7 @@ export async function registerRoutes(
 
     const session = await storage.updateSession(userId, req.params.id, withoutOwnershipFields(req.body));
     if (!session) return res.status(404).json({ message: "Session not found" });
+    const emailNotifications: EmailNotificationResult[] = [];
 
     // Handle session count on cancellation
     if (req.body.status === "cancelled" && existing?.status !== "cancelled") {
@@ -1729,36 +1874,38 @@ export async function registerRoutes(
     try {
       const client = await storage.getClient(userId, session.clientId);
       const s = await storage.getSettings(userId);
-      if (client?.email && existing && s?.enableEmailNotifications && hasFeature(s, "emailNotifications")) {
+      if (existing && session.sessionType !== "blocked" && session.clientId !== "__blocked__") {
         const emailData = {
-          clientName: client.name,
-          clientEmail: client.email,
+          clientName: client?.name || "",
+          clientEmail: client?.email || "",
           trainerName: s?.trainerName || "Coach",
           businessName: s?.businessName || "",
           trainerEmail: s?.trainerEmail || undefined,
         };
 
         if (req.body.status === "cancelled" && existing.status !== "cancelled") {
-          await sendSessionCancellationEmail({
+          emailNotifications.push(await notifications.send({ userId, settings: s, clientEmail: client?.email, kind: "cancellation", deliver: () => sendSessionCancellationEmail({
             ...emailData,
             sessionDate: session.date,
             sessionTime: session.startTime,
-          });
-        } else if ((req.body.date && req.body.date !== existing.date) || (req.body.startTime && req.body.startTime !== existing.startTime)) {
-          await sendSessionRescheduleEmail({
+          }) }));
+        } else if ((req.body.date && req.body.date !== existing.date) || (req.body.startTime && req.body.startTime !== existing.startTime) ||
+          (req.body.endTime && req.body.endTime !== existing.endTime)) {
+          emailNotifications.push(await notifications.send({ userId, settings: s, clientEmail: client?.email, kind: "reschedule", deliver: () => sendSessionRescheduleEmail({
             ...emailData,
             newDate: session.date,
             newTime: session.startTime,
             oldDate: existing.date,
             oldTime: existing.startTime,
-          });
+          }) }));
         }
       }
     } catch (err) {
       logError("Notification error", err);
+      emailNotifications.push({ kind: "session_update", status: "failed", message: "Session saved, but the email notification could not be checked or sent." });
     }
 
-    res.json(session);
+    res.json({ ...session, emailNotifications });
   });
 
   app.delete("/api/sessions/:id", async (req, res) => {
@@ -1813,17 +1960,18 @@ export async function registerRoutes(
       if (!client.email) return res.status(400).json({ message: "Client has no email address" });
       const settings = await storage.getSettings(userId);
       const remaining = pkg.totalSessions - (pkg.usedSessions || 0);
-      await sendLowSessionsEmail({
+      const notification = await notifications.send({ userId, settings, clientEmail: client.email, kind: "low_sessions", manual: true, deliver: () => sendLowSessionsEmail({
         clientName: client.name,
-        clientEmail: client.email,
+        clientEmail: client.email!,
         packageName: pkg.name,
         remainingSessions: remaining,
         trainerName: settings?.trainerName || "Your Trainer",
         businessName: settings?.businessName || undefined,
         trainerEmail: settings?.trainerEmail || undefined,
         paymentMethods: settings,
-      });
-      res.json({ success: true });
+      }) });
+      if (notificationFailed(res, notification)) return;
+      res.json({ success: true, emailNotifications: [notification] });
     } catch (err) {
       logError("Failed to send low sessions notification", err);
       res.status(502).json(EMAIL_PROVIDER_ERROR);
@@ -1831,6 +1979,54 @@ export async function registerRoutes(
   });
 
   // --- Notes ---
+  app.get("/api/notifications/usage", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const settings = await storage.getSettings(userId);
+      res.set("Cache-Control", "private, no-store");
+      res.json(await notifications.usage(userId, settings));
+    } catch (error) {
+      logError("Failed to check weekly notification usage", error);
+      res.status(503).json({ message: "Your weekly notification allowance could not be loaded. Please try again." });
+    }
+  });
+
+  app.post("/api/invoices/:id/remind-overdue", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!await requireFeature(res, userId, "invoiceManagement")) return;
+      const invoice = await storage.getInvoice(userId, getRouteParam(req.params.id));
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if (["paid", "cancelled", "void"].includes(invoice.status || "")) {
+        return res.status(400).json({ message: "Only unpaid invoices can receive overdue reminders." });
+      }
+      const settings = await storage.getSettings(userId);
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: settings?.timezone || "Europe/London" });
+      if (!invoice.dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(invoice.dueDate) ||
+        Number.isNaN(Date.parse(invoice.dueDate)) || invoice.dueDate >= today) {
+        return res.status(400).json({ message: "The invoice due date must have passed before sending an overdue reminder." });
+      }
+      const client = await storage.getClient(userId, invoice.clientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      const notification = await notifications.send({
+        userId, settings, clientEmail: client.email, kind: "overdue_invoice", manual: true,
+        deliver: () => sendInvoiceReminderEmail({
+          clientName: client.name, clientEmail: client.email!, invoiceNumber: invoice.invoiceNumber,
+          amount: invoice.amount, currency: settings?.currency || "£", dueDate: invoice.dueDate!,
+          notes: invoice.notes || undefined, trainerName: settings?.trainerName || "Coach",
+          businessName: settings?.businessName || "", businessAddress: settings?.businessAddress || undefined,
+          trainerEmail: settings?.trainerEmail || undefined, paymentMethods: settings,
+        }),
+      });
+      if (notificationFailed(res, notification)) return;
+      // A reminder is not a payment and must not reset the invoice lifecycle.
+      res.json({ success: true, emailNotifications: [notification] });
+    } catch (error) {
+      logError("Failed to send overdue invoice reminder", error);
+      res.status(502).json(EMAIL_PROVIDER_ERROR);
+    }
+  });
+
   app.get("/api/notes", async (req, res) => {
     const userId = getUserId(req);
     const notes = await storage.getNotes(userId);

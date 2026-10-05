@@ -177,6 +177,7 @@ before(async () => {
     storage,
     isAuthenticated: authenticate,
     sendBookingNotificationEmail: async () => {},
+    notificationBudget: { used: async () => 0, reserve: async () => true, releaseRejected: async () => {} },
     sendParqEmail: async () => {
       throw new Error(
         "private-provider-detail: Brevo request for client@example.test was rejected",

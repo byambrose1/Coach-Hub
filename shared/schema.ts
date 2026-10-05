@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, date, jsonb, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, date, jsonb, customType, primaryKey, check } from "drizzle-orm/pg-core";
+import { users } from "./models/auth";
 import type { CustomQuestion } from "./custom-forms";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -79,7 +80,7 @@ export const settings = pgTable("settings", {
   cancellationPolicy: text("cancellation_policy"),
   paymentLink: text("payment_link"),
   businessName: text("business_name"),
-  lowSessionThreshold: integer("low_session_threshold").default(2),
+  lowSessionThreshold: integer("low_session_threshold").default(3),
   trainerEmail: text("trainer_email"),
   trainerPhone: text("trainer_phone"),
   businessAddress: text("business_address"),
@@ -274,4 +275,20 @@ export const formDocuments = pgTable("form_documents", {
   content: documentBytes("content").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
   expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }),
+});
+
+export const emailNotificationUsage = pgTable("email_notification_usage", {
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  weekStart: date("week_start").notNull(),
+  usedCount: integer("used_count").notNull().default(0),
+}, table => [
+  primaryKey({ columns: [table.userId, table.weekStart] }),
+  check("email_notification_usage_count_check", sql`${table.usedCount} >= 0 AND ${table.usedCount} <= 10`),
+]);
+
+export const platformStaff = pgTable("platform_staff", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  active: boolean("active").notNull().default(true),
+  grantedBy: varchar("granted_by").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -13,7 +13,7 @@ const planRanks: Record<PlanName, number> = {
 };
 
 export const featureMinimumPlan: Record<FeatureName, PlanName> = {
-  emailNotifications: "starter",
+  emailNotifications: "free",
   paymentTracking: "starter",
   revenueTracking: "starter",
   broadcastEmails: "professional",

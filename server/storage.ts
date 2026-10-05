@@ -305,7 +305,9 @@ export class DatabaseStorage implements IStorage {
 
   // Platform admin
   async getAllUsers(): Promise<User[]> {
-    return db.select().from(users).orderBy(users.createdAt);
+    const rows = await db.select({ user: users, businessName: settings.businessName })
+      .from(users).leftJoin(settings, eq(settings.id, users.id)).orderBy(users.createdAt);
+    return rows.map(({ user, businessName }) => ({ ...user, businessName }));
   }
 
   async getPlatformConfig(): Promise<PlatformConfig> {

@@ -56,6 +56,7 @@ before(async () => {
     sendInvoiceEmail: async () => { sends++; },
     sendBroadcastEmail: async () => { sends++; return {} as any; },
     sendLowSessionsEmail: async () => { sends++; },
+    notificationBudget: { used: async () => 0, reserve: async () => true, releaseRejected: async () => {} },
   });
   server.on("request", app);
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -81,7 +82,7 @@ test("one feature matrix gives successive plans real permissions and unknown pla
       assert.equal(hasFeature({ subscriptionPlan: current }, feature),
         order.indexOf(current) >= order.indexOf(featureMinimumPlan[feature]), `${current}: ${feature}`);
     }
-    assert.equal(hasFeature({ subscriptionPlan: "admin" }, feature), false);
+    assert.equal(hasFeature({ subscriptionPlan: "admin" }, feature), featureMinimumPlan[feature] === "free");
   }
   assert.equal(getPlan({ subscriptionPlan: "toString" }), "free");
 });
@@ -94,9 +95,7 @@ test("Free retains basic invoices but direct paid-feature requests cannot write 
     ["/api/emails/broadcast", "POST", { subject: "Fixture", message: "Fixture" }],
     ["/api/invoices/invoice", "PATCH", { status: "paid", paidDate: "2026-10-03" }],
     ["/api/invoices/invoice/send", "POST", {}],
-    ["/api/packages/package/notify-low-sessions", "POST", {}],
     ["/api/packages", "POST", { billingType: "monthly", monthlyRate: "5" }],
-    ["/api/settings", "PUT", { enableEmailNotifications: true }],
     ["/api/settings", "PUT", { businessName: "New custom business" }],
     ["/api/invoices", "POST", { status: "paid", paymentMethod: "cash" }],
   ] as const) {

@@ -30,6 +30,7 @@ import type { Settings } from "@shared/schema";
 import { siteConfig } from "@/config/site";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { UpgradeNotice } from "@/components/upgrade-notice";
+import type { NotificationUsage } from "@shared/email-notifications";
 
 interface Tier {
   name: string;
@@ -440,10 +441,20 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const featureAccess = useFeatureAccess();
   const canEditBusinessDetails = featureAccess.hasFeature("customBusinessDetails");
-  const canEditNotifications = featureAccess.hasFeature("emailNotifications");
 
   const { data: settings, isLoading } = useQuery<Settings>({
     queryKey: ["/api/settings"],
+  });
+  const notificationUsageQuery = useQuery<NotificationUsage>({
+    queryKey: ["/api/notifications/usage"],
+    queryFn: async () => {
+      const response = await fetch("/api/notifications/usage", { credentials: "include", cache: "no-store" });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Could not load notification usage.");
+      }
+      return response.json();
+    },
   });
 
   const [formData, setFormData] = useState({
@@ -465,7 +476,7 @@ export default function SettingsPage() {
     acceptsOtherPayment: false,
     otherPaymentDetails: "",
     invoicePrefix: "INV",
-    lowSessionThreshold: 2,
+    lowSessionThreshold: 3,
     enableEmailNotifications: false,
     enableSessionReminders: false,
     reminderHoursBefore: 24,
@@ -498,7 +509,7 @@ export default function SettingsPage() {
         acceptsOtherPayment: settings.acceptsOtherPayment || false,
         otherPaymentDetails: settings.otherPaymentDetails || "",
         invoicePrefix: settings.invoicePrefix || "INV",
-        lowSessionThreshold: settings.lowSessionThreshold || 2,
+        lowSessionThreshold: settings.lowSessionThreshold || 3,
         enableEmailNotifications: settings.enableEmailNotifications || false,
         enableSessionReminders: settings.enableSessionReminders || false,
         reminderHoursBefore: settings.reminderHoursBefore || 24,
@@ -520,7 +531,6 @@ export default function SettingsPage() {
           && field !== "enableSessionReminders"
           && field !== "reminderHoursBefore"
           && (canEditBusinessDetails || (field !== "businessName" && field !== "businessAddress"))
-          && (canEditNotifications || field !== "enableEmailNotifications"),
         ),
       );
       const res = await apiRequest("PUT", "/api/settings", payload);
@@ -900,27 +910,64 @@ export default function SettingsPage() {
               min={1}
               max={10}
               value={formData.lowSessionThreshold}
-              onChange={(e) => setFormData({ ...formData, lowSessionThreshold: parseInt(e.target.value) || 2 })}
+              onChange={(e) => setFormData({ ...formData, lowSessionThreshold: parseInt(e.target.value) || 3 })}
               className="max-w-[120px]"
               data-testid="input-low-session-threshold"
             />
-            <p className="text-xs text-muted-foreground">Alert when a client's package has this many sessions or fewer remaining.</p>
+            <p className="text-xs text-muted-foreground">Show an alert when a block package has this many sessions or fewer. The automatic client email alert is triggered at three remaining sessions.</p>
           </div>
 
           <Separator />
 
           <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <Label>Email Notifications</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">Receive email alerts for bookings, cancellations, and low sessions</p>
+              <Label htmlFor="switch-email-notifications">Client email notifications</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">Emails go to your clients for bookings, cancellations, reschedules, and low-session alerts.</p>
             </div>
-            {canEditNotifications ? <Switch
+            <Switch
               checked={formData.enableEmailNotifications}
               onCheckedChange={(v) => setFormData({ ...formData, enableEmailNotifications: v })}
+              id="switch-email-notifications"
+              aria-label="Enable client email notifications"
               data-testid="switch-email-notifications"
-            /> : <span className="text-sm text-muted-foreground">{formData.enableEmailNotifications ? "On" : "Off"}</span>}
+            />
           </div>
-          {!canEditNotifications && <UpgradeNotice feature="emailNotifications" compact />}
+
+          <div className="rounded-lg border bg-muted/30 p-3" aria-live="polite" data-testid="notification-usage">
+            {notificationUsageQuery.isLoading ? (
+              <div role="status" aria-label="Loading weekly notification usage" className="space-y-2">
+                <Skeleton className="h-4 w-40" /><Skeleton className="h-3 w-56" />
+                <span className="sr-only">Loading weekly notification usage</span>
+              </div>
+            ) : notificationUsageQuery.isError ? (
+              <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <p role="alert" className="text-destructive">Notification usage is unavailable: {notificationUsageQuery.error.message}</p>
+                <Button size="sm" variant="outline" onClick={() => notificationUsageQuery.refetch()}>Try again</Button>
+              </div>
+            ) : notificationUsageQuery.data ? (
+              <>
+                <p className="text-sm font-medium">
+                  {notificationUsageQuery.data.enabled ? "Client email notifications are on" : "Client email notifications are off"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {notificationUsageQuery.data.limit === null
+                    ? `${notificationUsageQuery.data.used} used this week · no weekly plan cap${notificationUsageQuery.data.remaining !== null ? ` · ${notificationUsageQuery.data.remaining} remaining` : ""}. Provider limits may still apply.`
+                    : `${notificationUsageQuery.data.used} of ${notificationUsageQuery.data.limit} notifications used this week${notificationUsageQuery.data.remaining !== null ? ` · ${notificationUsageQuery.data.remaining} remaining` : ""}.`}
+                  {" "}Weekly usage resets Monday at 00:00 UTC ({new Date(notificationUsageQuery.data.resetsAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC).
+                </p>
+                {notificationUsageQuery.data.limit !== null && (
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Weekly email notifications used" aria-valuemin={0} aria-valuemax={notificationUsageQuery.data.limit} aria-valuenow={Math.min(notificationUsageQuery.data.used, notificationUsageQuery.data.limit)}>
+                    <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${Math.min(100, notificationUsageQuery.data.used / Math.max(1, notificationUsageQuery.data.limit) * 100)}%` }} />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <p>Weekly notification usage is not available yet.</p>
+                <Button size="sm" variant="outline" onClick={() => notificationUsageQuery.refetch()}>Try again</Button>
+              </div>
+            )}
+          </div>
 
           <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>

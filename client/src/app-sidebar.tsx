@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Calendar, Users, CreditCard, Settings, LayoutDashboard, LogOut, ShieldCheck, MessageSquarePlus } from "lucide-react";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -29,6 +29,7 @@ const navItems = [
   { title: "Schedule", url: "/schedule", icon: Calendar },
   { title: "Clients", url: "/clients", icon: Users },
   { title: "Payments", url: "/payments", icon: CreditCard },
+  { title: "Practice tools", url: "/practice-admin", icon: ShieldCheck },
 ];
 
 const bottomItems = [
@@ -100,6 +101,12 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const { data: platformRole } = useQuery<{ role: "owner" | "support" }>({
+    queryKey: ["/api/platform-admin/role"],
+  });
+  const visibleNavItems = platformRole?.role === "owner" || platformRole?.role === "support"
+    ? [...navItems, { title: "Admin", url: "/admin", icon: ShieldCheck }]
+    : navItems;
 
   return (
     <Sidebar>
@@ -117,7 +124,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild

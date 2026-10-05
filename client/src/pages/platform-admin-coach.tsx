@@ -8,6 +8,7 @@ import { ArrowLeft, Users, Calendar, DollarSign, Eye, Crown, AlertTriangle } fro
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { permissionMessage } from "@/lib/permission-message";
 
 const PLAN_LABELS: Record<string, string> = {
   free: "Free (up to 5 clients)",
@@ -32,18 +33,20 @@ export default function PlatformAdminCoach() {
   const { data, isLoading, error } = useQuery<any>({
     queryKey: ["/api/platform-admin/coaches", coachId],
     queryFn: async () => {
-      const res = await fetch(`/api/platform-admin/coaches/${coachId}`);
-      if (!res.ok) throw new Error("Failed to fetch coach");
+      const res = await apiRequest("GET", `/api/platform-admin/coaches/${coachId}`);
       return res.json();
     },
     enabled: !!coachId,
   });
 
   const { data: authUser } = useQuery<any>({ queryKey: ["/api/auth/user"] });
+  const { data: role } = useQuery<{ role: "owner" | "support" }>({ queryKey: ["/api/platform-admin/role"] });
+  const isOwner = role?.role === "owner";
   const isOwnAccount = authUser?.id === coachId;
 
   const planMutation = useMutation({
     mutationFn: async (plan: string) => {
+      if (!isOwner) throw new Error("Only the verified owner can change billing plans.");
       await apiRequest("PATCH", `/api/platform-admin/coaches/${coachId}/plan`, { plan });
     },
     onSuccess: () => {
@@ -82,7 +85,9 @@ export default function PlatformAdminCoach() {
     return (
       <div className="p-8 text-center">
         <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-        <p className="text-destructive font-medium">Coach not found or access denied</p>
+        <p role="alert" className="text-destructive font-medium">
+          {permissionMessage(error, "Access denied: only the owner and authorised account managers can inspect coach accounts.")}
+        </p>
         <Button variant="outline" className="mt-4" onClick={() => navigate("/platform-admin")}>
           Back to Admin
         </Button>
@@ -175,28 +180,33 @@ export default function PlatformAdminCoach() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <Select
-              value={plan || "free"}
-              onValueChange={(val) => planMutation.mutate(val)}
-              disabled={planMutation.isPending}
-            >
-              <SelectTrigger className="max-w-sm" data-testid="select-coach-plan">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="free">Free (up to 5 clients)</SelectItem>
-                <SelectItem value="starter">Starter - up to 10 clients (£1.99/mo)</SelectItem>
-                <SelectItem value="professional">Professional - up to 20 clients (£4.99/mo)</SelectItem>
-                <SelectItem value="business">Business - up to 50 clients (£7.99/mo)</SelectItem>
-              </SelectContent>
-            </Select>
-            {planMutation.isPending && (
-              <span className="text-sm text-muted-foreground">Saving...</span>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Badge className={`${PLAN_BADGE_COLORS[plan] || "bg-slate-100 text-slate-700"} w-fit`}>
+              {PLAN_LABELS[plan] || "Free"}
+            </Badge>
+            {isOwner && (
+              <Select
+                value={plan || "free"}
+                onValueChange={(val) => planMutation.mutate(val)}
+                disabled={planMutation.isPending}
+              >
+                <SelectTrigger className="min-h-11 max-w-sm" data-testid="select-coach-plan">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">Free (up to 5 clients)</SelectItem>
+                  <SelectItem value="starter">Starter - up to 10 clients (£1.99/mo)</SelectItem>
+                  <SelectItem value="professional">Professional - up to 20 clients (£4.99/mo)</SelectItem>
+                  <SelectItem value="business">Business - up to 50 clients (£7.99/mo)</SelectItem>
+                </SelectContent>
+              </Select>
             )}
+            {planMutation.isPending && <span className="text-sm text-muted-foreground">Saving…</span>}
           </div>
           <p className="text-sm text-muted-foreground">
-            Manually update a coach's subscription tier after they've completed payment.
+            {isOwner
+              ? "Subscription billing is handled through verified checkout. Do not use this control to record a purchase or bypass payment confirmation."
+              : "Account managers can review plan status and help troubleshoot, but cannot change pricing or billing plans."}
           </p>
         </CardContent>
       </Card>

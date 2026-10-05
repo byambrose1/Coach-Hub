@@ -29,7 +29,7 @@ export const pricingTiers = [
     period: "forever",
     clients: "Up to 5 clients",
     description: "A focused starting point for independent coaches.",
-    features: ["5 client records", "Session scheduling", "Client forms", "Basic invoicing with Practably logo", "Client data export"],
+    features: ["5 client records", "Session scheduling", "Client forms", "10 client email notifications/week", "Basic invoicing with Practably logo", "Client data export"],
   },
   {
     name: "Starter",
@@ -37,7 +37,7 @@ export const pricingTiers = [
     period: "/ month",
     clients: "Up to 10 clients",
     description: "For a small roster and a more organised week.",
-    features: ["10 client records", "Everything in Free", "Email notifications", "Invoice and payment tracking", "Revenue tracking"],
+    features: ["10 client records", "Everything in Free", "No weekly plan cap on client emails", "Invoice and payment tracking", "Revenue tracking"],
   },
   {
     name: "Professional",
@@ -45,7 +45,7 @@ export const pricingTiers = [
     period: "/ month",
     clients: "Up to 20 clients",
     description: "For coaches building a consistent coaching business.",
-    features: ["20 client records", "Everything in Starter", "Broadcast client emails", "Full invoice management"],
+    features: ["20 client records", "Everything in Starter", "Broadcast client emails", "Full invoice management", "No weekly plan cap on client emails"],
   },
   {
     name: "Business",
@@ -53,7 +53,7 @@ export const pricingTiers = [
     period: "/ month",
     clients: "Up to 50 clients",
     description: "For larger client rosters without complicated systems.",
-    features: ["50 client records", "Everything in Professional", "Date and client revenue reports", "Custom business details", "Priority support: 4-hour response target"],
+    features: ["50 client records", "Everything in Professional", "Date and client revenue reports", "Custom business details", "Priority support: 4-hour response target", "No weekly plan cap on client emails"],
   },
 ];
 

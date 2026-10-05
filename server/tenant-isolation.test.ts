@@ -197,6 +197,7 @@ before(async () => {
   await registerRoutes(server, app, {
     storage: store.storage,
     isAuthenticated: authenticate,
+    platformStaff: { get: async () => undefined, list: async () => [], setAccess: async () => {} },
     sendBookingNotificationEmail: async () => {},
     createMandateLink: async () => {
       throw new Error("not used in this suite");

@@ -83,7 +83,7 @@ export default function Admin() {
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Admin Overview</h1>
+        <h1 className="text-2xl font-bold">Practice tools</h1>
         <p className="text-sm text-muted-foreground">{today}</p>
       </div>
 
@@ -223,7 +223,7 @@ export default function Admin() {
         <CardContent className="space-y-2">
           <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
             <span className="text-sm text-muted-foreground">Auth Provider</span>
-            <Badge variant="outline" className="text-xs">Replit Auth (OIDC)</Badge>
+            <Badge variant="outline" className="text-xs">Supabase Auth</Badge>
           </div>
           <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-1 py-2 border-b">
             <span className="text-sm text-muted-foreground">Email Provider</span>

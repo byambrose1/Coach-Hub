@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, Link, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery, useMutation } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,7 +8,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/app-sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { PublicSeo } from "@/components/public-seo";
-import { Loader2, ShieldCheck, AlertTriangle, X } from "lucide-react";
+import { Loader2, ShieldCheck, AlertTriangle, X, LockKeyhole } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Schedule from "@/pages/schedule";
@@ -148,7 +148,8 @@ function Router() {
       <Route path="/clients" component={Clients} />
       <Route path="/payments" component={Payments} />
       <Route path="/settings" component={SettingsPage} />
-      <Route path="/admin" component={Admin} />
+      <Route path="/practice-admin" component={Admin} />
+      <Route path="/admin" component={PlatformAdmin} />
       <Route path="/platform-admin" component={PlatformAdmin} />
       <Route path="/platform-admin/waitlist" component={PlatformAdminWaitlist} />
       <Route path="/platform-admin/blog" component={PlatformAdminBlog} />
@@ -172,6 +173,45 @@ function PublicRouter() {
       <Route component={Landing} />
     </Switch>
   );
+}
+
+function ProtectedSignIn() {
+  const [location] = useLocation();
+  const isPlatformAdmin = location === "/admin" || location.startsWith("/platform-admin");
+  const isPracticeAdmin = location === "/practice-admin";
+  const area = isPlatformAdmin ? "owner and account-manager workspace" : isPracticeAdmin ? "practice tools" : "coach workspace";
+  return (
+    <main className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-10">
+      <section className="w-full max-w-md rounded-xl border bg-card p-6 shadow-sm sm:p-8">
+        <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <LockKeyhole className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Practably · protected area</p>
+        <h1 className="mt-2 text-2xl font-bold">Sign in to continue</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          This {area} needs an authenticated account. Sign in using the same hostname where your account is registered (for example, keep the www or non-www address consistent).
+        </p>
+        {(isPlatformAdmin || isPracticeAdmin) && (
+          <p className="mt-3 rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
+            {isPlatformAdmin
+              ? "Platform Admin is for the verified owner and authorised account managers. Owner-only controls remain restricted."
+              : "Practice tools shows your own practice overview. Platform Admin is a separate owner/account-manager area."}
+          </p>
+        )}
+        <Link href="/login" className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          Go to sign in
+        </Link>
+        <Link href="/" className="mt-4 inline-flex min-h-10 w-full items-center justify-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
+          Back to Practably
+        </Link>
+      </section>
+    </main>
+  );
+}
+
+function isProtectedPath(path: string) {
+  return path === "/schedule" || path === "/clients" || path === "/payments" || path === "/settings"
+    || path === "/practice-admin" || path === "/admin" || path.startsWith("/platform-admin");
 }
 
 function AuthenticatedApp() {
@@ -225,6 +265,7 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
+    if (isProtectedPath(location)) return <ProtectedSignIn />;
     return <PublicRouter />;
   }
 

@@ -39,7 +39,7 @@ interface InvoiceEmailData {
   paymentMethods?: Settings;
 }
 
-export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
+export async function sendInvoiceEmail(data: InvoiceEmailData, options: { overdueReminder?: boolean } = {}): Promise<void> {
   const { clientName, clientEmail, invoiceNumber, amount, currency, dueDate, notes, trainerName, businessName, businessAddress, trainerEmail, paymentMethods } = data;
   const { senderName, senderEmail, replyTo } = getSenderIdentity(trainerName, businessName, trainerEmail);
 
@@ -82,7 +82,7 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
 
   try {
     await brevo.transactionalEmails.sendTransacEmail({
-      subject: `Invoice ${invoiceNumber} from ${senderName}`,
+      subject: `${options.overdueReminder ? "Overdue invoice reminder" : "Invoice"} ${invoiceNumber} from ${senderName}`,
       htmlContent,
       sender: { name: senderName, email: senderEmail },
       to: [{ email: clientEmail, name: clientName }],
@@ -93,6 +93,13 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
     logError("Failed to send invoice email", error);
     throw error;
   }
+}
+
+export async function sendInvoiceReminderEmail(data: InvoiceEmailData): Promise<void> {
+  await sendInvoiceEmail({
+    ...data,
+    notes: `Payment reminder: the due date for this unpaid invoice has passed. Please arrange payment or contact your coach if it has already been paid.${data.notes ? `\n\n${data.notes}` : ""}`,
+  }, { overdueReminder: true });
 }
 
 export async function sendBookingNotificationEmail(data: {
@@ -138,6 +145,7 @@ export async function sendBookingNotificationEmail(data: {
     console.log("Booking notification sent");
   } catch (error) {
     logError("Failed to send booking notification", error);
+    throw error;
   }
 }
 
@@ -184,6 +192,7 @@ export async function sendSessionCancellationEmail(data: {
     console.log("Cancellation notification sent");
   } catch (error) {
     logError("Failed to send cancellation email", error);
+    throw error;
   }
 }
 
@@ -233,6 +242,7 @@ export async function sendSessionRescheduleEmail(data: {
     console.log("Reschedule notification sent");
   } catch (error) {
     logError("Failed to send reschedule email", error);
+    throw error;
   }
 }
 

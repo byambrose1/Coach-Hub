@@ -22,6 +22,7 @@ import { trackActivationEvent } from "@/lib/activation";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { UpgradeNotice } from "@/components/upgrade-notice";
 import { CustomFormsPanel } from "@/components/custom-forms-panel";
+import { emailNotificationFeedback } from "@/lib/email-notification-feedback";
 
 function formatDateUK(dateStr: string): string {
   try {
@@ -210,11 +211,15 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
       });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (payload) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      if (payload && typeof payload === "object" && "emailNotifications" in payload) {
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications/usage"] });
+      }
       setBookSessionOpen(false);
-      toast({ title: "Session booked successfully" });
+      const feedback = emailNotificationFeedback(payload, "Session booking");
+      toast({ title: feedback.title, description: feedback.description, variant: feedback.variant });
       trackActivationEvent("first_booking_created");
       setBookFormData({ date: format(new Date(), "yyyy-MM-dd"), startTime: "09:00", endTime: "10:00", sessionType: "1:1", location: "" });
     },
@@ -381,13 +386,15 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
       const res = await apiRequest("POST", "/api/parq/send-email", { clientId: client.id });
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: "PAR-Q email sent", description: `PAR-Q form sent to ${currentClient.email}` });
+    onSuccess: (payload) => {
+      const feedback = emailNotificationFeedback(payload, "PAR-Q link request");
+      toast({ title: feedback.title, description: feedback.description, variant: feedback.variant });
       trackActivationEvent("first_parq_form_sent");
     },
     onError: (err: Error) => {
       toast({ title: "Failed to send email", description: err.message, variant: "destructive" });
-    }
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["/api/notifications/usage"] }),
   });
 
   const handleExportData = async () => {
@@ -654,7 +661,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant={remaining <= 2 && p.status === "active" ? "destructive" : "secondary"} className="text-xs">
+                          <Badge variant={remaining <= 3 && p.status === "active" ? "destructive" : "secondary"} className="text-xs">
                             {remaining} left
                           </Badge>
                           {!isEditingThis && (
