@@ -56,7 +56,7 @@ integrations = ["javascript_log_in_with_replit:2.0.0"]
 [userenv]
 
 [userenv.shared]
-OWNER_USER_ID = "43697825"
+OWNER_USER_ID = "supabase:yartgvevnpvcuagaqfur.supabase.co:26bb50ae-06ae-486f-94f8-2b03cef9958d"
 STRIPE_AUTOMATIC_TAX_ENABLED = "false"
 STRIPE_BUSINESS_PRICE_ID = "price_1UK1xQEjwvi9YwHHwCTzHzu2"
 STRIPE_PORTAL_CONFIGURATION_ID = "bpc_1UMe9lEjwvi9YwHHHdT54uMG"
