@@ -29,6 +29,7 @@ import { apiRequest } from "./lib/queryClient";
 import { PrivacyPage, TermsPage, SupportPage } from "@/pages/public";
 import { BlogListPage, BlogPostPage } from "@/pages/blog";
 import { trackActivationEvent } from "@/lib/activation";
+import { publicSite } from "@shared/public-site";
 import { captureAttributionFromUrl } from "@/lib/attribution";
 import LoginPage from "@/pages/login";
 import PublicFormPage from "@/pages/public-form";
@@ -44,19 +45,23 @@ function TermsModal() {
   });
   const [open, setOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
-  const isLegalPage = ["/terms", "/privacy", "/support", "/login", "/f"].includes(location);
+  // /settings stays reachable even with outstanding terms, so a coach who
+  // doesn't want to accept a changed version can still cancel, request a
+  // refund, delete their account or export their data.
+  const isExemptPage = ["/terms", "/privacy", "/support", "/login", "/f", "/settings"].includes(location);
+  const needsAcceptance = !!settings && (!settings.hasAcceptedTerms || settings.termsAcceptedVersion !== publicSite.termsVersion);
 
   useEffect(() => {
-    if (isAuthenticated && settings && !settings.hasAcceptedTerms && !isLegalPage) {
+    if (isAuthenticated && needsAcceptance && !isExemptPage) {
       setOpen(true);
-    } else if (isLegalPage) {
+    } else if (isExemptPage) {
       setOpen(false);
     }
-  }, [isAuthenticated, settings, isLegalPage]);
+  }, [isAuthenticated, needsAcceptance, isExemptPage]);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("PUT", "/api/settings", { ...settings, hasAcceptedTerms: true });
+      await apiRequest("POST", "/api/settings/accept-terms");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });

@@ -8,6 +8,9 @@ export const publicSite = {
   contactAddress: "Unit 29 Highcroft Industrial Estate, Enterprise Road, Waterlooville, England, PO8 0BT",
   governingLaw: "England and Wales",
   effectiveDate: "2 October 2026",
+  // Changing this forces every coach to re-accept the terms modal - bump it
+  // whenever termsSections/privacySections materially change.
+  termsVersion: "2026-10-02",
   vatTreatment: "Practably is not VAT-registered, so no VAT is added to these prices.",
   paymentProviderFees: "Your Practably subscription is billed via Stripe. How you charge your own clients is your own arrangement; Practably does not process, hold, or take any share of payments between you and your clients.",
   cancellationTerms: "You can cancel or downgrade a paid plan from Manage billing in Settings. Normal cancellation stops renewal at the end of the paid billing period. If your client count exceeds the resulting plan limit, existing data is retained but you cannot add clients until you are within the limit. Unused portions of a billing period are not automatically refunded.",

@@ -1,4 +1,4 @@
-import { publicPlansFromConfig } from "@shared/public-site";
+import { publicPlansFromConfig, publicSite } from "@shared/public-site";
 import { registerCustomFormRoutes } from "./custom-form-routes";
 import { featureMinimumPlan, featureLabels, hasFeature, type FeatureName } from "@shared/subscription-features";
 import { revenueReport } from "./revenue-report";
@@ -476,7 +476,9 @@ export async function registerRoutes(
   app.use("/api/forms", isAuthenticated);
   app.use("/api/referrals", isAuthenticated);
   app.use("/api/invoices", isAuthenticated);
-  registerCustomFormRoutes(app, { storage, isAuthenticated, getUserId });
+  // Document uploads are disabled for launch - see the comment on
+  // registerFormDocumentRoutes for why and how to re-enable.
+  registerCustomFormRoutes(app, { storage, isAuthenticated, getUserId, documentUploadsEnabled: false });
 
   const resolveStripePrice = async (plan: string): Promise<string> => {
     const priceId = getStripePriceId(plan);
@@ -2119,6 +2121,11 @@ export async function registerRoutes(
     delete settingsInput.stripeSubscriptionId;
     delete settingsInput.subscriptionPlan;
     delete settingsInput.subscriptionStatus;
+    // Terms acceptance is only ever stamped by POST /api/settings/accept-terms,
+    // with a server-generated version and timestamp - never from this body.
+    delete settingsInput.hasAcceptedTerms;
+    delete settingsInput.termsAcceptedVersion;
+    delete settingsInput.termsAcceptedAt;
     const parsed = insertSettingsSchema.partial().safeParse(settingsInput);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     let existing;
@@ -2142,6 +2149,16 @@ export async function registerRoutes(
       if (!await requireFeature(res, userId, "emailNotifications")) return;
     }
     const s = await storage.upsertSettings(userId, parsed.data);
+    res.json(s);
+  });
+
+  app.post("/api/settings/accept-terms", async (req, res) => {
+    const userId = getUserId(req);
+    const s = await storage.upsertSettings(userId, {
+      hasAcceptedTerms: true,
+      termsAcceptedVersion: publicSite.termsVersion,
+      termsAcceptedAt: new Date(),
+    });
     res.json(s);
   });
 

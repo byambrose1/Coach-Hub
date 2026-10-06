@@ -11,8 +11,24 @@ import { logError } from "./safe-logging";
 export function registerFormDocumentRoutes(app: Express, deps: {
   forms: CustomFormStorage; documents?: FormDocumentStorage; isAuthenticated: RequestHandler;
   getUserId: (request: any) => string; protect: RequestHandler;
+  // Uploaded documents are validated (type, size, signature) but not
+  // malware-scanned, which isn't safe to expose to the public internet yet.
+  // Defaults to enabled so existing callers/tests are unaffected; the real
+  // production wiring in routes.ts passes false until scanning exists.
+  documentUploadsEnabled?: boolean;
 }) {
   const documents = deps.documents || formDocumentStorage;
+  if (deps.documentUploadsEnabled === false) {
+    const disabled: RequestHandler = (_req, res) => {
+      res.status(503).json({ message: "Document uploads are temporarily unavailable. Please try again later." });
+    };
+    app.post("/api/public-forms/documents", disabled);
+    app.delete("/api/public-forms/documents/:documentId", disabled);
+    app.post("/api/form-requests/:id/documents", disabled);
+    app.delete("/api/form-requests/:id/documents/:documentId", disabled);
+    app.get("/api/form-documents/:documentId/download", disabled);
+    return;
+  }
   const handle = (operation: RequestHandler): RequestHandler => async (req, res, next) => {
     try { await operation(req, res, next); }
     catch (error) {

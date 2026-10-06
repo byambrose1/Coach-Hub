@@ -114,6 +114,10 @@ export const settings = pgTable("settings", {
   termsAccepted: boolean("terms_accepted").default(false),
   currency: text("currency").default("£"),
   hasAcceptedTerms: boolean("has_accepted_terms").default(false),
+  // Set only by POST /api/settings/accept-terms, server-side - never trust a
+  // client-supplied version/timestamp for these.
+  termsAcceptedVersion: text("terms_accepted_version"),
+  termsAcceptedAt: timestamp("terms_accepted_at"),
   cancellationNoticeHours: integer("cancellation_notice_hours").default(24),
   timezone: text("timezone").default("Europe/London"),
   onboardingProgress: text("onboarding_progress").default("{}"),
