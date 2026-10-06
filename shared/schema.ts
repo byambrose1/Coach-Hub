@@ -109,6 +109,13 @@ export const settings = pgTable("settings", {
   subscriptionPlan: text("subscription_plan").default("free"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
+  // True when subscriptionPlan was set by an owner's manual override
+  // (platform-admin "change plan"), not a real Stripe subscription. Cleared
+  // automatically the moment a real Stripe webhook event writes this coach's
+  // subscription state. Lets billing checks recognise "nothing to verify in
+  // Stripe here" instead of surfacing a stale-reference error.
+  planGrantedManually: boolean("plan_granted_manually").default(false),
+  manualPlanExpiresAt: timestamp("manual_plan_expires_at"),
   hipaaCompliant: boolean("hipaa_compliant").default(false),
   dataRetentionDays: integer("data_retention_days").default(365),
   termsAccepted: boolean("terms_accepted").default(false),

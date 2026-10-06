@@ -4,8 +4,13 @@ export function isUnpaidBillingSetup(settings: {
   subscriptionPlan?: string | null;
   subscriptionStatus?: string | null;
   stripeSubscriptionId?: string | null;
+  planGrantedManually?: boolean | null;
 } | undefined): boolean {
-  return !!settings && settings.subscriptionPlan === "free"
+  if (!settings) return false;
+  // A plan an admin granted manually was never real Stripe billing, however
+  // it looks - there is nothing for Stripe-ownership checks to verify.
+  if (settings.planGrantedManually) return true;
+  return settings.subscriptionPlan === "free"
     && !settings.stripeSubscriptionId
     && (!settings.subscriptionStatus || settings.subscriptionStatus === "trial");
 }

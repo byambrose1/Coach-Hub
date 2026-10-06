@@ -580,6 +580,10 @@ export async function registerRoutes(
       stripeSubscriptionId: subscription.id,
       subscriptionPlan: entitled ? plan : preservedPlan || "free",
       subscriptionStatus: status,
+      // A real Stripe event means this plan is no longer just an admin's
+      // manual grant - clear that tracking so it doesn't linger stale.
+      planGrantedManually: false,
+      manualPlanExpiresAt: null,
     });
   };
 
@@ -1531,11 +1535,28 @@ export async function registerRoutes(
   app.patch("/api/platform-admin/coaches/:coachId/plan", isAuthenticated, async (req, res) => {
     if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
     try {
-      const { plan } = req.body;
+      const { plan, expiresAt } = req.body;
       if (!["free", "starter", "professional", "business"].includes(plan)) {
         return res.status(400).json({ message: "Invalid plan" });
       }
-      await storage.updateCoachPlan(getRouteParam(req.params.coachId), plan);
+      let expiry: Date | null = null;
+      if (expiresAt !== undefined && expiresAt !== null && expiresAt !== "") {
+        expiry = new Date(expiresAt);
+        if (Number.isNaN(expiry.getTime()) || expiry.getTime() <= Date.now()) {
+          return res.status(400).json({ message: "Expiry date must be a valid date in the future." });
+        }
+      }
+      await storage.updateCoachPlan(getRouteParam(req.params.coachId), plan, expiry);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/platform-admin/coaches/:coachId/clear-billing-reference", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    try {
+      await storage.clearBillingReference(getRouteParam(req.params.coachId));
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
