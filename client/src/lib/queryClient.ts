@@ -1,5 +1,5 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { responseError } from "./api-error";
+import { QueryClient, QueryCache, MutationCache, QueryFunction } from "@tanstack/react-query";
+import { responseError, ApiError } from "./api-error";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -44,7 +44,22 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+// A 401 from any query or mutation - not just the auth-status check itself -
+// means the session has expired server-side. Without this, nothing refetches
+// auth status on its own (refetchOnWindowFocus/refetchInterval are both off
+// above), so the UI would otherwise keep showing a signed-in app indefinitely
+// against a session that no longer exists. Flipping the cached auth-status
+// query to null here is what makes useAuth()'s isAuthenticated go false and
+// the app fall back to the signed-out view immediately.
+function handlePossibleSessionExpiry(error: unknown) {
+  if (error instanceof ApiError && error.status === 401) {
+    queryClient.setQueryData(["/api/auth/status"], null);
+  }
+}
+
 export const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: handlePossibleSessionExpiry }),
+  mutationCache: new MutationCache({ onError: handlePossibleSessionExpiry }),
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
