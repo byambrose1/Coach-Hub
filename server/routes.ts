@@ -104,6 +104,16 @@ function withoutOwnershipFields(body: any) {
   return data;
 }
 
+// A create-flow that stores a clientId (or similar foreign reference) supplied
+// in the request body must confirm that id actually belongs to the signed-in
+// coach before writing it - otherwise one coach's body could point a new
+// record at another coach's client/package by id. storage.getClient already
+// scopes its lookup by userId, so a mismatched id simply resolves to undefined.
+async function ownsClient(storage: IStorage, userId: string, clientId: unknown): Promise<boolean> {
+  if (typeof clientId !== "string" || !clientId) return false;
+  return !!(await storage.getClient(userId, clientId));
+}
+
 function withoutSessionReminderKey(session: Session) {
   const { reminderSentKey: _reminderSentKey, ...publicSession } = session;
   return publicSession;
@@ -1764,6 +1774,9 @@ export async function registerRoutes(
     const userId = getUserId(req);
     const parsed = insertSessionSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    if (parsed.data.clientId !== "__blocked__" && !await ownsClient(storage, userId, parsed.data.clientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
 
     const existingSessions = await storage.getSessions(userId);
     const conflict = findSchedulingConflict(existingSessions, parsed.data);
@@ -1834,6 +1847,10 @@ export async function registerRoutes(
     const userId = getUserId(req);
     const existing = await storage.getSession(userId, req.params.id);
     if (!existing) return res.status(404).json({ message: "Session not found" });
+    if (req.body.clientId !== undefined && req.body.clientId !== "__blocked__" &&
+        !await ownsClient(storage, userId, req.body.clientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
 
     const isReschedule = req.body.date !== undefined || req.body.startTime !== undefined || req.body.endTime !== undefined;
     if (isReschedule) {
@@ -1934,6 +1951,9 @@ export async function registerRoutes(
         !await requireFeature(res, userId, "paymentTracking")) return;
     const parsed = insertPackageSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    if (!await ownsClient(storage, userId, parsed.data.clientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
     const pkg = await storage.createPackage(userId, parsed.data);
     res.status(201).json(pkg);
   });
@@ -1942,6 +1962,9 @@ export async function registerRoutes(
     const userId = getUserId(req);
     if ((req.body.billingType === "monthly" || req.body.monthlyRate || req.body.nextBillingDate) &&
         !await requireFeature(res, userId, "paymentTracking")) return;
+    if (req.body.clientId !== undefined && !await ownsClient(storage, userId, req.body.clientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
     const pkg = await storage.updatePackage(userId, req.params.id, withoutOwnershipFields(req.body));
     if (!pkg) return res.status(404).json({ message: "Package not found" });
     if (req.body.billingType === "monthly" && !req.body.nextBillingDate && !pkg.nextBillingDate) {
@@ -2048,12 +2071,19 @@ export async function registerRoutes(
     const userId = getUserId(req);
     const parsed = insertSessionNoteSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    if (!await ownsClient(storage, userId, parsed.data.clientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
     const note = await storage.createNote(userId, parsed.data);
     res.status(201).json(note);
   });
 
   app.patch("/api/notes/:id", async (req, res) => {
-    const note = await storage.updateNote(getUserId(req), req.params.id, withoutOwnershipFields(req.body));
+    const userId = getUserId(req);
+    if (req.body.clientId !== undefined && !await ownsClient(storage, userId, req.body.clientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+    const note = await storage.updateNote(userId, req.params.id, withoutOwnershipFields(req.body));
     if (!note) return res.status(404).json({ message: "Note not found" });
     res.json(note);
   });
@@ -2132,12 +2162,19 @@ export async function registerRoutes(
     const userId = getUserId(req);
     const parsed = insertClientFormSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    if (!await ownsClient(storage, userId, parsed.data.clientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
     const form = await storage.createClientForm(userId, parsed.data);
     res.status(201).json(form);
   });
 
   app.patch("/api/forms/:id", async (req, res) => {
-    const form = await storage.updateClientForm(getUserId(req), req.params.id, withoutOwnershipFields(req.body));
+    const userId = getUserId(req);
+    if (req.body.clientId !== undefined && !await ownsClient(storage, userId, req.body.clientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+    const form = await storage.updateClientForm(userId, req.params.id, withoutOwnershipFields(req.body));
     if (!form) return res.status(404).json({ message: "Form not found" });
     res.json(form);
   });
@@ -2161,12 +2198,25 @@ export async function registerRoutes(
     const userId = getUserId(req);
     const parsed = insertReferralSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    if (!await ownsClient(storage, userId, parsed.data.referrerClientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+    if (parsed.data.referredClientId && !await ownsClient(storage, userId, parsed.data.referredClientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
     const ref = await storage.createReferral(userId, parsed.data);
     res.status(201).json(ref);
   });
 
   app.patch("/api/referrals/:id", async (req, res) => {
-    const ref = await storage.updateReferral(getUserId(req), req.params.id, withoutOwnershipFields(req.body));
+    const userId = getUserId(req);
+    if (req.body.referrerClientId !== undefined && !await ownsClient(storage, userId, req.body.referrerClientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+    if (req.body.referredClientId && !await ownsClient(storage, userId, req.body.referredClientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+    const ref = await storage.updateReferral(userId, req.params.id, withoutOwnershipFields(req.body));
     if (!ref) return res.status(404).json({ message: "Referral not found" });
     res.json(ref);
   });
@@ -2242,6 +2292,12 @@ export async function registerRoutes(
         !await requireFeature(res, userId, "paymentTracking")) return;
     const parsed = insertInvoiceSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    if (!await ownsClient(storage, userId, parsed.data.clientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+    if (parsed.data.packageId && !await storage.getPackage(userId, parsed.data.packageId)) {
+      return res.status(404).json({ message: "Package not found" });
+    }
     const inv = await storage.createInvoice(userId, parsed.data);
     res.status(201).json(inv);
   });
@@ -2256,6 +2312,12 @@ export async function registerRoutes(
     if (!await requireFeature(res, userId, feature)) return;
     if (req.body.status !== undefined && !["pending", "paid", "sent", "overdue"].includes(req.body.status)) {
       return res.status(400).json({ message: "Invalid invoice status" });
+    }
+    if (req.body.clientId !== undefined && !await ownsClient(storage, userId, req.body.clientId)) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+    if (req.body.packageId && !await storage.getPackage(userId, req.body.packageId)) {
+      return res.status(404).json({ message: "Package not found" });
     }
     const inv = await storage.updateInvoice(userId, req.params.id, withoutOwnershipFields(req.body));
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
