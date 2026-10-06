@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ArrowLeft, Users, Calendar, DollarSign, Eye, Crown, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -43,18 +46,37 @@ export default function PlatformAdminCoach() {
   const { data: role } = useQuery<{ role: "owner" | "support" }>({ queryKey: ["/api/platform-admin/role"] });
   const isOwner = role?.role === "owner";
   const isOwnAccount = authUser?.id === coachId;
+  const [expiryDate, setExpiryDate] = useState("");
 
   const planMutation = useMutation({
     mutationFn: async (plan: string) => {
       if (!isOwner) throw new Error("Only the verified owner can change billing plans.");
-      await apiRequest("PATCH", `/api/platform-admin/coaches/${coachId}/plan`, { plan });
+      await apiRequest("PATCH", `/api/platform-admin/coaches/${coachId}/plan`, {
+        plan,
+        expiresAt: expiryDate || undefined,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/platform-admin/coaches", coachId] });
       toast({ title: "Plan updated successfully" });
+      setExpiryDate("");
     },
     onError: () => {
       toast({ title: "Failed to update plan", variant: "destructive" });
+    },
+  });
+
+  const clearBillingMutation = useMutation({
+    mutationFn: async () => {
+      if (!isOwner) throw new Error("Only the verified owner can reconnect billing.");
+      await apiRequest("POST", `/api/platform-admin/coaches/${coachId}/clear-billing-reference`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/platform-admin/coaches", coachId] });
+      toast({ title: "Billing reference cleared", description: "The next upgrade will connect a fresh Stripe customer." });
+    },
+    onError: () => {
+      toast({ title: "Failed to clear billing reference", variant: "destructive" });
     },
   });
 
@@ -95,7 +117,7 @@ export default function PlatformAdminCoach() {
     );
   }
 
-  const { coach, clients, stats, plan } = data;
+  const { coach, clients, stats, plan, planGrantedManually, manualPlanExpiresAt, stripeCustomerId } = data;
   const isCurrentlyImpersonating = authUser?.impersonatedUserId === coachId;
 
   return (
@@ -203,13 +225,63 @@ export default function PlatformAdminCoach() {
             )}
             {planMutation.isPending && <span className="text-sm text-muted-foreground">Saving…</span>}
           </div>
+          {isOwner && (
+            <div className="flex flex-col gap-1.5 max-w-sm">
+              <Label htmlFor="plan-expiry" className="text-xs text-muted-foreground">
+                Auto-revert to Free on (optional - leave blank for a permanent manual grant)
+              </Label>
+              <Input
+                id="plan-expiry"
+                type="date"
+                className="min-h-11"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                data-testid="input-plan-expiry"
+              />
+            </div>
+          )}
+          {planGrantedManually && (
+            <Badge variant="outline" className="w-fit text-xs" data-testid="badge-manual-grant">
+              Manually granted{manualPlanExpiresAt ? ` · reverts to Free on ${format(new Date(manualPlanExpiresAt), "dd/MM/yyyy")}` : " · no expiry set"}
+            </Badge>
+          )}
           <p className="text-sm text-muted-foreground">
             {isOwner
-              ? "Subscription billing is handled through verified checkout. Do not use this control to record a purchase or bypass payment confirmation."
+              ? "Subscription billing is handled through verified checkout. Use the date above only to comp a plan manually (e.g. a free month) - it never charges a card or creates a Stripe subscription."
               : "Account managers can review plan status and help troubleshoot, but cannot change pricing or billing plans."}
           </p>
         </CardContent>
       </Card>
+
+      {isOwner && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+              Billing Connection
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {stripeCustomerId
+                ? "This coach has a saved Stripe customer reference. If upgrade/refund/portal actions say it can't be found (e.g. after a Stripe account switch), clear it here - the next real checkout will connect a fresh one. This never affects app access or existing payment history."
+                : "No Stripe customer reference saved yet - nothing to clear."}
+            </p>
+            {stripeCustomerId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => clearBillingMutation.mutate()}
+                disabled={clearBillingMutation.isPending}
+                data-testid="button-clear-billing-reference"
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                {clearBillingMutation.isPending ? "Clearing…" : "Clear billing reference"}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

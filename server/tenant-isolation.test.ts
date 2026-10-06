@@ -127,6 +127,7 @@ function makeStore() {
     upsertPlatformConfig: async (data) => ({ id: "default", ...data } as any),
     getCoachDetail: async () => undefined as unknown as CoachDetail,
     updateCoachPlan: async () => {},
+    clearBillingReference: async () => {},
 
     createWaitlistSignup: async (data) => withId(state.waitlist, "", data) as any,
     getWaitlistSignupByEmail: async (email) => state.waitlist.find((w) => w.email === email) as any,

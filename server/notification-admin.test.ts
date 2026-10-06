@@ -66,6 +66,7 @@ before(async () => {
       getPlatformConfig: async () => ({}),
       getCoachDetail: async (id: string) => accounts.some(a => a.id === id) ? { coach: accounts.find(a => a.id === id) } : undefined,
       updateCoachPlan: async () => { writes++; },
+      clearBillingReference: async () => {},
       getClients: async () => [],
       getClient: async (_id: string, id: string) => id === "client" ? { id, name: "Client fixture", email: "client@example.test" } : undefined,
       getSessions: async () => [...records.values()],

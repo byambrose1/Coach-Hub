@@ -71,7 +71,8 @@ export interface IStorage {
   getPlatformConfig(): Promise<PlatformConfig>;
   upsertPlatformConfig(data: Partial<PlatformConfig>): Promise<PlatformConfig>;
   getCoachDetail(coachId: string): Promise<CoachDetail | undefined>;
-  updateCoachPlan(coachId: string, plan: string): Promise<void>;
+  updateCoachPlan(coachId: string, plan: string, expiresAt?: Date | null): Promise<void>;
+  clearBillingReference(coachId: string): Promise<void>;
 
   // Waitlist signups
   createWaitlistSignup(data: InsertWaitlistSignup): Promise<WaitlistSignup>;
@@ -97,6 +98,9 @@ export interface CoachDetail {
     totalRevenue: number;
   };
   plan: string;
+  planGrantedManually: boolean;
+  manualPlanExpiresAt: string | null;
+  stripeCustomerId: string | null;
 }
 
 export interface PlatformStats {
@@ -214,7 +218,21 @@ export class DatabaseStorage implements IStorage {
 
   async getSettings(userId: string): Promise<Settings | undefined> {
     const rows = await db.select().from(settings).where(eq(settings.id, userId));
-    return rows[0];
+    const row = rows[0];
+    // A manually-granted plan with a past expiry reverts to Free the next
+    // time anything reads this coach's settings - no cron job needed, and
+    // every caller (this coach's own app, platform admin, Stripe checks)
+    // sees the reverted state consistently from here on.
+    if (row?.planGrantedManually && row.manualPlanExpiresAt && row.manualPlanExpiresAt.getTime() <= Date.now()) {
+      const [reverted] = await db.update(settings).set({
+        subscriptionPlan: "free",
+        subscriptionStatus: "trial",
+        planGrantedManually: false,
+        manualPlanExpiresAt: null,
+      }).where(eq(settings.id, userId)).returning();
+      return reverted;
+    }
+    return row;
   }
 
   async getSettingsByStripeSubscriptionId(subscriptionId: string): Promise<Settings | undefined> {
@@ -345,16 +363,29 @@ export class DatabaseStorage implements IStorage {
       clients: coachClients,
       stats: { totalClients: coachClients.length, totalSessions: coachSessions.length, totalRevenue },
       plan: coachSettings[0]?.subscriptionPlan || "free",
+      planGrantedManually: coachSettings[0]?.planGrantedManually || false,
+      manualPlanExpiresAt: coachSettings[0]?.manualPlanExpiresAt?.toISOString() || null,
+      stripeCustomerId: coachSettings[0]?.stripeCustomerId || null,
     };
   }
 
-  async updateCoachPlan(coachId: string, plan: string): Promise<void> {
+  async updateCoachPlan(coachId: string, plan: string, expiresAt?: Date | null): Promise<void> {
     const existing = await db.select().from(settings).where(eq(settings.id, coachId));
+    const fields = {
+      subscriptionPlan: plan,
+      subscriptionStatus: plan === "free" ? "trial" : "active",
+      planGrantedManually: true,
+      manualPlanExpiresAt: expiresAt ?? null,
+    };
     if (existing[0]) {
-      await db.update(settings).set({ subscriptionPlan: plan, subscriptionStatus: plan === "free" ? "trial" : "active" }).where(eq(settings.id, coachId));
+      await db.update(settings).set(fields).where(eq(settings.id, coachId));
     } else {
-      await db.insert(settings).values({ id: coachId, trainerName: "Coach", subscriptionPlan: plan, subscriptionStatus: plan === "free" ? "trial" : "active" });
+      await db.insert(settings).values({ id: coachId, trainerName: "Coach", ...fields });
     }
+  }
+
+  async clearBillingReference(coachId: string): Promise<void> {
+    await db.update(settings).set({ stripeCustomerId: null, stripeSubscriptionId: null }).where(eq(settings.id, coachId));
   }
 
   async getPlatformStats(): Promise<PlatformStats> {
