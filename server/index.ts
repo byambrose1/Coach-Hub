@@ -6,6 +6,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { createApiRequestLogger, logError } from "./safe-logging";
 import { securityHeaders } from "./security-headers";
+import { startSessionReminderScheduler } from "./session-reminders";
 
 const app = express();
 app.disable("x-powered-by");
@@ -117,6 +118,10 @@ app.use(
     },
     () => {
       log(`serving on port ${port}`);
+      if (process.env.NODE_ENV === "production") {
+        const stopSessionReminders = startSessionReminderScheduler();
+        httpServer.once("close", stopSessionReminders);
+      }
     },
   );
 })();

@@ -528,8 +528,6 @@ export default function SettingsPage() {
       const payload = Object.fromEntries(
         Object.entries(data).filter(([field]) =>
           !SERVER_MANAGED_SETTINGS_FIELDS.has(field)
-          && field !== "enableSessionReminders"
-          && field !== "reminderHoursBefore"
           && (canEditBusinessDetails || (field !== "businessName" && field !== "businessAddress"))
         ),
       );
@@ -926,7 +924,11 @@ export default function SettingsPage() {
             </div>
             <Switch
               checked={formData.enableEmailNotifications}
-              onCheckedChange={(v) => setFormData({ ...formData, enableEmailNotifications: v })}
+              onCheckedChange={(v) => setFormData({
+                ...formData,
+                enableEmailNotifications: v,
+                ...(v ? {} : { enableSessionReminders: false }),
+              })}
               id="switch-email-notifications"
               aria-label="Enable client email notifications"
               data-testid="switch-email-notifications"
@@ -972,16 +974,39 @@ export default function SettingsPage() {
           <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Label>Session Reminders</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">Scheduled session reminders are not available yet.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Send one email before each upcoming scheduled session.</p>
             </div>
             <Switch
               checked={formData.enableSessionReminders}
-              disabled
-              aria-label="Scheduled session reminders unavailable"
+              disabled={!formData.enableEmailNotifications}
+              onCheckedChange={(v) => setFormData({ ...formData, enableSessionReminders: v })}
+              aria-label="Enable scheduled session reminders"
               data-testid="switch-session-reminders"
             />
           </div>
-          <p className="text-xs text-muted-foreground">Your saved reminder preference is preserved; Practably does not currently send scheduled session reminders.</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Label htmlFor="input-reminder-hours">Send reminder</Label>
+            <Input
+              id="input-reminder-hours"
+              type="number"
+              min={1}
+              max={168}
+              step={1}
+              value={formData.reminderHoursBefore}
+              disabled={!formData.enableEmailNotifications || !formData.enableSessionReminders}
+              onChange={(event) => {
+                const hours = Number(event.target.value);
+                if (Number.isInteger(hours) && hours >= 1 && hours <= 168) {
+                  setFormData({ ...formData, reminderHoursBefore: hours });
+                }
+              }}
+              className="w-24"
+              aria-label="Hours before session to send reminder"
+              data-testid="input-reminder-hours"
+            />
+            <span className="text-sm text-muted-foreground">hours before the session (1–168)</span>
+          </div>
+          <p className="text-xs text-muted-foreground">Both client email notifications and session reminders must be enabled. Free-plan reminders count toward the weekly 10-email allowance. Emails are attempted once; inbox delivery depends on the email provider.</p>
 
         </CardContent>
       </Card>

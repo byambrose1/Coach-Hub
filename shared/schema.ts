@@ -18,9 +18,11 @@ export const clients = pgTable("clients", {
   status: text("status").default("active"),
   referredBy: varchar("referred_by"),
   referralCode: text("referral_code"),
+  // Retain the populated historical column so schema pushes do not delete legacy mandate data.
+  gocardlessMandateStatus: text("gocardless_mandate_status").default("inactive"),
 });
 
-export const insertClientSchema = createInsertSchema(clients).omit({ id: true });
+export const insertClientSchema = createInsertSchema(clients).omit({ id: true, gocardlessMandateStatus: true });
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 
@@ -36,9 +38,10 @@ export const trainingSessions = pgTable("training_sessions", {
   location: text("location"),
   status: text("status").default("scheduled"),
   notes: text("notes"),
+  reminderSentKey: text("reminder_sent_key"),
 });
 
-export const insertSessionSchema = createInsertSchema(trainingSessions).omit({ id: true });
+export const insertSessionSchema = createInsertSchema(trainingSessions).omit({ id: true, reminderSentKey: true });
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Session = typeof trainingSessions.$inferSelect;
 

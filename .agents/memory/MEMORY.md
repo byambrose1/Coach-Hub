@@ -10,3 +10,4 @@
 - [Subscription feature policy](subscription-feature-policy.md) — real tier restrictions; privacy stays universal; Free invoices carry Practably branding.
 - [Product audience and forms](product-audience-and-forms.md) — independent practices need simple client workflows and configurable forms, not fitness-only PAR-Q.
 - [Private form documents](private-form-document-boundary.md) — bounded uploads reuse the existing privacy boundary; format checks are not malware scanning or identity verification.
+- [Scheduled reminder policy](scheduled-reminder-policy.md) — reminders require both email opt-ins, share the Free quota, and are attempted once per schedule to avoid duplicates.

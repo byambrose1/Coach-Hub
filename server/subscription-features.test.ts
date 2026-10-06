@@ -124,6 +124,24 @@ test("Starter can record payments and view basic reports, not edit/send/broadcas
   assert.equal(Object.hasOwn(report.body, "byClient"), false);
 });
 
+test("scheduled reminders save their interval and require client email notifications", async () => {
+  plan = "free";
+  profile = { enableEmailNotifications: true, enableSessionReminders: false };
+  const enabled = await request("/api/settings", "PUT", {
+    enableSessionReminders: true,
+    reminderHoursBefore: 36,
+  });
+  assert.equal(enabled.status, 200);
+  assert.equal(profile.enableSessionReminders, true);
+  assert.equal(profile.reminderHoursBefore, 36);
+
+  assert.equal((await request("/api/settings", "PUT", { reminderHoursBefore: 0 })).status, 400);
+  assert.equal((await request("/api/settings", "PUT", { reminderHoursBefore: 169 })).status, 400);
+
+  profile = { enableEmailNotifications: false, enableSessionReminders: false };
+  assert.equal((await request("/api/settings", "PUT", { enableSessionReminders: true })).status, 400);
+});
+
 test("Professional gets editing/sending/broadcast but Business filters and custom details stay locked", async () => {
   plan = "professional"; profile = {};
   assert.equal((await request("/api/invoices/invoice", "PATCH", { amount: "25" })).status, 200);

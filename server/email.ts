@@ -149,6 +149,51 @@ export async function sendBookingNotificationEmail(data: {
   }
 }
 
+export async function sendSessionReminderEmail(data: {
+  clientName: string;
+  clientEmail: string;
+  sessionDate: string;
+  sessionTime: string;
+  trainerName: string;
+  businessName?: string;
+  trainerEmail?: string;
+}): Promise<void> {
+  const { clientName, clientEmail, sessionDate, sessionTime, trainerName, businessName, trainerEmail } = data;
+  const { senderName, senderEmail, replyTo } = getSenderIdentity(trainerName, businessName, trainerEmail);
+  const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
+  })[character]!);
+  const safeClientName = escapeHtml(clientName);
+  const safeTrainerName = escapeHtml(trainerName);
+  const safeDate = escapeHtml(sessionDate);
+  const safeTime = escapeHtml(sessionTime);
+  const safeSenderName = escapeHtml(senderName);
+  const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:Arial,sans-serif;background:#f4f4f7;margin:0;padding:24px">
+    <div style="max-width:600px;margin:0 auto;background:#fff;padding:30px;border-radius:8px">
+      <h1 style="color:#2563eb">Upcoming session reminder</h1>
+      <p>Hi ${safeClientName},</p>
+      <p>This is a reminder of your upcoming session with <strong>${safeTrainerName}</strong>.</p>
+      <p><strong>Date:</strong> ${safeDate}<br><strong>Time:</strong> ${safeTime}</p>
+      <p>Please contact your coach if you need to discuss the session.</p>
+      <p style="font-size:12px;color:#888">Sent via Practably by ${safeSenderName}</p>
+    </div>
+  </body></html>`;
+
+  try {
+    await brevo.transactionalEmails.sendTransacEmail({
+      subject: `Session reminder: ${sessionDate}`,
+      htmlContent,
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: clientEmail, name: clientName }],
+      replyTo,
+    });
+    console.log("Session reminder email sent");
+  } catch (error) {
+    logError("Failed to send session reminder", error);
+    throw error;
+  }
+}
+
 export async function sendSessionCancellationEmail(data: {
   clientName: string;
   clientEmail: string;

@@ -104,6 +104,11 @@ function withoutOwnershipFields(body: any) {
   return data;
 }
 
+function withoutSessionReminderKey(session: Session) {
+  const { reminderSentKey: _reminderSentKey, ...publicSession } = session;
+  return publicSession;
+}
+
 function timeToMinutes(time: string): number {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + (minutes || 0);
@@ -1739,20 +1744,20 @@ export async function registerRoutes(
     const clientForms = forms.filter(f => f.clientId === client.id);
     const invoices = await storage.getInvoices(userId);
     const clientInvoices = invoices.filter(i => i.clientId === client.id);
-    res.json({ client, sessions: clientSessions, packages: clientPackages, notes: clientNotes, forms: clientForms, invoices: clientInvoices });
+    res.json({ client, sessions: clientSessions.map(withoutSessionReminderKey), packages: clientPackages, notes: clientNotes, forms: clientForms, invoices: clientInvoices });
   });
 
   // --- Sessions ---
   app.get("/api/sessions", async (req, res) => {
     const userId = getUserId(req);
     const sessions = await storage.getSessions(userId);
-    res.json(sessions);
+    res.json(sessions.map(withoutSessionReminderKey));
   });
 
   app.get("/api/sessions/:id", async (req, res) => {
     const session = await storage.getSession(getUserId(req), req.params.id);
     if (!session) return res.status(404).json({ message: "Session not found" });
-    res.json(session);
+    res.json(withoutSessionReminderKey(session));
   });
 
   app.post("/api/sessions", async (req, res) => {
@@ -1822,7 +1827,7 @@ export async function registerRoutes(
       emailNotifications.push({ kind: "booking", status: "failed", message: "Session booked, but the email notification could not be checked or sent." });
     }
 
-    res.status(201).json({ ...session, emailNotifications });
+    res.status(201).json({ ...withoutSessionReminderKey(session), emailNotifications });
   });
 
   app.patch("/api/sessions/:id", async (req, res) => {
@@ -1905,7 +1910,7 @@ export async function registerRoutes(
       emailNotifications.push({ kind: "session_update", status: "failed", message: "Session saved, but the email notification could not be checked or sent." });
     }
 
-    res.json({ ...session, emailNotifications });
+    res.json({ ...withoutSessionReminderKey(session), emailNotifications });
   });
 
   app.delete("/api/sessions/:id", async (req, res) => {
@@ -2095,8 +2100,16 @@ export async function registerRoutes(
     if (businessChanged && !await requireFeature(res, userId, "customBusinessDetails")) return;
     if (parsed.data.enableEmailNotifications === true && existing?.enableEmailNotifications !== true &&
         !await requireFeature(res, userId, "emailNotifications")) return;
-    if (parsed.data.enableSessionReminders === true && existing?.enableSessionReminders !== true) {
-      return res.status(503).json({ code: "REMINDERS_UNAVAILABLE", message: "Scheduled session reminders are not available yet." });
+    const reminderHoursBefore = parsed.data.reminderHoursBefore;
+    if (reminderHoursBefore != null &&
+        (!Number.isInteger(reminderHoursBefore) || reminderHoursBefore < 1 || reminderHoursBefore > 168)) {
+      return res.status(400).json({ message: "Session reminders must be set between 1 and 168 hours before the session." });
+    }
+    if (parsed.data.enableSessionReminders === true) {
+      if ((parsed.data.enableEmailNotifications ?? existing?.enableEmailNotifications) !== true) {
+        return res.status(400).json({ message: "Turn on client email notifications before enabling scheduled session reminders." });
+      }
+      if (!await requireFeature(res, userId, "emailNotifications")) return;
     }
     const s = await storage.upsertSettings(userId, parsed.data);
     res.json(s);
