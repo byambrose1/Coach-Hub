@@ -13,7 +13,8 @@ const chrome = spawn("chromium", ["--headless", "--no-sandbox", "--disable-gpu",
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const user = { id: "fixture-coach", email: "fixture@example.test", firstName: "Fixture" };
 const client = { id: "fixture-client", userId: user.id, name: "Fixture Client", email: "private@example.test", status: "active" };
-const settings = { id: user.id, subscriptionPlan: "free", hasAcceptedTerms: true, onboardingDismissed: true, trainerName: "Fixture Coach", currency: "£" };
+// termsAcceptedVersion must match shared/public-site.ts's publicSite.termsVersion, or the terms modal blocks this fixture.
+const settings = { id: user.id, subscriptionPlan: "free", hasAcceptedTerms: true, termsAcceptedVersion: "2026-10-02", onboardingDismissed: true, trainerName: "Fixture Coach", currency: "£" };
 let templates = [], requests = [], responses = [], tokens = new Map(), signedIn = true, failSubmission = false;
 let socket, sequence = 0, templateCounter = 0, requestCounter = 0;
 const pending = new Map(), unexpected = [];

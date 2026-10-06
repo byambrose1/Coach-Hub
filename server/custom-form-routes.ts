@@ -22,6 +22,7 @@ export const safeRequest = ({ userId: _owner, tokenHash: _token, ...request }: R
 export function registerCustomFormRoutes(app: Express, deps: {
   storage: Pick<IStorage, "getClient">; isAuthenticated: RequestHandler;
   getUserId: (request: any) => string; forms?: CustomFormStorage; documents?: FormDocumentStorage;
+  documentUploadsEnabled?: boolean;
 }) {
   const forms = deps.forms || customFormStorage;
   const { isAuthenticated, getUserId } = deps;
@@ -45,7 +46,10 @@ export function registerCustomFormRoutes(app: Express, deps: {
   app.use("/api/form-requests", protect, isAuthenticated);
   const publicLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: "draft-7", legacyHeaders: false });
   app.use("/api/public-forms", protect, publicLimiter);
-  registerFormDocumentRoutes(app, { forms, documents: deps.documents, isAuthenticated, getUserId, protect });
+  registerFormDocumentRoutes(app, {
+    forms, documents: deps.documents, isAuthenticated, getUserId, protect,
+    documentUploadsEnabled: deps.documentUploadsEnabled,
+  });
 
   app.get("/api/form-templates", handle(async (req, res) => { res.json((await forms.templates(getUserId(req))).map(safeTemplate)); }));
   app.post("/api/form-templates", handle(async (req, res) => {

@@ -41,7 +41,7 @@ const settings = () => ({
   timezone: "Europe/London", subscriptionPlan: fixture.plan,
   subscriptionStatus: fixture.plan === "free" ? "canceled" : "active",
   stripeCustomerId: "cus_fixture", stripeSubscriptionId: "sub_fixture",
-  hasAcceptedTerms: true, termsAccepted: true, onboardingDismissed: true,
+  hasAcceptedTerms: true, termsAccepted: true, termsAcceptedVersion: "2026-10-02", onboardingDismissed: true,
   lowSessionThreshold: 2, reminderHoursBefore: 24, dataRetentionDays: 365,
   enableEmailNotifications: true, enableSessionReminders: true,
 });

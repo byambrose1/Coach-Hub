@@ -32,7 +32,7 @@ try {
   });
   const user = { id: "ui-coach", email: "test@example.invalid", firstName: "Test" };
   const settings = { id: "ui-settings", userId: user.id, subscriptionPlan: "free",
-    subscriptionStatus: "trial", stripeCustomerId: "cus_stale", termsAccepted: true, hasAcceptedTerms: true };
+    subscriptionStatus: "trial", stripeCustomerId: "cus_stale", termsAccepted: true, hasAcceptedTerms: true, termsAcceptedVersion: "2026-10-02" };
   const apiCalls = [];
   const documentId = "11111111-1111-4111-8111-111111111111";
   const documentQuestion = { id: "evidence", label: "Supporting document", type: "file", required: true };

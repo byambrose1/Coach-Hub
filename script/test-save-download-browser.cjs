@@ -16,7 +16,8 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const user = { id: "fixture-coach", email: "fixture@example.test", firstName: "Fixture", isImpersonating: false };
 const clients = [], packages = [], notes = [];
 const invoice = { id: "fixture-invoice", userId: user.id, clientId: "fixture-client", invoiceNumber: "INV-1234", amount: "12.34", status: "pending", dueDate: "2099-10-10", notes: "Fixture service" };
-const settings = { id: user.id, trainerName: "Fixture Coach", businessName: "Fixture practice", currency: "£", hasAcceptedTerms: true, onboardingDismissed: true, subscriptionPlan: "free", lowSessionThreshold: 2, enableEmailNotifications: false };
+// termsAcceptedVersion must match shared/public-site.ts's publicSite.termsVersion, or the terms modal blocks this fixture.
+const settings = { id: user.id, trainerName: "Fixture Coach", businessName: "Fixture practice", currency: "£", hasAcceptedTerms: true, termsAcceptedVersion: "2026-10-02", onboardingDismissed: true, subscriptionPlan: "free", lowSessionThreshold: 2, enableEmailNotifications: false };
 let socket, sequence = 0, delayReads = false;
 const pending = new Map(), unexpected = [], writes = [];
 function cdp(method, params = {}) {

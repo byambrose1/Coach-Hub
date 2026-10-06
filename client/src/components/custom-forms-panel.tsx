@@ -263,7 +263,7 @@ export function CustomFormsPanel({ clientId, clientName, clientForms, onViewForm
                  }}>
                   <SelectTrigger aria-label="Question type"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                     <SelectItem value="text">Short text</SelectItem><SelectItem value="textarea">Long text</SelectItem><SelectItem value="yes_no">Yes / no</SelectItem><SelectItem value="single_choice">Choose one</SelectItem><SelectItem value="multiple_choice">Choose many</SelectItem><SelectItem value="file" disabled={(draft.questions.filter(item => (item.type as string) === "file").length >= 5) && (question.type as string) !== "file"}>Document upload</SelectItem>
+                     <SelectItem value="text">Short text</SelectItem><SelectItem value="textarea">Long text</SelectItem><SelectItem value="yes_no">Yes / no</SelectItem><SelectItem value="single_choice">Choose one</SelectItem><SelectItem value="multiple_choice">Choose many</SelectItem><SelectItem value="file" disabled>Document upload (temporarily unavailable)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

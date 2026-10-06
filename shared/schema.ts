@@ -18,11 +18,9 @@ export const clients = pgTable("clients", {
   status: text("status").default("active"),
   referredBy: varchar("referred_by"),
   referralCode: text("referral_code"),
-  // Retain the populated historical column so schema pushes do not delete legacy mandate data.
-  gocardlessMandateStatus: text("gocardless_mandate_status").default("inactive"),
 });
 
-export const insertClientSchema = createInsertSchema(clients).omit({ id: true, gocardlessMandateStatus: true });
+export const insertClientSchema = createInsertSchema(clients).omit({ id: true });
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 
@@ -116,6 +114,10 @@ export const settings = pgTable("settings", {
   termsAccepted: boolean("terms_accepted").default(false),
   currency: text("currency").default("£"),
   hasAcceptedTerms: boolean("has_accepted_terms").default(false),
+  // Set only by POST /api/settings/accept-terms, server-side - never trust a
+  // client-supplied version/timestamp for these.
+  termsAcceptedVersion: text("terms_accepted_version"),
+  termsAcceptedAt: timestamp("terms_accepted_at"),
   cancellationNoticeHours: integer("cancellation_notice_hours").default(24),
   timezone: text("timezone").default("Europe/London"),
   onboardingProgress: text("onboarding_progress").default("{}"),
