@@ -629,7 +629,6 @@ export async function registerRoutes(
 
   app.get("/api/subscription/status", isAuthenticated, async (req, res) => {
     const mode = getStripeMode();
-    const livemode = mode === "live";
     const messages: string[] = [];
     let code: string | undefined;
     let billingCustomerNeedsReconnect = false;
@@ -685,7 +684,6 @@ export async function registerRoutes(
     }
 
     return res.json({
-      livemode,
       ready: messages.length === 0,
       checkoutPaused: process.env.STRIPE_SUBSCRIPTION_CHECKOUT_PAUSED === "true",
       billingCustomerNeedsReconnect,

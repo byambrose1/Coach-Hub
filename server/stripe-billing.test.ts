@@ -441,11 +441,12 @@ describe("hardened Stripe subscription billing", () => {
     assert.equal(state.checkoutCreateCalls.length, 0);
   });
 
-  test("status reports mode/readiness without returning Stripe identifiers", async () => {
+  test("status reports readiness without exposing Stripe mode or identifiers", async () => {
     const response = await request("/api/subscription/status");
     const result = await response.json();
     assert.equal(response.status, 200);
-    assert.deepEqual(result, { livemode: false, ready: true, checkoutPaused: false, billingCustomerNeedsReconnect: false });
+    assert.deepEqual(result, { ready: true, checkoutPaused: false, billingCustomerNeedsReconnect: false });
+    assert.equal("livemode" in result, false);
     assert.equal(JSON.stringify(result).includes("price_"), false);
   });
 
@@ -517,7 +518,7 @@ describe("hardened Stripe subscription billing", () => {
     const response = await request("/api/subscription/status");
     const body = await response.json();
     assert.equal(response.status, 200);
-    assert.equal(body.livemode, true);
+    assert.equal("livemode" in body, false);
     assert.equal(body.ready, false);
     assert.match(body.message, /does not match the configured live-mode account/);
 
@@ -548,7 +549,7 @@ describe("hardened Stripe subscription billing", () => {
     delete process.env.STRIPE_WEBHOOK_CONFIGURED;
     const response = await request("/api/subscription/status");
     const body = await response.json();
-    assert.equal(body.livemode, false);
+    assert.equal("livemode" in body, false);
     assert.equal(body.ready, false);
     assert.match(body.message, /webhook signing secret has not been verified/);
     const checkout = await request("/api/subscription/checkout", {

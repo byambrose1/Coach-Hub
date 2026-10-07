@@ -50,7 +50,7 @@ function QuickBookDialog({ open, onOpenChange, clients }: {
         queryClient.invalidateQueries({ queryKey: ["/api/notifications/usage"] });
       }
       onOpenChange(false);
-      const feedback = emailNotificationFeedback(payload, "Session booking");
+      const feedback = emailNotificationFeedback(payload, "Session booking", "session booking");
       toast({ title: feedback.title, description: feedback.description, variant: feedback.variant });
       trackActivationEvent("first_booking_created");
       setFormData({
@@ -252,7 +252,7 @@ function NotifyButton({ packageId }: { packageId: string }) {
       return res.json();
     },
     onSuccess: (payload) => {
-      const result = emailNotificationFeedback(payload, "Low-session notification");
+      const result = emailNotificationFeedback(payload, "Low-session notification", "low-session alert");
       toast({ title: result.title, description: result.description, variant: result.variant });
     },
     onError: (err: Error) => toast({ title: "Could not send notification", description: err.message, variant: "destructive" }),

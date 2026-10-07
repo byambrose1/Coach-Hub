@@ -434,7 +434,10 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose, allowInvo
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ title: "Invoice sent", description: "Invoice emailed to client successfully." });
+      toast({
+        title: "Invoice email accepted",
+        description: `Invoice ${invoice.invoiceNumber} for ${clientName} was accepted for sending. Inbox delivery is not yet confirmed.`,
+      });
     },
     onError: (err: Error) => {
       toast({ title: "Error sending invoice", description: err.message, variant: "destructive" });
@@ -447,7 +450,7 @@ function InvoiceDetailDialog({ invoice, clientName, settings, onClose, allowInvo
       return res.json();
     },
     onSuccess: (payload) => {
-      const feedback = emailNotificationFeedback(payload, "Overdue invoice reminder");
+      const feedback = emailNotificationFeedback(payload, "Overdue invoice reminder", "overdue invoice reminder");
       toast({ title: feedback.title, description: feedback.description, variant: feedback.variant });
     },
     onError: (err: Error) => {

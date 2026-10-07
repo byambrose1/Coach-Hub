@@ -218,7 +218,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
         queryClient.invalidateQueries({ queryKey: ["/api/notifications/usage"] });
       }
       setBookSessionOpen(false);
-      const feedback = emailNotificationFeedback(payload, "Session booking");
+      const feedback = emailNotificationFeedback(payload, "Session booking", "session booking");
       toast({ title: feedback.title, description: feedback.description, variant: feedback.variant });
       trackActivationEvent("first_booking_created");
       setBookFormData({ date: format(new Date(), "yyyy-MM-dd"), startTime: "09:00", endTime: "10:00", sessionType: "1:1", location: "" });
@@ -387,7 +387,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
       return res.json();
     },
     onSuccess: (payload) => {
-      const feedback = emailNotificationFeedback(payload, "PAR-Q link request");
+      const feedback = emailNotificationFeedback(payload, "PAR-Q link request", "PAR-Q link");
       toast({ title: feedback.title, description: feedback.description, variant: feedback.variant });
       trackActivationEvent("first_parq_form_sent");
     },
@@ -1198,9 +1198,16 @@ function BroadcastEmailDialog({ open, onOpenChange, clients }: {
       return res.json();
     },
     onSuccess: (data: { sent: number; failed: number }) => {
+      const subjectLabel = `“${subject.trim()}”`;
+      const accepted = data.sent > 0
+        ? `${data.sent} client email${data.sent === 1 ? "" : "s"} for announcement ${subjectLabel} ${data.sent === 1 ? "was" : "were"} accepted for sending. Inbox delivery is not yet confirmed.`
+        : `No client emails for announcement ${subjectLabel} were confirmed as accepted for sending.`;
+      const unconfirmed = data.failed > 0
+        ? `The provider did not confirm ${data.failed} recipient email${data.failed === 1 ? "" : "s"}.`
+        : "";
       toast({
-        title: `Announcement sent`,
-        description: `Delivered to ${data.sent} client${data.sent !== 1 ? "s" : ""}${data.failed > 0 ? ` (${data.failed} failed)` : ""}.`,
+        title: data.failed > 0 ? "Announcement send outcome" : "Announcement accepted for sending",
+        description: [accepted, unconfirmed].filter(Boolean).join(" "),
       });
       onOpenChange(false);
       setSubject("");
