@@ -237,10 +237,14 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <div className="my-5 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9a93a5]">
-              <span className="h-px flex-1 bg-[#ece7f1]" />Or continue with<span className="h-px flex-1 bg-[#ece7f1]" />
-            </div>
-            <SocialSignIn providers={providers} loading={checkingProviders} />
+            {(checkingProviders || providers?.google || providers?.apple) && (
+              <>
+                <div className="my-5 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9a93a5]">
+                  <span className="h-px flex-1 bg-[#ece7f1]" />Or continue with<span className="h-px flex-1 bg-[#ece7f1]" />
+                </div>
+                <SocialSignIn providers={providers} loading={checkingProviders} />
+              </>
+            )}
             <p className="mt-4 text-center text-xs leading-5 text-[#837b90]">
               Please review our{" "}
               <Link href="/terms" className="font-semibold text-violet-800 underline decoration-violet-300 underline-offset-2 hover:text-violet-950">Terms</Link>

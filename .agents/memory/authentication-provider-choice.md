@@ -8,11 +8,11 @@ Use the owner's existing Supabase project for the requested replacement of Repli
 
 **How to apply:** Scope the migration to authentication. Preserve existing coach identities, tenant ownership and Stripe links; do not move the application database without a separate explicit request. Existing accounts must be linked through a verified ownership path, not automatically merged by a matching email address.
 
-Email, Google and Apple are the approved customer sign-in choices. Remove GitHub as a customer login option.
+Email sign-in remains available, and social sign-in must reflect the providers enabled in Supabase. Apple was disabled by the owner on 2026-10-07; do not show it while disabled. Keep GitHub removed as a customer login option.
 
-**Why:** On 2026-10-03 the owner explicitly selected “Email, Google and Apple — remove GitHub”, superseding the earlier GitHub selection.
+**Why:** The owner initially selected email, Google and Apple, then disabled Apple in Supabase and asked to remove it from the sign-in choices.
 
-**How to apply:** Keep the existing Supabase project keys: they are independent of social-provider credentials. Preserve email sign-in and existing account ownership. Do not restore GitHub when fixing Google or Apple configuration.
+**How to apply:** Treat Supabase's current provider availability as authoritative; hide disabled social options in the login UI and retain server-side availability checks. Keep the existing Supabase project keys: they are independent of social-provider credentials. Preserve email sign-in and existing account ownership. Do not restore GitHub when fixing provider configuration.
 
 Auth-provider migrations need real SDK-construction/configuration probes as well as mocked token tests.
 

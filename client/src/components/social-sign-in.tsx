@@ -17,31 +17,23 @@ function ProviderMark({ provider }: { provider: SocialAuthProvider }) {
 }
 
 export function SocialSignIn({ providers, loading }: { providers: AuthProviders | null; loading: boolean }) {
-  const unavailable = providers ? socialAuthProviders.filter(provider => !providers[provider]) : [];
+  const available = providers ? socialAuthProviders.filter(provider => providers[provider]) : [];
   return (
     <div className="space-y-3">
-      {socialAuthProviders.map(provider => {
-        const enabled = providers?.[provider] === true;
+      {available.map(provider => {
         const label = `Continue with ${socialAuthLabels[provider]}`;
         const classes = `flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
           provider === "apple" ? "border-black bg-black text-white" : "border-[#ded7e8] bg-white text-[#30283b]"
-        } ${enabled ? "hover:opacity-85" : "cursor-not-allowed opacity-45"}`;
+        } hover:opacity-85`;
         const content = <><ProviderMark provider={provider} />{label}</>;
-        return enabled ? (
+        return (
           <a key={provider} href={`/api/auth/${provider}`} className={classes} data-testid={`button-auth-${provider}`}>
             {content}
           </a>
-        ) : (
-          <button key={provider} type="button" disabled className={classes}
-            aria-label={`${label} — currently unavailable`} data-testid={`button-auth-${provider}`}>
-            {content}
-          </button>
         );
       })}
       {loading ? <p role="status" className="text-center text-xs text-[#837b90]">Checking sign-in options…</p>
-        : unavailable.length > 0 ? <p className="text-center text-xs leading-5 text-[#837b90]">
-          {unavailable.map(provider => socialAuthLabels[provider]).join(" and ")} sign-in is not available yet. Please use another option.
-        </p> : null}
+        : null}
     </div>
   );
 }
