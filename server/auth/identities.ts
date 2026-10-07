@@ -14,10 +14,14 @@ export async function ensureIdentityTable() {
 }
 
 export class AccountLinkError extends Error {
-  constructor(public code: "link_required" | "already_linked") { super(code); }
+  constructor(public code: "link_required" | "already_linked" | "account_required") { super(code); }
 }
 
-export async function resolveCoach(providerUser: SupabaseUser, verifiedLegacyId?: string) {
+export async function resolveCoach(
+  providerUser: SupabaseUser,
+  verifiedLegacyId?: string,
+  { allowCreate = false }: { allowCreate?: boolean } = {},
+) {
   const identity = identityKey(providerUser.id);
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${identity}, 0))`);
@@ -38,6 +42,7 @@ export async function resolveCoach(providerUser: SupabaseUser, verifiedLegacyId?
         // Email alone is not proof of ownership of a legacy account.
         if (existing) throw new AccountLinkError("link_required");
       }
+      if (!allowCreate) throw new AccountLinkError("account_required");
       const metadata = providerUser.user_metadata || {};
       [coach] = await tx.insert(users).values({
         id: identity, email: providerUser.email || null,

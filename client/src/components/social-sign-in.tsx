@@ -16,18 +16,25 @@ function ProviderMark({ provider }: { provider: SocialAuthProvider }) {
   );
 }
 
-export function SocialSignIn({ providers, loading }: { providers: AuthProviders | null; loading: boolean }) {
+export function SocialSignIn({ providers, loading, allowAccountCreation = false }: {
+  providers: AuthProviders | null;
+  loading: boolean;
+  allowAccountCreation?: boolean;
+}) {
   const available = providers ? socialAuthProviders.filter(provider => providers[provider]) : [];
   return (
     <div className="space-y-3">
       {available.map(provider => {
-        const label = `Continue with ${socialAuthLabels[provider]}`;
+        const label = allowAccountCreation
+          ? `Create account with ${socialAuthLabels[provider]}`
+          : `Continue with ${socialAuthLabels[provider]}`;
+        const href = `/api/auth/${provider}${allowAccountCreation ? "?intent=signup" : ""}`;
         const classes = `flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
           provider === "apple" ? "border-black bg-black text-white" : "border-[#ded7e8] bg-white text-[#30283b]"
         } hover:opacity-85`;
         const content = <><ProviderMark provider={provider} />{label}</>;
         return (
-          <a key={provider} href={`/api/auth/${provider}`} className={classes} data-testid={`button-auth-${provider}`}>
+          <a key={provider} href={href} className={classes} data-testid={`button-auth-${provider}`}>
             {content}
           </a>
         );

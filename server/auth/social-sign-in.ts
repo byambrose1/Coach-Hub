@@ -4,7 +4,7 @@ import { socialAuthProviders, type AuthProviders, type SocialAuthProvider } from
 
 type Dependencies = {
   providers: () => Promise<AuthProviders>;
-  begin: (req: Request, res: Response) => Promise<string>;
+  begin: (req: Request, res: Response, allowAccountCreation?: boolean) => Promise<string>;
   client: (req: Request) => Pick<SupabaseClient, "auth">;
   callback: (req: Request, state: string) => string;
   save: (req: Request) => Promise<void>;
@@ -20,7 +20,8 @@ export function socialSignInHandler(provider: SocialAuthProvider, dependencies: 
         res.redirect("/login?error=provider_unavailable");
         return;
       }
-      const state = await dependencies.begin(req, res);
+      const allowAccountCreation = req.query?.intent === "signup";
+      const state = await dependencies.begin(req, res, allowAccountCreation);
       const { data, error } = await dependencies.client(req).auth.signInWithOAuth({
         provider,
         options: { redirectTo: dependencies.callback(req, state), skipBrowserRedirect: true },
