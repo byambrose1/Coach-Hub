@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import type { Invoice, Settings } from "@shared/schema";
-import { getPaymentMethods } from "@shared/payment-methods";
+import { getInvoicePaymentMethods } from "@shared/payment-methods";
 import { getPlan } from "@shared/subscription-features";
 
 export function invoicePdfFilename(invoiceNumber: string) {
@@ -65,13 +65,12 @@ export function createInvoicePdf(invoice: Invoice, clientName: string, settings?
   if (invoice.sentDate) text(`Sent: ${date(invoice.sentDate)}`);
   text(`Due: ${date(invoice.dueDate)}`);
   if (invoice.paidDate) text(`Paid: ${date(invoice.paidDate)}`);
-  if (invoice.paymentMethod) text(`Payment method: ${invoice.paymentMethod}`);
   y += 6;
   text("Description", 12, true);
   text(invoice.notes || "Coaching sessions");
   y += 6;
   text(`${invoice.status === "paid" ? "Amount paid" : "Total due"}: ${currency}${amount.toFixed(2)}`, 16, true);
-  const methods = getPaymentMethods(settings);
+  const methods = getInvoicePaymentMethods(settings, invoice.paymentMethod);
   if (methods.length) {
     y += 8;
     text("Ways to pay", 12, true);
