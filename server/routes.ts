@@ -2067,6 +2067,7 @@ export async function registerRoutes(
           notes: invoice.notes || undefined, trainerName: settings?.trainerName || "Coach",
           businessName: settings?.businessName || "", businessAddress: settings?.businessAddress || undefined,
           trainerEmail: settings?.trainerEmail || undefined, paymentMethods: settings,
+          invoicePaymentMethod: invoice.paymentMethod,
         }),
       });
       if (notificationFailed(res, notification)) return;
@@ -2387,6 +2388,7 @@ export async function registerRoutes(
         businessAddress: s?.businessAddress || undefined,
         trainerEmail: s?.trainerEmail || undefined,
         paymentMethods: s,
+        invoicePaymentMethod: inv.paymentMethod,
       });
 
       const updated = await storage.updateInvoice(userId, req.params.id, {

@@ -37,10 +37,14 @@ interface InvoiceEmailData {
   businessAddress?: string;
   trainerEmail?: string;
   paymentMethods?: Settings;
+  // The invoice's own chosen method (cash/card_machine/bank_transfer/paypal/
+  // stripe/other) - when set, the email shows only that one way to pay
+  // instead of every method the coach has switched on in Settings.
+  invoicePaymentMethod?: string | null;
 }
 
 export async function sendInvoiceEmail(data: InvoiceEmailData, options: { overdueReminder?: boolean } = {}): Promise<void> {
-  const { clientName, clientEmail, invoiceNumber, amount, currency, dueDate, notes, trainerName, businessName, businessAddress, trainerEmail, paymentMethods } = data;
+  const { clientName, clientEmail, invoiceNumber, amount, currency, dueDate, notes, trainerName, businessName, businessAddress, trainerEmail, paymentMethods, invoicePaymentMethod } = data;
   const { senderName, senderEmail, replyTo } = getSenderIdentity(trainerName, businessName, trainerEmail);
 
   const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -72,7 +76,7 @@ export async function sendInvoiceEmail(data: InvoiceEmailData, options: { overdu
         <tr class="amount-row"><td>Amount Due</td><td>${currency}${amount}</td></tr>
       </table>
       ${notes ? `<div class="notes"><strong>Notes:</strong> ${notes}</div>` : ""}
-      ${paymentMethodsHtml(paymentMethods)}
+      ${paymentMethodsHtml(paymentMethods, invoicePaymentMethod)}
       <p style="color:#555;font-size:14px;">If you have any questions, please don't hesitate to get in touch.</p>
       <p style="color:#333;font-size:14px;">Thank you,<br><strong>${trainerName}</strong></p>
     </div>
