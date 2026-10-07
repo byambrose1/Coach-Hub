@@ -294,11 +294,6 @@ export default function LoginPage() {
 
       <footer className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-3 border-t border-violet-200/60 px-5 py-5 text-xs leading-5 text-[#7b7388] sm:px-8 sm:flex-row sm:items-center sm:justify-between">
         <p>Built for independent coaches across the UK.</p>
-        <p className="max-w-2xl sm:text-right">
-          Returning Replit user?{" "}
-          <a href="/api/auth/legacy/login" className="font-semibold text-violet-800 underline decoration-violet-300 underline-offset-2 hover:text-violet-950">Connect your existing coach account</a>
-          {" "}first, then sign in with email or Google to keep your records. This won’t create a duplicate account. Email addresses alone don’t automatically merge accounts.
-        </p>
       </footer>
     </main>
   );
