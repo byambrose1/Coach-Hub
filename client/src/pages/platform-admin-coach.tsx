@@ -66,6 +66,25 @@ export default function PlatformAdminCoach() {
     },
   });
 
+  const markPlanManualMutation = useMutation({
+    mutationFn: async () => {
+      if (!isOwner) throw new Error("Only the verified owner can mark a plan as manual.");
+      await apiRequest("POST", `/api/platform-admin/coaches/${coachId}/mark-plan-manual`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/platform-admin/coaches", coachId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/refund"] });
+      toast({
+        title: "Manual plan recorded",
+        description: "Plan access is unchanged; billing checks now treat this as manual access.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Could not mark plan as manual", variant: "destructive" });
+    },
+  });
+
   const clearBillingMutation = useMutation({
     mutationFn: async () => {
       if (!isOwner) throw new Error("Only the verified owner can reconnect billing.");
@@ -117,7 +136,7 @@ export default function PlatformAdminCoach() {
     );
   }
 
-  const { coach, clients, stats, plan, planGrantedManually, manualPlanExpiresAt, stripeCustomerId } = data;
+  const { coach, clients, stats, plan, planGrantedManually, manualPlanExpiresAt, stripeCustomerId, stripeSubscriptionId } = data;
   const isCurrentlyImpersonating = authUser?.impersonatedUserId === coachId;
 
   return (
@@ -244,6 +263,33 @@ export default function PlatformAdminCoach() {
             <Badge variant="outline" className="w-fit text-xs" data-testid="badge-manual-grant">
               Manually granted{manualPlanExpiresAt ? ` · reverts to Free on ${format(new Date(manualPlanExpiresAt), "dd/MM/yyyy")}` : " · no expiry set"}
             </Badge>
+          )}
+          {isOwner && plan !== "free" && !planGrantedManually && !stripeSubscriptionId && (
+            <div className="space-y-2 rounded-md border border-muted p-3">
+              <p className="text-sm text-muted-foreground">
+                For an older manual plan change, record it here after confirming this account has never had a successful subscription payment. This leaves the plan and access unchanged.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const confirmed = window.confirm(
+                    "Confirm this plan was granted manually and this account has never had a successful subscription payment. The plan and access will stay unchanged."
+                  );
+                  if (confirmed) markPlanManualMutation.mutate();
+                }}
+                disabled={markPlanManualMutation.isPending}
+                data-testid="button-mark-plan-manual"
+              >
+                {markPlanManualMutation.isPending ? "Saving…" : "Mark current plan as manually granted"}
+              </Button>
+            </div>
+          )}
+          {isOwner && plan !== "free" && !planGrantedManually && stripeSubscriptionId && (
+            <p className="text-sm text-muted-foreground">
+              A Stripe subscription is linked to this account, so the plan cannot be marked as manual.
+            </p>
           )}
           <p className="text-sm text-muted-foreground">
             {isOwner

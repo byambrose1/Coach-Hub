@@ -663,7 +663,9 @@ export async function registerRoutes(
             await verifyStripeCustomerOwnership(settings.stripeCustomerId, getUserId(req));
           } catch (error) {
             if (error instanceof StripeBillingLinkError && isUnpaidBillingSetup(settings)) {
-              billingCustomerNeedsReconnect = true;
+              // A manual plan is intentionally not backed by this Stripe
+              // customer reference, so don't show a reconnect prompt for it.
+              billingCustomerNeedsReconnect = !settings?.planGrantedManually;
             } else {
               throw error;
             }
@@ -1547,6 +1549,20 @@ export async function registerRoutes(
         }
       }
       await storage.updateCoachPlan(getRouteParam(req.params.coachId), plan, expiry);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/platform-admin/coaches/:coachId/mark-plan-manual", isAuthenticated, async (req, res) => {
+    if (!isOwner(req)) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const result = await storage.markCoachPlanManually(getRouteParam(req.params.coachId));
+      if (result === "not_found") return res.status(404).json({ message: "Coach settings not found" });
+      if (result === "stripe_subscription_linked") {
+        return res.status(409).json({ message: "A Stripe subscription is linked to this account; its plan cannot be marked as manual." });
+      }
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });

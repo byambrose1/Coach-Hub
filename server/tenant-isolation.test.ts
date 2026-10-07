@@ -127,6 +127,13 @@ function makeStore() {
     upsertPlatformConfig: async (data) => ({ id: "default", ...data } as any),
     getCoachDetail: async () => undefined as unknown as CoachDetail,
     updateCoachPlan: async () => {},
+    markCoachPlanManually: async (coachId) => {
+      const accountSettings = state.settings.get(coachId);
+      if (!accountSettings) return "not_found";
+      if (accountSettings.stripeSubscriptionId) return "stripe_subscription_linked";
+      accountSettings.planGrantedManually = true;
+      return "marked";
+    },
     clearBillingReference: async () => {},
 
     createWaitlistSignup: async (data) => withId(state.waitlist, "", data) as any,
@@ -350,11 +357,41 @@ test("a non-owner coach cannot reach platform-admin routes", async () => {
     as: COACH_A,
   });
   assert.equal(impersonate.response.status, 403);
+
+  const markManual = await request("/api/platform-admin/coaches/legacy-manual-coach/mark-plan-manual", {
+    method: "POST",
+    as: COACH_A,
+  });
+  assert.equal(markManual.response.status, 403);
 });
 
 test("the platform owner can reach platform-admin routes", async () => {
   const stats = await request("/api/platform-admin/stats", { as: OWNER_ID });
   assert.equal(stats.response.status, 200);
+
+  store.state.settings.set("legacy-manual-coach", {
+    id: "legacy-manual-coach",
+    stripeSubscriptionId: null,
+    planGrantedManually: false,
+  });
+  const marked = await request("/api/platform-admin/coaches/legacy-manual-coach/mark-plan-manual", {
+    method: "POST",
+    as: OWNER_ID,
+  });
+  assert.equal(marked.response.status, 200);
+  assert.equal(store.state.settings.get("legacy-manual-coach")?.planGrantedManually, true);
+
+  store.state.settings.set("stripe-linked-coach", {
+    id: "stripe-linked-coach",
+    stripeSubscriptionId: "sub_existing",
+    planGrantedManually: false,
+  });
+  const linked = await request("/api/platform-admin/coaches/stripe-linked-coach/mark-plan-manual", {
+    method: "POST",
+    as: OWNER_ID,
+  });
+  assert.equal(linked.response.status, 409);
+  assert.equal(store.state.settings.get("stripe-linked-coach")?.planGrantedManually, false);
 });
 
 test("deleting an account removes that coach's data and the auth user, and leaves other coaches untouched", async () => {

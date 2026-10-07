@@ -1,4 +1,4 @@
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   clients, trainingSessions, packages, sessionNotes, settings, clientForms, referrals, invoices, users, platformConfig,
@@ -72,6 +72,7 @@ export interface IStorage {
   upsertPlatformConfig(data: Partial<PlatformConfig>): Promise<PlatformConfig>;
   getCoachDetail(coachId: string): Promise<CoachDetail | undefined>;
   updateCoachPlan(coachId: string, plan: string, expiresAt?: Date | null): Promise<void>;
+  markCoachPlanManually(coachId: string): Promise<"marked" | "not_found" | "stripe_subscription_linked">;
   clearBillingReference(coachId: string): Promise<void>;
 
   // Waitlist signups
@@ -101,6 +102,7 @@ export interface CoachDetail {
   planGrantedManually: boolean;
   manualPlanExpiresAt: string | null;
   stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
 }
 
 export interface PlatformStats {
@@ -366,6 +368,7 @@ export class DatabaseStorage implements IStorage {
       planGrantedManually: coachSettings[0]?.planGrantedManually || false,
       manualPlanExpiresAt: coachSettings[0]?.manualPlanExpiresAt?.toISOString() || null,
       stripeCustomerId: coachSettings[0]?.stripeCustomerId || null,
+      stripeSubscriptionId: coachSettings[0]?.stripeSubscriptionId || null,
     };
   }
 
@@ -382,6 +385,21 @@ export class DatabaseStorage implements IStorage {
     } else {
       await db.insert(settings).values({ id: coachId, trainerName: "Coach", ...fields });
     }
+  }
+
+  async markCoachPlanManually(coachId: string): Promise<"marked" | "not_found" | "stripe_subscription_linked"> {
+    const updated = await db.update(settings)
+      .set({ planGrantedManually: true })
+      .where(and(eq(settings.id, coachId), isNull(settings.stripeSubscriptionId)))
+      .returning({ id: settings.id });
+    if (updated.length) return "marked";
+
+    const [existing] = await db.select({
+      id: settings.id,
+      stripeSubscriptionId: settings.stripeSubscriptionId,
+    }).from(settings).where(eq(settings.id, coachId));
+    if (!existing) return "not_found";
+    return "stripe_subscription_linked";
   }
 
   async clearBillingReference(coachId: string): Promise<void> {
