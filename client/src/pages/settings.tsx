@@ -32,6 +32,15 @@ import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { UpgradeNotice } from "@/components/upgrade-notice";
 import type { NotificationUsage } from "@shared/email-notifications";
 
+function formatDaysHours(totalHours: number): string {
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  const parts: string[] = [];
+  if (days) parts.push(`${days} day${days === 1 ? "" : "s"}`);
+  if (hours || !days) parts.push(`${hours} hour${hours === 1 ? "" : "s"}`);
+  return parts.join(", ");
+}
+
 interface Tier {
   name: string;
   label: string;
@@ -536,6 +545,7 @@ export default function SettingsPage() {
     },
   });
 
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("DELETE", "/api/account");
@@ -568,7 +578,7 @@ export default function SettingsPage() {
 
   return (
     <div className="p-4 space-y-6 max-w-2xl sm:p-6">
-      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="sticky top-0 z-10 flex flex-col items-stretch gap-2 border-b bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold" data-testid="text-settings-title">Settings</h1>
         <Button className="min-h-11 w-full sm:min-h-9 sm:w-auto" onClick={() => mutation.mutate(formData)} disabled={mutation.isPending} data-testid="button-save-settings">
           <Save className="w-4 h-4 mr-1" />
@@ -997,7 +1007,9 @@ export default function SettingsPage() {
               aria-label="Hours before session to send reminder"
               data-testid="input-reminder-hours"
             />
-            <span className="text-sm text-muted-foreground">hours before the session (1–168)</span>
+            <span className="text-sm text-muted-foreground">
+              hours before the session (1–168) — that's {formatDaysHours(formData.reminderHoursBefore)}
+            </span>
           </div>
           <p className="text-xs text-muted-foreground">Both client email notifications and session reminders must be enabled. Free-plan reminders count toward the weekly 10-email allowance. Emails are attempted once; inbox delivery depends on the email provider.</p>
 
@@ -1082,7 +1094,7 @@ export default function SettingsPage() {
               <p className="text-sm font-medium">Delete Account</p>
               <p className="text-xs text-muted-foreground mt-0.5">Permanently delete your account and all associated data. This cannot be undone.</p>
             </div>
-            <AlertDialog>
+            <AlertDialog onOpenChange={(open) => { if (!open) setDeleteConfirmText(""); }}>
               <AlertDialogTrigger asChild>
                 <Button className="min-h-11 w-full sm:min-h-8 sm:w-auto" variant="destructive" size="sm" data-testid="button-delete-account">
                   Delete Account
@@ -1092,14 +1104,27 @@ export default function SettingsPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action cannot be undone. After subscription cancellation is confirmed, your account and client records are removed from the active application database. Export anything you need first. Provider records and infrastructure backups have separate retention arrangements; see the Privacy page.
+                    This cannot be undone. Deleting your account will immediately: cancel any active subscription; delete your sign-in; and permanently erase every client, session, invoice, package, note, referral and form on your account. You'll be logged out everywhere. Export anything you need first — once this finishes, there's no way back. Provider records and infrastructure backups have separate retention arrangements; see the Privacy page.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                <div className="space-y-1.5">
+                  <Label htmlFor="delete-confirm-text" className="text-sm font-medium">
+                    Type DELETE to confirm
+                  </Label>
+                  <Input
+                    id="delete-confirm-text"
+                    value={deleteConfirmText}
+                    onChange={(event) => setDeleteConfirmText(event.target.value)}
+                    placeholder="DELETE"
+                    autoComplete="off"
+                    data-testid="input-confirm-delete"
+                  />
+                </div>
                 <AlertDialogFooter>
                   <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    disabled={deleteAccountMutation.isPending}
+                    disabled={deleteAccountMutation.isPending || deleteConfirmText.trim().toUpperCase() !== "DELETE"}
                     onClick={() => deleteAccountMutation.mutate()}
                     data-testid="button-confirm-delete"
                   >
