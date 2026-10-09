@@ -61,6 +61,7 @@ export default function LoginPage() {
   }, []);
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
 
   const params = new URLSearchParams(window.location.search);
   const queryError = params.get("error");
@@ -73,6 +74,56 @@ export default function LoginPage() {
     setMode(nextMode);
     setError("");
     setMessage("");
+  }
+
+  function openReset() {
+    setResetMode(true);
+    setError("");
+    setMessage("");
+  }
+
+  function closeReset() {
+    setResetMode(false);
+    setError("");
+    setMessage("");
+  }
+
+  async function submitPasswordReset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+    setSubmitting(true);
+    try {
+      const csrfResponse = await fetch("/api/auth/csrf", {
+        method: "GET",
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      if (!csrfResponse.ok) throw new Error("We couldn’t prepare a secure request. Please try again.");
+      const csrfData = await csrfResponse.json() as { token?: string };
+      if (!csrfData.token) throw new Error("We couldn’t prepare a secure request. Please try again.");
+
+      const response = await fetch("/api/auth/password/reset", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfData.token,
+        },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const result = await response.json().catch(() => ({})) as AuthResponse;
+      if (!response.ok) {
+        setError(result.message || "We couldn’t send that reset link. Please try again.");
+        return;
+      }
+      setMessage(result.message || "Check your email for the next step.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -170,6 +221,49 @@ export default function LoginPage() {
               </div>
             )}
 
+            {resetMode ? (
+              <div className="mt-1">
+                <button
+                  type="button"
+                  onClick={closeReset}
+                  className="mb-4 text-sm font-semibold text-violet-800 underline decoration-violet-300 underline-offset-2 hover:text-violet-950"
+                >
+                  ← Back to sign in
+                </button>
+                <h2 className="text-lg font-bold text-[#241d32]">Reset your password</h2>
+                <p className="mt-1.5 text-sm leading-5 text-[#655e71]">Enter your email and we'll send you a link to set a new password.</p>
+                <form className="mt-5 space-y-4" onSubmit={submitPasswordReset} noValidate>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-semibold text-[#3d354b]">Email address</span>
+                    <span className="relative block">
+                      <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8c8499]" aria-hidden="true" />
+                      <input
+                        type="email"
+                        name="email"
+                        autoComplete="email"
+                        required
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        placeholder="you@example.co.uk"
+                        className="h-12 w-full rounded-xl border border-[#e5dfed] bg-[#fcfbfe] pl-10 pr-3.5 text-sm text-[#282132] outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+                      />
+                    </span>
+                  </label>
+
+                  {error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-3 text-sm leading-5 text-rose-800">{error}</p>}
+                  {message && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm leading-5 text-emerald-900">{message}</p>}
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 text-sm font-bold text-white shadow-[0_8px_20px_-10px_rgba(76,42,137,0.7)] transition hover:bg-violet-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200 disabled:cursor-wait disabled:opacity-70"
+                  >
+                    {submitting ? <><LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> Working…</> : <>Send reset link<ArrowRight className="h-4 w-4" aria-hidden="true" /></>}
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <>
             <div className="grid grid-cols-3 rounded-xl bg-[#f3f0f8] p-1" role="tablist" aria-label="Choose account action">
               {(["login", "signup", "magic"] as const).map((item) => (
                 <button
@@ -233,6 +327,15 @@ export default function LoginPage() {
                       {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                     </button>
                   </span>
+                  {mode === "login" && (
+                    <button
+                      type="button"
+                      onClick={openReset}
+                      className="mt-1.5 text-xs font-semibold text-violet-800 underline decoration-violet-300 underline-offset-2 hover:text-violet-950"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
                 </label>
               )}
 
@@ -264,6 +367,8 @@ export default function LoginPage() {
               {" "}and{" "}
               <Link href="/privacy" className="font-semibold text-violet-800 underline decoration-violet-300 underline-offset-2 hover:text-violet-950">Privacy Policy</Link>.
             </p>
+              </>
+            )}
           </div>
         </section>
 
