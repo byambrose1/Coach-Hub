@@ -1100,7 +1100,7 @@ export default function SettingsPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action cannot be undone. After subscription cancellation is confirmed, your account and client records are removed from the active application database. Export anything you need first. Provider records and infrastructure backups have separate retention arrangements; see the Privacy page.
+                    This cannot be undone. Deleting your account will immediately: cancel any active subscription; delete your sign-in; and permanently erase every client, session, invoice, package, note, referral and form on your account. You'll be logged out everywhere. Export anything you need first — once this finishes, there's no way back. Provider records and infrastructure backups have separate retention arrangements; see the Privacy page.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
