@@ -28,7 +28,7 @@ const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Schedule", url: "/schedule", icon: Calendar },
   { title: "Clients", url: "/clients", icon: Users },
-  { title: "Payments", url: "/payments", icon: CreditCard },
+  { title: "Payments & Packages", url: "/payments", icon: CreditCard },
   { title: "Practice tools", url: "/practice-admin", icon: ShieldCheck },
 ];
 
