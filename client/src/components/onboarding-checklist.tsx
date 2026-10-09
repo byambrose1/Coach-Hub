@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRight, Check, ChevronDown, Circle, Settings2, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
   toggleOnboardingStep,
   type OnboardingProgress,
 } from "@/lib/onboarding-progress";
-import type { Settings } from "@shared/schema";
+import type { Client, ClientForm, Invoice, Package, Session, Settings } from "@shared/schema";
 import { siteConfig } from "@/config/site";
 
 const steps = [
@@ -27,12 +27,29 @@ const steps = [
 export function OnboardingChecklist() {
   const [collapsed, setCollapsed] = useState(false);
   const { data: settings } = useQuery<Settings>({ queryKey: ["/api/settings"] });
+  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
+  const { data: packages = [] } = useQuery<Package[]>({ queryKey: ["/api/packages"] });
+  const { data: sessions = [] } = useQuery<Session[]>({ queryKey: ["/api/sessions"] });
+  const { data: invoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
+  const { data: forms = [] } = useQuery<ClientForm[]>({ queryKey: ["/api/forms"] });
+
   const progress = useMemo(
     () => parseOnboardingProgress(settings?.onboardingProgress),
     [settings?.onboardingProgress],
   );
 
-  const completed = steps.filter((step) => progress[step.id]).length;
+  // What's actually true in the coach's own data - lets a step tick itself off
+  // the moment it's genuinely done, instead of waiting for a manual click.
+  const detected = useMemo<OnboardingProgress>(() => ({
+    business: !!(settings?.businessName?.trim() && settings?.trainerName?.trim()),
+    client: clients.length > 0,
+    service: packages.length > 0,
+    availability: sessions.some((s) => s.sessionType === "blocked"),
+    parq: forms.some((f) => f.formType === "parq"),
+    "first-booking": invoices.length > 0 || sessions.some((s) => s.sessionType !== "blocked"),
+  }), [settings, clients, packages, sessions, invoices, forms]);
+
+  const completed = steps.filter((step) => progress[step.id] || detected[step.id]).length;
   const dismissed = settings?.onboardingDismissed || completed === steps.length;
 
   const saveMutation = useMutation({
@@ -45,6 +62,20 @@ export function OnboardingChecklist() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/settings"] }),
   });
+
+  useEffect(() => {
+    if (!settings) return;
+    const next = { ...progress };
+    let changed = false;
+    for (const step of steps) {
+      if (detected[step.id] && !next[step.id]) {
+        next[step.id] = true;
+        changed = true;
+      }
+    }
+    if (changed && !saveMutation.isPending) saveMutation.mutate({ progress: next });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings, detected]);
 
   if (!settings || dismissed) return null;
 
@@ -75,10 +106,17 @@ export function OnboardingChecklist() {
           </div>
           <ol className="grid gap-2 sm:grid-cols-2">
             {steps.map((step) => {
-              const done = !!progress[step.id];
+              const autoDone = !!detected[step.id];
+              const done = !!progress[step.id] || autoDone;
               return (
                 <li key={step.id} className="flex items-center gap-3 rounded-xl border border-white/80 bg-white/75 p-3">
-                  <button type="button" onClick={() => markStep(step.id)} aria-label={`${done ? "Mark incomplete" : "Mark complete"}: ${step.label}`} className="shrink-0 rounded-full text-violet-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">
+                  <button
+                    type="button"
+                    onClick={() => !autoDone && markStep(step.id)}
+                    disabled={autoDone}
+                    aria-label={autoDone ? `Automatically detected as complete: ${step.label}` : `${done ? "Mark incomplete" : "Mark complete"}: ${step.label}`}
+                    className="shrink-0 rounded-full text-violet-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-default"
+                  >
                     {done ? <Check className="h-5 w-5 rounded-full bg-emerald-100 p-0.5 text-emerald-700" aria-hidden="true" /> : <Circle className="h-5 w-5" aria-hidden="true" />}
                   </button>
                   <a href={step.href} className={`min-w-0 flex-1 text-sm font-medium hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${done ? "text-muted-foreground line-through" : "text-slate-800"}`}>
