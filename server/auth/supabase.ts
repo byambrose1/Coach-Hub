@@ -11,6 +11,11 @@ import { sessionUser } from "./supabase-session";
 import { publicSite } from "@shared/public-site";
 import { socialAuthProviders } from "@shared/auth-providers";
 import { socialSignInHandler } from "./social-sign-in";
+import { passwordMeetsPolicy, PASSWORD_POLICY_HINT } from "@shared/password-policy";
+
+// Supabase rejected the signup itself (most commonly its own password
+// policy) - the message is safe to show as-is, unlike a sign-in failure.
+class SignupRejected extends Error {}
 
 export const AUTH_TTL = 10 * 60 * 1000;
 export function equalToken(left: unknown, right: unknown) {
@@ -120,8 +125,11 @@ export async function setupAuthentication(app: Express) {
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Enter a valid email address and sign-in option." });
     const { email, password, action } = parsed.data;
-    if (action !== "magic" && (!password || (action === "signup" && password.length < 8))) {
-      return res.status(400).json({ message: action === "signup" ? "Use a password of at least 8 characters." : "Enter your password." });
+    if (action !== "magic" && !password) {
+      return res.status(400).json({ message: "Enter your password." });
+    }
+    if (action === "signup" && !passwordMeetsPolicy(password!)) {
+      return res.status(400).json({ message: `Choose a password with ${PASSWORD_POLICY_HINT}.` });
     }
     try {
       const state = await transaction(req, res);
@@ -135,7 +143,10 @@ export async function setupAuthentication(app: Express) {
       const result = action === "signup"
         ? await client.auth.signUp({ email, password: password!, options: { emailRedirectTo: callbackUrl(req, state) } })
         : await client.auth.signInWithPassword({ email, password: password! });
-      if (result.error) throw new Error("Email sign-in failed");
+      if (result.error) {
+        if (action === "signup") throw new SignupRejected(result.error.message || "Unable to create your account.");
+        throw new Error("Email sign-in failed");
+      }
       if (!result.data.session) {
         await save(req);
         return res.json({ message: "Check your email to confirm your account. Open the confirmation link in this browser." });
@@ -150,6 +161,9 @@ export async function setupAuthentication(app: Express) {
         return res.status(409).json({ message: error.code === "link_required"
           ? "An existing Practably account needs linking. Sign in with your original Replit account first, then choose your new login."
           : "This sign-in is already linked to another Practably account." });
+      }
+      if (error instanceof SignupRejected) {
+        return res.status(422).json({ message: error.message });
       }
       logError("Unable to complete Supabase email sign-in", error);
       res.status(401).json({ message: "Unable to sign in. Check your details or try again shortly." });

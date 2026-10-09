@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, Check, CircleAlert, KeyRound, LoaderCircle, Mail, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, CircleAlert, Eye, EyeOff, KeyRound, LoaderCircle, Mail, ShieldCheck } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { SocialSignIn } from "@/components/social-sign-in";
 import type { AuthProviders } from "@shared/auth-providers";
+import { passwordMeetsPolicy, PASSWORD_POLICY_HINT } from "@shared/password-policy";
 
 type AuthMode = "login" | "signup" | "magic";
 type AuthResponse = { redirect?: string; message?: string };
@@ -58,6 +59,7 @@ export default function LoginPage() {
     return () => { active = false; };
   }, []);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const params = new URLSearchParams(window.location.search);
   const queryError = params.get("error");
@@ -81,8 +83,8 @@ export default function LoginPage() {
       setError("Email sign-in is not available right now. Please try again shortly.");
       return;
     }
-    if (mode === "signup" && password.length < 8) {
-      setError("Choose a password with at least 8 characters.");
+    if (mode === "signup" && !passwordMeetsPolicy(password)) {
+      setError(`Choose a password with ${PASSWORD_POLICY_HINT}.`);
       return;
     }
 
@@ -206,12 +208,12 @@ export default function LoginPage() {
                 <label className="block">
                   <span className="mb-1.5 flex items-center justify-between text-sm font-semibold text-[#3d354b]">
                     <span>Password</span>
-                    {mode === "signup" && <span className="text-xs font-medium text-[#898194]">At least 8 characters</span>}
+                    {mode === "signup" && <span className="text-xs font-medium text-[#898194]">{PASSWORD_POLICY_HINT}</span>}
                   </span>
                   <span className="relative block">
                     <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8c8499]" aria-hidden="true" />
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       name="password"
                       autoComplete={mode === "signup" ? "new-password" : "current-password"}
                       required
@@ -219,8 +221,16 @@ export default function LoginPage() {
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       placeholder={mode === "signup" ? "Create a password" : "Your password"}
-                      className="h-12 w-full rounded-xl border border-[#e5dfed] bg-[#fcfbfe] pl-10 pr-3.5 text-sm text-[#282132] outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+                      className="h-12 w-full rounded-xl border border-[#e5dfed] bg-[#fcfbfe] pl-10 pr-11 text-sm text-[#282132] outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(value => !value)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-[#8c8499] transition hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                    </button>
                   </span>
                 </label>
               )}
