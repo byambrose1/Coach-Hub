@@ -33,6 +33,7 @@ import { publicSite } from "@shared/public-site";
 import { captureAttributionFromUrl } from "@/lib/attribution";
 import LoginPage from "@/pages/login";
 import PublicFormPage from "@/pages/public-form";
+import NewPasswordPage from "@/pages/new-password";
 
 captureAttributionFromUrl();
 
@@ -48,7 +49,7 @@ function TermsModal() {
   // /settings stays reachable even with outstanding terms, so a coach who
   // doesn't want to accept a changed version can still cancel, request a
   // refund, delete their account or export their data.
-  const isExemptPage = ["/terms", "/privacy", "/support", "/login", "/f", "/settings"].includes(location);
+  const isExemptPage = ["/terms", "/privacy", "/support", "/login", "/f", "/settings", "/account/new-password"].includes(location);
   const needsAcceptance = !!settings && (!settings.hasAcceptedTerms || settings.termsAcceptedVersion !== publicSite.termsVersion);
 
   useEffect(() => {
@@ -153,6 +154,7 @@ function Router() {
       <Route path="/clients" component={Clients} />
       <Route path="/payments" component={Payments} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/account/new-password" component={NewPasswordPage} />
       <Route path="/practice-admin" component={Admin} />
       <Route path="/admin" component={PlatformAdmin} />
       <Route path="/platform-admin" component={PlatformAdmin} />
@@ -216,6 +218,7 @@ function ProtectedSignIn() {
 
 function isProtectedPath(path: string) {
   return path === "/schedule" || path === "/clients" || path === "/payments" || path === "/settings"
+    || path === "/account/new-password"
     || path === "/practice-admin" || path === "/admin" || path.startsWith("/platform-admin");
 }
 

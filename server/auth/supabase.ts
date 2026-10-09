@@ -82,6 +82,7 @@ export async function setupAuthentication(app: Express) {
     message: { message: "Too many sign-in attempts. Please try again later." } });
   for (const provider of socialAuthProviders) app.use(`/api/auth/${provider}`, limiter);
   app.use("/api/auth/email", limiter);
+  app.use("/api/auth/password/reset", limiter);
   app.get("/api/login", (_req, res) => res.redirect("/login"));
   let providers: Awaited<ReturnType<typeof getAuthProviders>> | undefined;
   let providersCheckedAt = 0;
@@ -169,6 +170,22 @@ export async function setupAuthentication(app: Express) {
       res.status(401).json({ message: "Unable to sign in. Check your details or try again shortly." });
     }
   });
+  app.post("/api/auth/password/reset", async (req, res) => {
+    if (!equalToken(req.get("X-CSRF-Token"), (req.session as any).authCsrf)) {
+      return res.status(403).json({ message: "Please reload the page and try again." });
+    }
+    const parsed = z.object({ email: z.string().email().max(254) }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Enter a valid email address." });
+    try {
+      const state = await transaction(req, res);
+      await supabaseClient(req).auth.resetPasswordForEmail(parsed.data.email, { redirectTo: callbackUrl(req, state) });
+      await save(req);
+    } catch (error) {
+      logError("Unable to start a password reset", error);
+    }
+    // Same neutral response either way - never reveal whether the email has an account.
+    res.json({ message: "If that email has a Practably account, a password reset link has been sent. Open it in this browser to continue." });
+  });
   app.get("/api/auth/supabase/callback", async (req, res) => {
     const pending = (req.session as any).supabaseTransaction;
     if (!validTransaction(pending, req.query.state) || typeof req.query.code !== "string" || req.query.code.length > 2048) {
@@ -181,13 +198,32 @@ export async function setupAuthentication(app: Express) {
       const { data, error } = await supabaseClient(req).auth.exchangeCodeForSession(req.query.code);
       if (error || !data.session) throw new Error("Invalid callback");
       await complete(req, data.session);
-      res.redirect("/");
+      res.redirect(req.query.type === "recovery" ? "/account/new-password" : "/");
     } catch (error) {
       delete (req.session as any).supabaseTransaction;
       delete (req.session as any).supabasePkce;
       await save(req);
       if (!(error instanceof AccountLinkError)) logError("Unable to complete Supabase callback", error);
       res.redirect(`/login?error=${error instanceof AccountLinkError ? error.code : "signin_failed"}`);
+    }
+  });
+  app.post("/api/auth/password", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user?.auth_provider !== "supabase" || !user?.supabase_subject) {
+      return res.status(400).json({ message: "Password changes aren't available for this sign-in method." });
+    }
+    const parsed = z.object({ password: z.string().max(128) }).safeParse(req.body);
+    if (!parsed.success || !passwordMeetsPolicy(parsed.data.password)) {
+      return res.status(400).json({ message: `Choose a password with ${PASSWORD_POLICY_HINT}.` });
+    }
+    try {
+      const { supabaseAdmin } = await import("./supabase-client");
+      const { error } = await supabaseAdmin().auth.admin.updateUserById(user.supabase_subject, { password: parsed.data.password });
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error) {
+      logError("Unable to update password", error);
+      res.status(502).json({ message: "Unable to update your password right now. Please try again shortly." });
     }
   });
   app.get("/api/logout", async (req, res) => {
