@@ -112,7 +112,7 @@ export function SupportPage() {
         </div>
       </div>
       <h2>What support covers</h2>
-      <p>We can help with account access, dashboard workflows, bookings, invoices, and payment records. Expected response time: {siteConfig.paidPlanSupportResponse}</p>
+      <p>We can help with account access, dashboard workflows, bookings, invoices, and payment records. {siteConfig.paidPlanSupportResponse}</p>
       <p className="not-prose mt-8 rounded-xl bg-slate-100 p-4 text-sm text-slate-600">{siteConfig.name} provides software tools. It does not provide legal, medical, or financial advice.</p>
     </LegalLayout>
   );

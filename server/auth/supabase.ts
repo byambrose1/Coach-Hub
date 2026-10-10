@@ -38,10 +38,10 @@ async function legacyAccount(req: Request, res: Response): Promise<string | unde
   return valid ? (req.user as any).claims.sub : undefined;
 }
 
-async function transaction(req: Request, res: Response) {
+async function transaction(req: Request, res: Response, allowAccountCreation = false) {
   const state = randomBytes(32).toString("hex");
   (req.session as any).supabaseTransaction = {
-    state, startedAt: Date.now(), legacyId: await legacyAccount(req, res),
+    state, startedAt: Date.now(), legacyId: await legacyAccount(req, res), allowAccountCreation,
   };
   return state;
 }
@@ -62,8 +62,10 @@ async function complete(req: Request, providerSession: Session) {
   // Verify with the configured provider, rather than trusting decoded JWT claims.
   const { data, error } = await supabaseClient().auth.getUser(providerSession.access_token);
   if (error || !data.user || data.user.id !== providerSession.user.id) throw new Error("Sign-in verification failed");
-  const target = (req.session as any).supabaseTransaction?.legacyId;
-  const coach = await resolveCoach(data.user, target);
+  const pending = (req.session as any).supabaseTransaction;
+  const coach = await resolveCoach(data.user, pending?.legacyId, {
+    allowCreate: pending?.allowAccountCreation === true,
+  });
   const user = sessionUser(coach.id, providerSession, coach.email || undefined);
   // Passport regenerates the session, preventing fixation and removing PKCE state.
   await new Promise<void>((resolve, reject) => req.logIn(user, error => error ? reject(error) : resolve()));
@@ -133,10 +135,13 @@ export async function setupAuthentication(app: Express) {
       return res.status(400).json({ message: `Choose a password with ${PASSWORD_POLICY_HINT}.` });
     }
     try {
-      const state = await transaction(req, res);
+      const state = await transaction(req, res, action === "signup");
       const client = supabaseClient(req);
       if (action === "magic") {
-        const { error } = await client.auth.signInWithOtp({ email, options: { emailRedirectTo: callbackUrl(req, state) } });
+        const { error } = await client.auth.signInWithOtp({
+          email,
+          options: { shouldCreateUser: false, emailRedirectTo: callbackUrl(req, state) },
+        });
         if (error) throw new Error("Unable to send sign-in link");
         await save(req);
         return res.json({ message: "If your email can receive a sign-in link, it will arrive shortly. Open it in this browser." });
@@ -161,7 +166,9 @@ export async function setupAuthentication(app: Express) {
       if (error instanceof AccountLinkError) {
         return res.status(409).json({ message: error.code === "link_required"
           ? "An existing Practably account needs linking. Sign in with your original Replit account first, then choose your new login."
-          : "This sign-in is already linked to another Practably account." });
+          : error.code === "account_required"
+            ? "No Practably account is linked to this sign-in yet. Choose Create account to register."
+            : "This sign-in is already linked to another Practably account." });
       }
       if (error instanceof SignupRejected) {
         return res.status(422).json({ message: error.message });

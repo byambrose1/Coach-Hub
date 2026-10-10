@@ -53,7 +53,7 @@ export const pricingTiers = [
     period: "/ month",
     clients: "Up to 50 clients",
     description: "For larger client rosters without complicated systems.",
-    features: ["50 client records", "Everything in Professional", "Date and client revenue reports", "Custom business details", "Priority support: 4-hour response target", "No weekly plan cap on client emails"],
+    features: ["50 client records", "Everything in Professional", "Date and client revenue reports", "Custom business details", "Staffed priority support: 4-hour response target", "No weekly plan cap on client emails"],
   },
 ];
 

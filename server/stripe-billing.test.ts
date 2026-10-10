@@ -367,6 +367,56 @@ describe("hardened Stripe subscription billing", () => {
     assert.equal(state.checkoutCreateCalls[0].params.customer, "cus_new_1");
   });
 
+  test("manually granted plans do not show stale-customer reconnect errors", async () => {
+    state.settings.set(USER_A, {
+      id: USER_A,
+      userId: USER_A,
+      stripeCustomerId: "cus_old",
+      stripeSubscriptionId: null,
+      subscriptionPlan: "business",
+      subscriptionStatus: "active",
+      planGrantedManually: true,
+    });
+    stripe.customers.retrieve = async () => {
+      throw Object.assign(new Error("No such customer"), { code: "resource_missing", statusCode: 404 });
+    };
+
+    const readinessResponse = await request("/api/subscription/status");
+    const readiness = await readinessResponse.json();
+    assert.equal(readinessResponse.status, 200);
+    assert.equal(readiness.ready, true);
+    assert.equal(readiness.billingCustomerNeedsReconnect, false);
+    assert.equal(readiness.code, undefined);
+
+    const refundResponse = await request("/api/subscription/refund");
+    const refund = await refundResponse.json();
+    assert.equal(refundResponse.status, 200);
+    assert.equal(refund.state, "ineligible");
+  });
+
+  test("a linked Stripe subscription prevents manual-grant recovery", async () => {
+    state.settings.set(USER_A, {
+      id: USER_A,
+      userId: USER_A,
+      stripeCustomerId: "cus_old",
+      stripeSubscriptionId: "sub_old",
+      subscriptionPlan: "business",
+      subscriptionStatus: "active",
+      planGrantedManually: true,
+    });
+    stripe.customers.retrieve = async () => {
+      throw Object.assign(new Error("No such customer"), { code: "resource_missing", statusCode: 404 });
+    };
+
+    const readiness = await (await request("/api/subscription/status")).json();
+    assert.equal(readiness.ready, false);
+    assert.equal(readiness.code, "BILLING_ACCOUNT_REVIEW_REQUIRED");
+
+    const refund = await request("/api/subscription/refund");
+    assert.equal(refund.status, 409);
+    assert.equal((await refund.json()).code, "BILLING_ACCOUNT_REVIEW_REQUIRED");
+  });
+
   test("temporary Stripe errors do not classify billing links as missing", async () => {
     stripe.customers.retrieve = async () => {
       throw Object.assign(new Error("Provider unavailable"), { code: "api_error", statusCode: 503 });
@@ -391,11 +441,12 @@ describe("hardened Stripe subscription billing", () => {
     assert.equal(state.checkoutCreateCalls.length, 0);
   });
 
-  test("status reports mode/readiness without returning Stripe identifiers", async () => {
+  test("status reports readiness without exposing Stripe mode or identifiers", async () => {
     const response = await request("/api/subscription/status");
     const result = await response.json();
     assert.equal(response.status, 200);
-    assert.deepEqual(result, { livemode: false, ready: true, checkoutPaused: false, billingCustomerNeedsReconnect: false });
+    assert.deepEqual(result, { ready: true, checkoutPaused: false, billingCustomerNeedsReconnect: false });
+    assert.equal("livemode" in result, false);
     assert.equal(JSON.stringify(result).includes("price_"), false);
   });
 
@@ -467,7 +518,7 @@ describe("hardened Stripe subscription billing", () => {
     const response = await request("/api/subscription/status");
     const body = await response.json();
     assert.equal(response.status, 200);
-    assert.equal(body.livemode, true);
+    assert.equal("livemode" in body, false);
     assert.equal(body.ready, false);
     assert.match(body.message, /does not match the configured live-mode account/);
 
@@ -498,7 +549,7 @@ describe("hardened Stripe subscription billing", () => {
     delete process.env.STRIPE_WEBHOOK_CONFIGURED;
     const response = await request("/api/subscription/status");
     const body = await response.json();
-    assert.equal(body.livemode, false);
+    assert.equal("livemode" in body, false);
     assert.equal(body.ready, false);
     assert.match(body.message, /webhook signing secret has not been verified/);
     const checkout = await request("/api/subscription/checkout", {

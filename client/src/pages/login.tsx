@@ -14,6 +14,7 @@ const queryMessages: Record<string, string> = {
   expired: "That sign-in link has expired. Request a new one to continue.",
   link_required: "This account needs to be connected to your existing coach account first.",
   already_linked: "That sign-in method is already connected to another account. Try a different one.",
+  account_required: "This sign-in isn’t linked to a Practably account. For a new account, choose Create account and select email or Google.",
   provider_unavailable: "That sign-in option is temporarily unavailable. Please use email instead.",
 };
 
@@ -30,7 +31,7 @@ const modeCopy: Record<AuthMode, { title: string; description: string; submit: s
   },
   magic: {
     title: "A link, then you’re in.",
-    description: "We’ll send a secure sign-in link to your email address.",
+    description: "For an existing account, we’ll send a secure sign-in link to your email address.",
     submit: "Send sign-in link",
   },
 };
@@ -350,10 +351,16 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <div className="my-5 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9a93a5]">
-              <span className="h-px flex-1 bg-[#ece7f1]" />Or continue with<span className="h-px flex-1 bg-[#ece7f1]" />
-            </div>
-            <SocialSignIn providers={providers} loading={checkingProviders} />
+            {(checkingProviders || providers?.google || providers?.apple) && (
+              <>
+                <div className="my-5 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9a93a5]">
+                  <span className="h-px flex-1 bg-[#ece7f1]" />
+                  {mode === "signup" ? "Or create account with" : "Or continue with"}
+                  <span className="h-px flex-1 bg-[#ece7f1]" />
+                </div>
+                <SocialSignIn providers={providers} loading={checkingProviders} allowAccountCreation={mode === "signup"} />
+              </>
+            )}
             <p className="mt-4 text-center text-xs leading-5 text-[#837b90]">
               Please review our{" "}
               <Link href="/terms" className="font-semibold text-violet-800 underline decoration-violet-300 underline-offset-2 hover:text-violet-950">Terms</Link>
@@ -402,11 +409,6 @@ export default function LoginPage() {
 
       <footer className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-3 border-t border-violet-200/60 px-5 py-5 text-xs leading-5 text-[#7b7388] sm:px-8 sm:flex-row sm:items-center sm:justify-between">
         <p>Built for independent coaches across the UK.</p>
-        <p className="max-w-2xl sm:text-right">
-          Returning Replit user?{" "}
-          <a href="/api/auth/legacy/login" className="font-semibold text-violet-800 underline decoration-violet-300 underline-offset-2 hover:text-violet-950">Connect your existing coach account</a>
-          {" "}first, then sign in with email, Google or Apple to keep your records. This won’t create a duplicate account. Email addresses alone don’t automatically merge accounts.
-        </p>
       </footer>
     </main>
   );

@@ -19,16 +19,17 @@ function notificationResults(payload: unknown): EmailNotificationResult[] {
 }
 
 /** “sent” means accepted by the mail provider, never proof of delivery. */
-export function emailNotificationFeedback(payload: unknown, operation: string): ToastFeedback {
+export function emailNotificationFeedback(payload: unknown, operation: string, emailPurpose: string): ToastFeedback {
   const results = notificationResults(payload);
   const sent = results.filter(result => result.status === "sent").length;
   const skipped = results.filter(result => result.status !== "sent");
   const reasons = Array.from(new Set(skipped.map(result => result.message)));
+  const acceptedMessage = `${sent} client email${sent === 1 ? "" : "s"} for ${emailPurpose} ${sent === 1 ? "was" : "were"} accepted for sending. Inbox delivery is not yet confirmed.`;
 
   if (sent > 0 && skipped.length === 0) {
     return {
       title: `${operation} saved`,
-      description: `${sent} client email${sent === 1 ? " was" : "s were"} accepted for sending.`,
+      description: acceptedMessage,
     };
   }
   if (results.length === 0) {
@@ -37,7 +38,7 @@ export function emailNotificationFeedback(payload: unknown, operation: string): 
   return {
     title: `${operation} saved`,
     description: [
-      sent > 0 ? `${sent} client email${sent === 1 ? " was" : "s were"} accepted for sending.` : "",
+      sent > 0 ? acceptedMessage : "",
       reasons.length ? reasons.join(" ") : "",
     ].filter(Boolean).join(" "),
   };

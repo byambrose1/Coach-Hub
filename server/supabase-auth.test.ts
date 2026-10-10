@@ -62,6 +62,34 @@ test("only Google and Apple can start social OAuth with an HTTPS, state-bound ca
   assert.throws(() => socialSignInHandler("github" as any, {} as any));
 });
 
+test("social OAuth can create a Practably account only with an explicit signup intent", async () => {
+  for (const [intent, expected] of [["signup", true], ["login", false], ["other", false], [undefined, false]] as const) {
+    let allowAccountCreation: boolean | undefined;
+    let redirect = "";
+    const req: any = {
+      hostname: "www.practably.co.uk",
+      session: {},
+      query: intent === undefined ? {} : { intent },
+    };
+    const handler = socialSignInHandler("google", {
+      providers: async () => ({ google: true, apple: false, email: true }),
+      begin: async (_req, _res, allowCreate) => {
+        allowAccountCreation = allowCreate;
+        return "fixture-state";
+      },
+      client: () => ({ auth: { signInWithOAuth: async () => ({
+        data: { url: "https://fixture.supabase.co/auth/v1/authorize" }, error: null,
+      }) } } as any),
+      callback: () => "https://www.practably.co.uk/api/auth/supabase/callback?state=fixture-state",
+      save: async () => {},
+      onError: () => assert.fail("Successful fixture must not fail"),
+    });
+    await handler(req, { redirect: (url: string) => { redirect = url; } } as any, () => {});
+    assert.equal(allowAccountCreation, expected);
+    assert.equal(redirect, "https://fixture.supabase.co/auth/v1/authorize");
+  }
+});
+
 test("disabled social providers cannot start OAuth; provider errors discard pending sign-in state", async () => {
   for (const scenario of ["disabled", "unavailable", "oauthFailure", "saveFailure"] as const) {
     let oauthCalled = false, began = false, redirect = "", errors = 0;
@@ -138,10 +166,19 @@ async function fixtureDatabase(options: { mapping?: string; existingEmail?: bool
 
 test("new Supabase users get a distinct account and explicit subject mapping", async () => {
   await fixtureDatabase({}, async writes => {
-    const coach = await resolveCoach(provider);
+    const coach = await resolveCoach(provider, undefined, { allowCreate: true });
     assert.equal(coach.id, identity);
     assert.deepEqual(writes.map(write => write.table), ["users", "auth_identities"]);
     assert.equal(writes[1].data.userId, identity);
+  });
+});
+test("sign-in cannot create a Practably account without an existing identity mapping", async () => {
+  await fixtureDatabase({}, async writes => {
+    await assert.rejects(
+      resolveCoach(provider),
+      (error: any) => error instanceof AccountLinkError && error.code === "account_required",
+    );
+    assert.equal(writes.length, 0);
   });
 });
 test("a verified legacy link preserves the original coach ID without rewriting billing or client records", async () => {

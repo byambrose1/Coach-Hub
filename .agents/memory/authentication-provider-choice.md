@@ -8,11 +8,11 @@ Use the owner's existing Supabase project for the requested replacement of Repli
 
 **How to apply:** Scope the migration to authentication. Preserve existing coach identities, tenant ownership and Stripe links; do not move the application database without a separate explicit request. Existing accounts must be linked through a verified ownership path, not automatically merged by a matching email address.
 
-Email, Google and Apple are the approved customer sign-in choices. Remove GitHub as a customer login option.
+Only an explicit Create account action may create a Practably coach account. Email links are existing-account-only; Google is existing-account-only on Sign in and may create an account only from the Create account tab. Apple was disabled by the owner on 2026-10-07; hide it while disabled. Keep GitHub removed.
 
-**Why:** On 2026-10-03 the owner explicitly selected “Email, Google and Apple — remove GitHub”, superseding the earlier GitHub selection.
+**Why:** The owner asked that only the explicit Create account path register new users, while preserving Google signup as an explicit choice and disabling Apple.
 
-**How to apply:** Keep the existing Supabase project keys: they are independent of social-provider credentials. Preserve email sign-in and existing account ownership. Do not restore GitHub when fixing Google or Apple configuration.
+**How to apply:** Treat Supabase's provider availability as authoritative and hide disabled social options. The owner says nobody has access to the old Replit sign-in; do not show its prompt on the login page. Before disabling any server-side legacy-linking route, check whether unmapped coach records still need it. Default identity resolution to existing accounts; opt into local account creation only for the explicit email-signup action or Google OAuth started from the Create account tab. Disable automatic account creation for email links. Supabase may create an upstream Auth identity during a first Google OAuth attempt, but the app must not create the Practably coach account unless the signup intent was explicit. Preserve existing account ownership and do not restore GitHub.
 
 Auth-provider migrations need real SDK-construction/configuration probes as well as mocked token tests.
 

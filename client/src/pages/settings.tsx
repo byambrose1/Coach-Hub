@@ -50,7 +50,6 @@ interface Tier {
 
 interface SubscriptionStatus {
   ready: boolean;
-  livemode: boolean;
   checkoutPaused?: boolean;
   billingCustomerNeedsReconnect?: boolean;
   code?: string;
@@ -286,18 +285,12 @@ function SubscriptionSection({ settings }: { settings: Settings | undefined }) {
       <CardContent className="space-y-3">
         {subscriptionStatusQuery.isLoading ? (
           <p className="text-xs text-muted-foreground">Checking billing setup...</p>
-        ) : subscriptionStatusQuery.data?.ready === true
-          && typeof subscriptionStatusQuery.data.livemode === "boolean" ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">
-              Stripe {subscriptionStatusQuery.data.livemode ? "live mode" : "test mode"}
+        ) : subscriptionStatusQuery.data?.ready === true ? (
+          (subscriptionStatusQuery.data.subscriptionStatus || subscriptionStatusQuery.data.status) ? (
+            <Badge variant="secondary">
+              Billing status: {subscriptionStatusQuery.data.subscriptionStatus || subscriptionStatusQuery.data.status}
             </Badge>
-            {(subscriptionStatusQuery.data.subscriptionStatus || subscriptionStatusQuery.data.status) && (
-              <Badge variant="secondary">
-                Billing status: {subscriptionStatusQuery.data.subscriptionStatus || subscriptionStatusQuery.data.status}
-              </Badge>
-            )}
-          </div>
+          ) : null
         ) : (
           <div role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
             <p>{subscriptionStatusQuery.data?.message || "Billing status could not be verified. Please try again later or contact support."}</p>
@@ -1126,9 +1119,8 @@ export default function SettingsPage() {
 
       <SubscriptionSection settings={settings} />
       {featureAccess.hasFeature("customBusinessDetails") && <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">Business support</CardTitle><CardDescription>Priority support is a staffed response target, not an automated resolution guarantee.</CardDescription></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Business support</CardTitle><CardDescription>{siteConfig.paidPlanSupportResponse}</CardDescription></CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          <p>4-hour response target. Messages sent after 8pm GMT are handled the following morning.</p>
           <a className="mt-3 inline-flex font-medium text-primary hover:underline" href={`mailto:${siteConfig.supportEmail}?subject=${encodeURIComponent("Practably Business support request")}`}>Email priority support: {siteConfig.supportEmail}</a>
         </CardContent>
       </Card>}

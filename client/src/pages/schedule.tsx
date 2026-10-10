@@ -87,7 +87,7 @@ function NewSessionDialog({ open, onOpenChange, clients, preselectedDate, presel
         queryClient.invalidateQueries({ queryKey: ["/api/notifications/usage"] });
       }
       onOpenChange(false);
-      const feedback = emailNotificationFeedback(payload, "Session booking");
+      const feedback = emailNotificationFeedback(payload, "Session booking", "session booking");
       toast({ title: feedback.title, description: feedback.description, variant: feedback.variant });
       setFormData({
         clientId: "",
@@ -629,7 +629,7 @@ export default function Schedule() {
       }
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       if (payload && typeof payload === "object" && "emailNotifications" in payload) {
-        const feedback = emailNotificationFeedback(payload, "Session update");
+        const feedback = emailNotificationFeedback(payload, "Session update", "session update");
         toast({ title: feedback.title, description: feedback.description, variant: feedback.variant });
       }
     },

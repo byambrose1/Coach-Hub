@@ -7,9 +7,9 @@ export function isUnpaidBillingSetup(settings: {
   planGrantedManually?: boolean | null;
 } | undefined): boolean {
   if (!settings) return false;
-  // A plan an admin granted manually was never real Stripe billing, however
-  // it looks - there is nothing for Stripe-ownership checks to verify.
-  if (settings.planGrantedManually) return true;
+  // A plan an admin granted manually is not Stripe billing, but a linked
+  // subscription still signals history that must be preserved.
+  if (settings.planGrantedManually) return !settings.stripeSubscriptionId;
   return settings.subscriptionPlan === "free"
     && !settings.stripeSubscriptionId
     && (!settings.subscriptionStatus || settings.subscriptionStatus === "trial");
@@ -25,7 +25,8 @@ export class StripeBillingLinkError extends Error {
 
 // A missing customer may belong to a former Stripe account. Never silently
 // replace subscribed accounts: the old account may still contain payments.
-// Only the explicitly approved unpaid Free setup can recover at checkout.
+// Only explicitly marked manual access without a linked subscription, or an
+// unpaid Free setup without a linked subscription, can recover at checkout.
 export async function retrieveBillingCustomer(
   stripe: Stripe,
   customerId: string,
