@@ -114,6 +114,8 @@ function makeStore() {
       state.invoices = state.invoices.filter((i) => i.userId !== userId);
       state.settings.delete(userId);
     },
+    exportAccountData: async () => ({} as any),
+    importAccountData: async () => ({ clients: 0, packages: 0, sessions: 0, invoices: 0, sessionNotes: 0, clientForms: 0, referrals: 0 }),
 
     getAllUsers: async () => [] as any,
     getPlatformStats: async () => ({} as PlatformStats),

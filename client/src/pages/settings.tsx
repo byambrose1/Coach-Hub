@@ -24,7 +24,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, User, FileText, CreditCard, Bell, Shield, Trash2, Mail, Phone, MapPin, Receipt, Crown, ArrowUp, ArrowDown, ExternalLink, Check, Loader2 } from "lucide-react";
+import { Save, User, FileText, CreditCard, Bell, Shield, Trash2, Mail, Phone, MapPin, Receipt, Crown, ArrowUp, ArrowDown, ExternalLink, Check, Loader2, Download, Upload } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Settings } from "@shared/schema";
 import { siteConfig } from "@/config/site";
@@ -542,6 +542,50 @@ export default function SettingsPage() {
     },
     onError: (err: Error) => {
       toast({ title: "Error saving settings", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const exportMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("GET", "/api/account/export");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `practably-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "Export ready", description: "Your data has been downloaded." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    },
+  });
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const text = await file.text();
+      let parsed: unknown;
+      try { parsed = JSON.parse(text); } catch { throw new Error("That file isn't valid JSON."); }
+      const res = await apiRequest("POST", "/api/account/import", parsed);
+      return res.json();
+    },
+    onSuccess: (data: { summary?: Record<string, number> }) => {
+      const parts = data.summary
+        ? Object.entries(data.summary).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${k}`).join(", ")
+        : "";
+      toast({ title: "Import complete", description: parts || "No new records were found in that file." });
+      for (const key of ["/api/clients", "/api/sessions", "/api/packages", "/api/invoices", "/api/notes", "/api/forms", "/api/settings"]) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (err: Error) => {
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -1080,6 +1124,56 @@ export default function SettingsPage() {
           <a className="mt-3 inline-flex font-medium text-primary hover:underline" href={`mailto:${siteConfig.supportEmail}?subject=${encodeURIComponent("Practably Business support request")}`}>Email priority support: {siteConfig.supportEmail}</a>
         </CardContent>
       </Card>}
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Your data
+          </CardTitle>
+          <CardDescription>Download everything in your account, or restore from a previous export</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={exportMutation.isPending}
+              onClick={() => exportMutation.mutate()}
+              className="min-h-11 sm:min-h-8"
+              data-testid="button-export-data"
+            >
+              <Download className="w-4 h-4 mr-1" />
+              {exportMutation.isPending ? "Exporting..." : "Export my data"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={importMutation.isPending}
+              onClick={() => importInputRef.current?.click()}
+              className="min-h-11 sm:min-h-8"
+              data-testid="button-import-data"
+            >
+              <Upload className="w-4 h-4 mr-1" />
+              {importMutation.isPending ? "Importing..." : "Import data"}
+            </Button>
+            <input
+              type="file"
+              accept="application/json"
+              ref={importInputRef}
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) importMutation.mutate(file);
+                event.target.value = "";
+              }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground sm:max-w-xs">
+            Import only accepts a file previously exported from Practably, and only adds to your own account - it never overwrites or deletes anything existing.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card className="border-destructive/50">
         <CardHeader className="pb-3">

@@ -24,6 +24,9 @@ declare module "http" {
 
 app.use(
   express.json({
+    // Default 100kb is too small for a full account data export/import
+    // (clients plus years of sessions, invoices, notes and forms).
+    limit: "10mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },

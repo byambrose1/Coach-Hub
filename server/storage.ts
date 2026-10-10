@@ -1,8 +1,11 @@
+import { z } from "zod";
 import { eq, and, desc, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   clients, trainingSessions, packages, sessionNotes, settings, clientForms, referrals, invoices, users, platformConfig,
   waitlistSignups, blogPosts, formRequests, formTemplates,
+  insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema,
+  insertClientFormSchema, insertReferralSchema, insertInvoiceSchema,
   type Client, type InsertClient,
   type Session, type InsertSession,
   type Package, type InsertPackage,
@@ -15,6 +18,66 @@ import {
   type WaitlistSignup, type InsertWaitlistSignup,
   type BlogPost, type InsertBlogPost,
 } from "@shared/schema";
+
+// Settings fields that are safe and meaningful to carry between accounts -
+// never billing/auth/internal state (subscriptionPlan, stripe ids, terms
+// acceptance, onboarding progress, etc).
+export const PORTABLE_SETTINGS_FIELDS = [
+  "trainerName", "cancellationPolicy", "businessName", "lowSessionThreshold",
+  "trainerEmail", "trainerPhone", "businessAddress",
+  "acceptsCash", "acceptsCardMachine", "acceptsBankTransfer", "bankTransferDetails",
+  "acceptsPaypal", "paypalLink", "acceptsStripeLink", "stripePaymentLink",
+  "acceptsOtherPayment", "otherPaymentDetails", "invoicePrefix",
+  "enableEmailNotifications", "enableSessionReminders", "reminderHoursBefore",
+  "currency", "cancellationNoticeHours", "timezone",
+] as const satisfies readonly (keyof Settings)[];
+type PortableSettings = Pick<Settings, typeof PORTABLE_SETTINGS_FIELDS[number]>;
+
+function pickPortableSettings(source: Record<string, unknown>): Partial<PortableSettings> {
+  const out: Record<string, unknown> = {};
+  for (const key of PORTABLE_SETTINGS_FIELDS) if (key in source) out[key] = (source as any)[key];
+  return out as Partial<PortableSettings>;
+}
+
+export type AccountExport = {
+  formatVersion: 1;
+  exportedAt: string;
+  settings: Partial<PortableSettings> | null;
+  clients: Client[];
+  packages: Package[];
+  sessions: Session[];
+  invoices: Invoice[];
+  sessionNotes: SessionNote[];
+  clientForms: ClientForm[];
+  referrals: Referral[];
+  formTemplates: { title: string; description: string; questions: unknown }[];
+};
+
+const importId = z.string().min(1).max(200);
+const importClientSchema = insertClientSchema.omit({ userId: true }).extend({ id: importId });
+const importPackageSchema = insertPackageSchema.omit({ userId: true }).extend({ id: importId });
+const importSessionSchema = insertSessionSchema.omit({ userId: true }).extend({ id: importId });
+const importInvoiceSchema = insertInvoiceSchema.omit({ userId: true }).extend({ id: importId });
+const importSessionNoteSchema = insertSessionNoteSchema.omit({ userId: true }).extend({ id: importId });
+const importClientFormSchema = insertClientFormSchema.omit({ userId: true }).extend({ id: importId });
+const importReferralSchema = insertReferralSchema.omit({ userId: true }).extend({ id: importId });
+
+export const accountImportSchema = z.object({
+  settings: z.record(z.string(), z.unknown()).nullable().optional(),
+  clients: z.array(importClientSchema).max(500).default([]),
+  packages: z.array(importPackageSchema).max(2000).default([]),
+  sessions: z.array(importSessionSchema).max(5000).default([]),
+  invoices: z.array(importInvoiceSchema).max(5000).default([]),
+  sessionNotes: z.array(importSessionNoteSchema).max(5000).default([]),
+  clientForms: z.array(importClientFormSchema).max(5000).default([]),
+  referrals: z.array(importReferralSchema).max(2000).default([]),
+});
+export type AccountImportPayload = z.infer<typeof accountImportSchema>;
+
+export type AccountImportSummary = {
+  clients: number; packages: number; sessions: number; invoices: number;
+  sessionNotes: number; clientForms: number; referrals: number;
+};
 
 export interface IStorage {
   // User-scoped operations (all require userId)
@@ -64,6 +127,17 @@ export interface IStorage {
   // under them, settings). Does not touch the auth user record - that's a
   // separate concern owned by IAuthStorage.
   deleteAccountData(userId: string): Promise<void>;
+
+  // A full, portable snapshot of this coach's own data - clients and
+  // everything under them, plus the business-profile parts of settings.
+  // Never includes billing/auth/internal state.
+  exportAccountData(userId: string): Promise<AccountExport>;
+  // Re-creates records from a previous export under this coach's own
+  // account, with fresh ids - never trusts incoming ids or userId. Foreign
+  // keys (clientId, packageId, sessionId, referral client ids) are remapped
+  // to the newly created rows; a reference to something outside this import
+  // is skipped rather than guessed at.
+  importAccountData(userId: string, payload: AccountImportPayload): Promise<AccountImportSummary>;
 
   // Platform admin (owner only)
   getAllUsers(): Promise<User[]>;
@@ -320,6 +394,105 @@ export class DatabaseStorage implements IStorage {
       await tx.delete(referrals).where(eq(referrals.userId, userId));
       await tx.delete(clients).where(eq(clients.userId, userId));
       await tx.delete(settings).where(eq(settings.id, userId));
+    });
+  }
+
+  async exportAccountData(userId: string): Promise<AccountExport> {
+    const [clientRows, packageRows, sessionRows, invoiceRows, noteRows, formRows, referralRows, settingsRow, templateRows] = await Promise.all([
+      this.getClients(userId),
+      this.getPackages(userId),
+      this.getSessions(userId),
+      this.getInvoices(userId),
+      this.getNotes(userId),
+      this.getClientForms(userId),
+      this.getReferrals(userId),
+      this.getSettings(userId),
+      db.select().from(formTemplates).where(eq(formTemplates.userId, userId)),
+    ]);
+    return {
+      formatVersion: 1,
+      exportedAt: new Date().toISOString(),
+      settings: settingsRow ? pickPortableSettings(settingsRow) : null,
+      clients: clientRows,
+      packages: packageRows,
+      sessions: sessionRows,
+      invoices: invoiceRows,
+      sessionNotes: noteRows,
+      clientForms: formRows,
+      referrals: referralRows,
+      formTemplates: templateRows.map(t => ({ title: t.title, description: t.description, questions: t.questions })),
+    };
+  }
+
+  async importAccountData(userId: string, payload: AccountImportPayload): Promise<AccountImportSummary> {
+    return db.transaction(async tx => {
+      const clientIdMap = new Map<string, string>();
+      const packageIdMap = new Map<string, string>();
+      const sessionIdMap = new Map<string, string>();
+      const summary: AccountImportSummary = {
+        clients: 0, packages: 0, sessions: 0, invoices: 0, sessionNotes: 0, clientForms: 0, referrals: 0,
+      };
+
+      for (const item of payload.clients) {
+        const { id: oldId, ...values } = item;
+        const [row] = await tx.insert(clients).values({ ...values, userId }).returning();
+        clientIdMap.set(oldId, row.id);
+        summary.clients += 1;
+      }
+      for (const item of payload.packages) {
+        const { id: oldId, clientId: oldClientId, ...values } = item;
+        const newClientId = clientIdMap.get(oldClientId);
+        if (!newClientId) continue;
+        const [row] = await tx.insert(packages).values({ ...values, userId, clientId: newClientId }).returning();
+        packageIdMap.set(oldId, row.id);
+        summary.packages += 1;
+      }
+      for (const item of payload.sessions) {
+        const { id: oldId, clientId: oldClientId, ...values } = item;
+        const newClientId = clientIdMap.get(oldClientId);
+        if (!newClientId) continue;
+        const [row] = await tx.insert(trainingSessions).values({ ...values, userId, clientId: newClientId }).returning();
+        sessionIdMap.set(oldId, row.id);
+        summary.sessions += 1;
+      }
+      for (const item of payload.invoices) {
+        const { id: _oldId, clientId: oldClientId, packageId: oldPackageId, ...values } = item;
+        const newClientId = clientIdMap.get(oldClientId);
+        if (!newClientId) continue;
+        const newPackageId = oldPackageId ? packageIdMap.get(oldPackageId) ?? null : null;
+        await tx.insert(invoices).values({ ...values, userId, clientId: newClientId, packageId: newPackageId });
+        summary.invoices += 1;
+      }
+      for (const item of payload.sessionNotes) {
+        const { id: _oldId, clientId: oldClientId, sessionId: oldSessionId, ...values } = item;
+        const newClientId = clientIdMap.get(oldClientId);
+        if (!newClientId) continue;
+        const newSessionId = oldSessionId ? sessionIdMap.get(oldSessionId) ?? null : null;
+        await tx.insert(sessionNotes).values({ ...values, userId, clientId: newClientId, sessionId: newSessionId });
+        summary.sessionNotes += 1;
+      }
+      for (const item of payload.clientForms) {
+        const { id: _oldId, clientId: oldClientId, ...values } = item;
+        const newClientId = clientIdMap.get(oldClientId);
+        if (!newClientId) continue;
+        await tx.insert(clientForms).values({ ...values, userId, clientId: newClientId });
+        summary.clientForms += 1;
+      }
+      for (const item of payload.referrals) {
+        const { id: _oldId, referrerClientId: oldReferrer, referredClientId: oldReferred, ...values } = item;
+        const newReferrer = clientIdMap.get(oldReferrer);
+        if (!newReferrer) continue;
+        const newReferred = oldReferred ? clientIdMap.get(oldReferred) ?? null : null;
+        await tx.insert(referrals).values({ ...values, userId, referrerClientId: newReferrer, referredClientId: newReferred });
+        summary.referrals += 1;
+      }
+      if (payload.settings) {
+        const filtered = pickPortableSettings(payload.settings);
+        if (Object.keys(filtered).length) {
+          await tx.update(settings).set(filtered).where(eq(settings.id, userId));
+        }
+      }
+      return summary;
     });
   }
 

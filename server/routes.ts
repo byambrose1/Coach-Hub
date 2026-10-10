@@ -10,7 +10,7 @@ import { deleteSupabaseAccounts } from "./auth/identities";
 import type { Express, Response } from "express";
 import rateLimit from "express-rate-limit";
 import { createServer, type Server } from "http";
-import { storage as defaultStorage, type IStorage } from "./storage";
+import { storage as defaultStorage, type IStorage, accountImportSchema } from "./storage";
 import { insertClientSchema, insertSessionSchema, insertPackageSchema, insertSessionNoteSchema, insertClientFormSchema, insertReferralSchema, insertInvoiceSchema, insertSettingsSchema, insertWaitlistSignupSchema, insertBlogPostSchema, type Session } from "@shared/schema";
 import { isAuthenticated as defaultIsAuthenticated, authStorage } from "./replit_integrations/auth";
 import {
@@ -2465,6 +2465,64 @@ export async function registerRoutes(
         res.status(200).json({ success: true, stripeCancelFailed: false });
       });
     });
+  });
+
+  // --- Account data export/import (self-service) ---
+  app.get("/api/account/export", isAuthenticated, async (req, res) => {
+    if ((req.session as any)?.impersonatedUserId) {
+      return res.status(400).json({ message: "Stop impersonating before exporting account data." });
+    }
+    try {
+      const data = await storage.exportAccountData(getRealUserId(req));
+      res.setHeader("Content-Disposition", `attachment; filename="practably-export-${new Date().toISOString().slice(0, 10)}.json"`);
+      res.json(data);
+    } catch (err) {
+      logError("Failed to export account data", err);
+      res.status(500).json({ message: "Unable to export your data right now. Please try again." });
+    }
+  });
+
+  app.post("/api/account/import", isAuthenticated, async (req, res) => {
+    if ((req.session as any)?.impersonatedUserId) {
+      return res.status(400).json({ message: "Stop impersonating before importing account data." });
+    }
+    const parsed = accountImportSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "That file doesn't look like a valid Practably export." });
+    }
+    const userId = getRealUserId(req);
+    try {
+      const [existingClients, coachSettings, config] = await Promise.all([
+        storage.getClients(userId),
+        storage.getSettings(userId),
+        storage.getPlatformConfig(),
+      ]);
+      const plan = coachSettings?.subscriptionPlan || "free";
+      const tier = PLAN_TIER[plan] || 1;
+      const tierMaxMap: Record<number, number> = {
+        1: config.tier1MaxClients ?? 5,
+        2: config.tier2MaxClients ?? 10,
+        3: config.tier3MaxClients ?? 20,
+        4: config.tier4MaxClients ?? 50,
+      };
+      const currentMax = tierMaxMap[tier];
+      const incoming = parsed.data.clients.length;
+      if (existingClients.length + incoming > currentMax) {
+        return res.status(402).json({
+          message: `This file has ${incoming} client(s), but your ${plan} plan allows ${currentMax} total and you already have ${existingClients.length}. Upgrade your plan or trim the file before importing.`,
+        });
+      }
+    } catch (err) {
+      logError("Failed to check plan limits before import", err);
+      return res.status(500).json({ message: "Unable to check your plan limits right now. Please try again." });
+    }
+    try {
+      const summary = await storage.importAccountData(userId, parsed.data);
+      res.json({ success: true, summary });
+    } catch (err) {
+      logError("Failed to import account data", err);
+      res.status(500).json({ message: "Unable to import that file. No data was changed." });
+    }
   });
 
   return httpServer;
